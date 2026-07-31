@@ -13,16 +13,29 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
 
 /**
  * Automatically detects the pixel overlap height between two images.
- * It takes a center vertical strip of both images to perform SSD (Sum of Squared Differences) matching.
+ * It takes a center vertical strip of both images to perform MAD (Mean Absolute Difference) matching.
  * Returns the best overlap height in pixels.
  */
-export async function detectOverlap(
-  imgA: HTMLImageElement,
-  imgB: HTMLImageElement
-): Promise<number> {
+export function detectOverlap(
+  img1: HTMLImageElement | CanvasImageSource,
+  img2: HTMLImageElement | CanvasImageSource,
+  maxOverlapRatio?: number
+): number {
   const sampleWidth = 120; // Width of the sample strip in center
-  const maxOverlap = Math.min(imgA.naturalHeight, imgB.naturalHeight, 600);
+
+  const getWidth = (img: any) => img.naturalWidth || img.videoWidth || img.width;
+  const getHeight = (img: any) => img.naturalHeight || img.videoHeight || img.height;
+
+  const width1 = getWidth(img1);
+  const height1 = getHeight(img1);
+  const width2 = getWidth(img2);
+  const height2 = getHeight(img2);
+
+  const ratio = maxOverlapRatio !== undefined ? maxOverlapRatio : 1.0;
+  const maxOverlap = Math.min(height1, height2, 600, Math.floor(height1 * ratio), Math.floor(height2 * ratio));
   const minOverlap = 40; // Minimum overlap to consider
+
+  if (maxOverlap < minOverlap) return 0;
 
   // Create temporary canvases to extract pixel data
   const canvasA = document.createElement('canvas');
@@ -38,19 +51,19 @@ export async function detectOverlap(
   canvasB.width = sampleWidth;
   canvasB.height = maxOverlap;
 
-  // Draw the bottom portion of image A
-  const srcXA = Math.max(0, (imgA.naturalWidth - sampleWidth) / 2);
-  const srcYA = imgA.naturalHeight - maxOverlap;
+  // Draw the bottom portion of image 1
+  const srcXA = Math.max(0, (width1 - sampleWidth) / 2);
+  const srcYA = height1 - maxOverlap;
   ctxA.drawImage(
-    imgA,
+    img1,
     srcXA, srcYA, sampleWidth, maxOverlap,
     0, 0, sampleWidth, maxOverlap
   );
 
-  // Draw the top portion of image B
-  const srcXB = Math.max(0, (imgB.naturalWidth - sampleWidth) / 2);
+  // Draw the top portion of image 2
+  const srcXB = Math.max(0, (width2 - sampleWidth) / 2);
   ctxB.drawImage(
-    imgB,
+    img2,
     srcXB, 0, sampleWidth, maxOverlap,
     0, 0, sampleWidth, maxOverlap
   );
@@ -85,11 +98,11 @@ export async function detectOverlap(
         const pxB = offsetB + x * 4;
 
         // R, G, B channels
-        const dr = dataA[pxA] - dataB[pxB];
-        const dg = dataA[pxA + 1] - dataB[pxB + 1];
-        const db = dataA[pxA + 2] - dataB[pxB + 2];
+        const dr = Math.abs(dataA[pxA] - dataB[pxB]);
+        const dg = Math.abs(dataA[pxA + 1] - dataB[pxB + 1]);
+        const db = Math.abs(dataA[pxA + 2] - dataB[pxB + 2]);
 
-        diffSum += dr * dr + dg * dg + db * db;
+        diffSum += dr + dg + db;
         comparisons++;
       }
     }
@@ -108,8 +121,8 @@ export async function detectOverlap(
   }
 
   // If the match difference is too high, it's likely they don't overlap
-  // 350 is a reasonable empirical threshold for average squared difference per color channel
-  if (minDifference > 500) {
+  // 40 is a reasonable empirical threshold for average absolute difference for 3 color channels
+  if (minDifference > 40) {
     return 0;
   }
 

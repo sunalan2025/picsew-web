@@ -233,6 +233,18 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   />
                 </div>
 
+                {/* Auto Align Trigger */}
+                {images && images.length > 1 && (
+                  <div className="pt-2 pb-1">
+                    <button
+                      onClick={onAutoStitchTrigger}
+                      className="w-full bg-linear-to-r from-primary-600 to-primary-400 hover:from-primary-700 hover:to-primary-500 text-white font-medium py-2 px-3 rounded-lg shadow-sm transition-all duration-200 text-xs flex items-center justify-center gap-1"
+                    >
+                      ✨ 智能自动对齐 (Auto Align)
+                    </button>
+                  </div>
+                )}
+
                 {/* Manual overlaps */}
                 {overlaps.length > 0 && direction === 'vertical' && (
                   <div className="space-y-3 pt-2">

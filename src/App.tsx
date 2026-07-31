@@ -122,17 +122,35 @@ function App() {
   };
 
   // Synchronize overlaps size when uploading images manually
-  const handleImagesChange = (newImgs: StitchedImage[]) => {
+  const handleImagesChange = async (newImgs: StitchedImage[]) => {
     let newOverlaps = [...overlaps];
     if (newImgs.length <= 1) {
       newOverlaps = [];
+      commitState(newImgs, newOverlaps, annotations);
     } else {
-      while (newOverlaps.length < newImgs.length - 1) {
-        newOverlaps.push(0);
+      // Automatically detect overlap for new additions
+      const oldLen = images.length;
+      const newLen = newImgs.length;
+
+      for (let i = oldLen > 1 ? oldLen - 1 : 0; i < newLen - 1; i++) {
+        try {
+          const imgA = await loadImage(newImgs[i].src);
+          const imgB = await loadImage(newImgs[i + 1].src);
+          const detected = detectOverlap(imgA, imgB);
+
+          if (newOverlaps.length <= i) {
+             newOverlaps.push(detected);
+          } else {
+             newOverlaps[i] = detected;
+          }
+        } catch (e) {
+          console.error("Error pre-calculating overlap", e);
+          if (newOverlaps.length <= i) newOverlaps.push(0);
+        }
       }
-      newOverlaps = newOverlaps.slice(0, newImgs.length - 1);
+      newOverlaps = newOverlaps.slice(0, newLen - 1);
+      commitState(newImgs, newOverlaps, annotations);
     }
-    commitState(newImgs, newOverlaps, annotations);
   };
 
   // --- Auto Stitching Logic ---
@@ -145,7 +163,7 @@ function App() {
       for (let i = 0; i < images.length - 1; i++) {
         const imgA = await loadImage(images[i].src);
         const imgB = await loadImage(images[i + 1].src);
-        const detected = await detectOverlap(imgA, imgB);
+        const detected = detectOverlap(imgA, imgB);
         newOverlaps.push(detected);
       }
       
