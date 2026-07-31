@@ -190,6 +190,15 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   💡 <b>提示</b>：现在您可以直接在预览图的接缝附近<b>按住左键上下拖拽</b>，调整图片对齐重叠度。
                 </div>
 
+                {images && images.length > 1 && onAutoStitchTrigger && (
+                  <button
+                    onClick={onAutoStitchTrigger}
+                    className="w-full bg-linear-to-r from-primary-600 to-primary-400 hover:from-primary-700 hover:to-primary-500 text-white font-medium py-2 px-4 rounded-xl shadow-md transition-all duration-200 text-xs"
+                  >
+                    🚀 智能自动对齐
+                  </button>
+                )}
+
                 {/* Direction */}
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-gray-400">拼接方向</label>

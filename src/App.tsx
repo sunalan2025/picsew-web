@@ -122,13 +122,22 @@ function App() {
   };
 
   // Synchronize overlaps size when uploading images manually
-  const handleImagesChange = (newImgs: StitchedImage[]) => {
+  const handleImagesChange = async (newImgs: StitchedImage[]) => {
     let newOverlaps = [...overlaps];
     if (newImgs.length <= 1) {
       newOverlaps = [];
     } else {
+      // Calculate overlaps for new pairs
       while (newOverlaps.length < newImgs.length - 1) {
-        newOverlaps.push(0);
+        const i = newOverlaps.length;
+        try {
+          const imgA = await loadImage(newImgs[i].src);
+          const imgB = await loadImage(newImgs[i + 1].src);
+          const detected = detectOverlap(imgA, imgB);
+          newOverlaps.push(detected);
+        } catch {
+          newOverlaps.push(0);
+        }
       }
       newOverlaps = newOverlaps.slice(0, newImgs.length - 1);
     }
@@ -145,7 +154,7 @@ function App() {
       for (let i = 0; i < images.length - 1; i++) {
         const imgA = await loadImage(images[i].src);
         const imgB = await loadImage(images[i + 1].src);
-        const detected = await detectOverlap(imgA, imgB);
+        const detected = detectOverlap(imgA, imgB);
         newOverlaps.push(detected);
       }
       

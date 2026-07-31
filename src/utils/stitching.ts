@@ -16,13 +16,30 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
  * It takes a center vertical strip of both images to perform SSD (Sum of Squared Differences) matching.
  * Returns the best overlap height in pixels.
  */
-export async function detectOverlap(
-  imgA: HTMLImageElement,
-  imgB: HTMLImageElement
-): Promise<number> {
+export function detectOverlap(
+  imgA: HTMLImageElement | CanvasImageSource,
+  imgB: HTMLImageElement | CanvasImageSource,
+  maxOverlapRatio?: number
+): number {
+  const widthA = 'naturalWidth' in imgA ? imgA.naturalWidth : ('width' in imgA ? (imgA.width as number) : 0);
+  const heightA = 'naturalHeight' in imgA ? imgA.naturalHeight : ('height' in imgA ? (imgA.height as number) : 0);
+  const widthB = 'naturalWidth' in imgB ? imgB.naturalWidth : ('width' in imgB ? (imgB.width as number) : 0);
+  const heightB = 'naturalHeight' in imgB ? imgB.naturalHeight : ('height' in imgB ? (imgB.height as number) : 0);
+
+  if (!widthA || !heightA || !widthB || !heightB) {
+    return 0;
+  }
+
   const sampleWidth = 120; // Width of the sample strip in center
-  const maxOverlap = Math.min(imgA.naturalHeight, imgB.naturalHeight, 600);
+  let maxOverlap = Math.min(heightA, heightB, 600);
+
+  if (maxOverlapRatio !== undefined) {
+    maxOverlap = Math.min(maxOverlap, Math.floor(Math.min(heightA, heightB) * maxOverlapRatio));
+  }
+
   const minOverlap = 40; // Minimum overlap to consider
+
+  if (maxOverlap <= minOverlap) return 0;
 
   // Create temporary canvases to extract pixel data
   const canvasA = document.createElement('canvas');
@@ -39,8 +56,8 @@ export async function detectOverlap(
   canvasB.height = maxOverlap;
 
   // Draw the bottom portion of image A
-  const srcXA = Math.max(0, (imgA.naturalWidth - sampleWidth) / 2);
-  const srcYA = imgA.naturalHeight - maxOverlap;
+  const srcXA = Math.max(0, (widthA - sampleWidth) / 2);
+  const srcYA = heightA - maxOverlap;
   ctxA.drawImage(
     imgA,
     srcXA, srcYA, sampleWidth, maxOverlap,
@@ -48,7 +65,7 @@ export async function detectOverlap(
   );
 
   // Draw the top portion of image B
-  const srcXB = Math.max(0, (imgB.naturalWidth - sampleWidth) / 2);
+  const srcXB = Math.max(0, (widthB - sampleWidth) / 2);
   ctxB.drawImage(
     imgB,
     srcXB, 0, sampleWidth, maxOverlap,
