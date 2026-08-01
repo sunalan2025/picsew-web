@@ -168,6 +168,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                   <button
                     disabled={index === 0}
                     onClick={() => moveImage(index, 'up')}
+                    aria-label="上移"
+                    title="上移"
                     className="p-0.5 hover:bg-dark-700 text-gray-400 disabled:text-gray-600 disabled:hover:bg-transparent rounded"
                   >
                     <ChevronUp className="w-4 h-4" />
@@ -175,6 +177,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                   <button
                     disabled={index === images.length - 1}
                     onClick={() => moveImage(index, 'down')}
+                    aria-label="下移"
+                    title="下移"
                     className="p-0.5 hover:bg-dark-700 text-gray-400 disabled:text-gray-600 disabled:hover:bg-transparent rounded"
                   >
                     <ChevronDown className="w-4 h-4" />
@@ -183,6 +187,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
                 <button
                   onClick={() => removeImage(img.id)}
+                  aria-label="删除"
+                  title="删除"
                   className="p-1 hover:bg-red-500/10 text-red-400 hover:text-red-300 rounded-lg transition-colors"
                 >
                   <X className="w-4 h-4" />
