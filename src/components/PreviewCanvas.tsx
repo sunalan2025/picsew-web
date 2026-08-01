@@ -202,6 +202,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const baseCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const renderPipelineRef = useRef<(() => void) | null>(null);
+  const lastBaseDepsRef = useRef<any>(null);
 
   // --- Zoom Controllers ---
   const handleZoomIn = () => setZoom(z => Math.min(3.0, z + 0.1));
@@ -253,6 +254,29 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
   const renderStitchedImage = useCallback((): HTMLCanvasElement => {
     const baseCanvas = baseCanvasRef.current || document.createElement('canvas');
     baseCanvasRef.current = baseCanvas;
+
+    // Check if we can reuse the existing canvas based on dependencies
+    const isDepsEqual = (prev: any, next: any) => {
+      if (!prev) return false;
+      if (prev.direction !== next.direction || prev.gap !== next.gap || prev.statusBar !== next.statusBar) return false;
+      if (prev.overlaps.length !== next.overlaps.length || !prev.overlaps.every((v: number, i: number) => v === next.overlaps[i])) return false;
+      if (prev.images.length !== next.images.length) return false;
+      for (let i = 0; i < prev.images.length; i++) {
+        const p = prev.images[i];
+        const n = next.images[i];
+        if (p.id !== n.id || p.cropTop !== n.cropTop || p.cropBottom !== n.cropBottom || p.cropLeft !== n.cropLeft || p.cropRight !== n.cropRight) return false;
+      }
+      return true;
+    };
+
+    const currentDeps = { images, direction, overlaps, gap, statusBar };
+    if (
+      isDepsEqual(lastBaseDepsRef.current, currentDeps) &&
+      baseCanvas.width > 0
+    ) {
+      return baseCanvas;
+    }
+    lastBaseDepsRef.current = currentDeps;
 
     const ctx = baseCanvas.getContext('2d');
     if (!ctx || images.length === 0) return baseCanvas;
