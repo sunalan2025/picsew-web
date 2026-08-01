@@ -31,7 +31,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           const img = new Image();
           img.onload = () => {
             resolve({
-              id: Math.random().toString(36).substring(2, 9),
+              id: crypto.randomUUID(),
               name: file.name,
               src: event.target?.result as string,
               width: img.naturalWidth,
