@@ -101,10 +101,18 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     <div className="flex flex-col h-full overflow-hidden">
       {/* Upload Zone */}
       <div
+        role="button"
+        tabIndex={0}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
-        className="border-2 border-dashed border-dark-700 hover:border-primary-500 rounded-2xl p-6 mb-4 flex flex-col items-center justify-center cursor-pointer transition-colors duration-200 glass-card text-center"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
+        className="border-2 border-dashed border-dark-700 hover:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none rounded-2xl p-6 mb-4 flex flex-col items-center justify-center cursor-pointer transition-colors duration-200 glass-card text-center"
       >
         <input
           type="file"
@@ -168,14 +176,18 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                   <button
                     disabled={index === 0}
                     onClick={() => moveImage(index, 'up')}
-                    className="p-0.5 hover:bg-dark-700 text-gray-400 disabled:text-gray-600 disabled:hover:bg-transparent rounded"
+                    aria-label="上移图片"
+                    title="上移图片"
+                    className="p-0.5 hover:bg-dark-700 text-gray-400 disabled:text-gray-600 disabled:hover:bg-transparent rounded focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
                   >
                     <ChevronUp className="w-4 h-4" />
                   </button>
                   <button
                     disabled={index === images.length - 1}
                     onClick={() => moveImage(index, 'down')}
-                    className="p-0.5 hover:bg-dark-700 text-gray-400 disabled:text-gray-600 disabled:hover:bg-transparent rounded"
+                    aria-label="下移图片"
+                    title="下移图片"
+                    className="p-0.5 hover:bg-dark-700 text-gray-400 disabled:text-gray-600 disabled:hover:bg-transparent rounded focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
                   >
                     <ChevronDown className="w-4 h-4" />
                   </button>
@@ -183,7 +195,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
                 <button
                   onClick={() => removeImage(img.id)}
-                  className="p-1 hover:bg-red-500/10 text-red-400 hover:text-red-300 rounded-lg transition-colors"
+                  aria-label="移除图片"
+                  title="移除图片"
+                  className="p-1 hover:bg-red-500/10 text-red-400 hover:text-red-300 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-red-500 focus:outline-none"
                 >
                   <X className="w-4 h-4" />
                 </button>
