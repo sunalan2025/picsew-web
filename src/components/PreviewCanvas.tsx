@@ -324,12 +324,14 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
       }
     }
 
-    if (direction === 'vertical') {
-      baseCanvas.width = totalW;
-      baseCanvas.height = totalH;
-    } else {
-      baseCanvas.width = totalH;
-      baseCanvas.height = baseW;
+    const targetW = direction === 'vertical' ? totalW : totalH;
+    const targetH = direction === 'vertical' ? totalH : baseW;
+
+    if (baseCanvas.width !== targetW) {
+      baseCanvas.width = targetW;
+    }
+    if (baseCanvas.height !== targetH) {
+      baseCanvas.height = targetH;
     }
 
     // Clean canvas
@@ -512,10 +514,20 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
     if (shouldShowMockup) {
       drawMockup(canvasRef.current, baseStitchedCanvas, mockup);
     } else {
-      canvasRef.current.width = baseStitchedCanvas.width;
-      canvasRef.current.height = baseStitchedCanvas.height;
+      let resized = false;
+      if (canvasRef.current.width !== baseStitchedCanvas.width) {
+        canvasRef.current.width = baseStitchedCanvas.width;
+        resized = true;
+      }
+      if (canvasRef.current.height !== baseStitchedCanvas.height) {
+        canvasRef.current.height = baseStitchedCanvas.height;
+        resized = true;
+      }
       const ctx = canvasRef.current.getContext('2d');
       if (ctx) {
+        if (!resized) {
+          ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        }
         ctx.drawImage(baseStitchedCanvas, 0, 0);
       }
     }
