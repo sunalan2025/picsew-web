@@ -808,7 +808,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
     if (!isDrawing || !startPoint || !currentPoint) return;
     setIsDrawing(false);
 
-    const id = Math.random().toString(36).substring(2, 9);
+    const id = crypto.randomUUID();
 
     if (selectedTool === 'pen') {
       onAddAnnotation({
@@ -895,7 +895,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
   const saveTextInput = () => {
     if (textInput && textInput.val.trim() !== '') {
       onAddAnnotation({
-        id: Math.random().toString(36).substring(2, 9),
+        id: crypto.randomUUID(),
         type: 'text',
         color,
         strokeWidth: 2,
