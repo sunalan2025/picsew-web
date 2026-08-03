@@ -166,24 +166,30 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                 {/* Move / Action buttons */}
                 <div className="flex flex-col items-center gap-0.5">
                   <button
+                    aria-label="上移图片"
+                    title="上移图片"
                     disabled={index === 0}
                     onClick={() => moveImage(index, 'up')}
-                    className="p-0.5 hover:bg-dark-700 text-gray-400 disabled:text-gray-600 disabled:hover:bg-transparent rounded"
+                    className="p-0.5 hover:bg-dark-700 text-gray-400 disabled:text-gray-600 disabled:hover:bg-transparent rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500"
                   >
                     <ChevronUp className="w-4 h-4" />
                   </button>
                   <button
+                    aria-label="下移图片"
+                    title="下移图片"
                     disabled={index === images.length - 1}
                     onClick={() => moveImage(index, 'down')}
-                    className="p-0.5 hover:bg-dark-700 text-gray-400 disabled:text-gray-600 disabled:hover:bg-transparent rounded"
+                    className="p-0.5 hover:bg-dark-700 text-gray-400 disabled:text-gray-600 disabled:hover:bg-transparent rounded focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500"
                   >
                     <ChevronDown className="w-4 h-4" />
                   </button>
                 </div>
 
                 <button
+                  aria-label="删除图片"
+                  title="删除图片"
                   onClick={() => removeImage(img.id)}
-                  className="p-1 hover:bg-red-500/10 text-red-400 hover:text-red-300 rounded-lg transition-colors"
+                  className="p-1 hover:bg-red-500/10 text-red-400 hover:text-red-300 rounded-lg transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-red-500"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -197,8 +203,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                 </div>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
                   <div>
-                    <label className="text-[10px] text-gray-500 font-medium">顶部 (Top)</label>
+                    <label htmlFor={`cropTop-${img.id}`} className="text-[10px] text-gray-500 font-medium">顶部 (Top)</label>
                     <input
+                      id={`cropTop-${img.id}`}
                       type="number"
                       value={img.cropTop}
                       onChange={(e) => updateCrop(img.id, 'cropTop', parseInt(e.target.value) || 0)}
@@ -206,8 +213,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-gray-500 font-medium">底部 (Bottom)</label>
+                    <label htmlFor={`cropBottom-${img.id}`} className="text-[10px] text-gray-500 font-medium">底部 (Bottom)</label>
                     <input
+                      id={`cropBottom-${img.id}`}
                       type="number"
                       value={img.cropBottom}
                       onChange={(e) => updateCrop(img.id, 'cropBottom', parseInt(e.target.value) || 0)}
@@ -215,8 +223,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-gray-500 font-medium">左侧 (Left)</label>
+                    <label htmlFor={`cropLeft-${img.id}`} className="text-[10px] text-gray-500 font-medium">左侧 (Left)</label>
                     <input
+                      id={`cropLeft-${img.id}`}
                       type="number"
                       value={img.cropLeft}
                       onChange={(e) => updateCrop(img.id, 'cropLeft', parseInt(e.target.value) || 0)}
@@ -224,8 +233,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-gray-500 font-medium">右侧 (Right)</label>
+                    <label htmlFor={`cropRight-${img.id}`} className="text-[10px] text-gray-500 font-medium">右侧 (Right)</label>
                     <input
+                      id={`cropRight-${img.id}`}
                       type="number"
                       value={img.cropRight}
                       onChange={(e) => updateCrop(img.id, 'cropRight', parseInt(e.target.value) || 0)}
