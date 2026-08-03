@@ -22,7 +22,23 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   };
 
   const addFiles = (files: File[]) => {
-    const validFiles = files.filter(f => f.type.startsWith('image/'));
+    // SECURITY: Limit number of files to prevent DoS
+    let filesToProcess = files;
+    if (images.length + filesToProcess.length > 50) {
+      alert('最多只能添加 50 张图片 (Maximum 50 images allowed)');
+      filesToProcess = filesToProcess.slice(0, Math.max(0, 50 - images.length));
+    }
+
+    // SECURITY: Limit file size to prevent memory exhaustion (50MB)
+    const MAX_FILE_SIZE = 50 * 1024 * 1024;
+    const validFiles = filesToProcess.filter(f => {
+      if (!f.type.startsWith('image/')) return false;
+      if (f.size > MAX_FILE_SIZE) {
+        alert(`图片 ${f.name} 过大，最大允许 50MB (Image too large, max 50MB)`);
+        return false;
+      }
+      return true;
+    });
     
     const loadPromises = validFiles.map(file => {
       return new Promise<StitchedImage>((resolve) => {
