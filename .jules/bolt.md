@@ -1,0 +1,3 @@
+## 2024-02-12 - Caching Intermediate Canvas Renders for Complex Operations
+**Learning:** Rendering complex stitched images (involving dozens of O(N) canvas `drawImage` operations) directly to the main display canvas causes massive frame drops during transient mouse interactions (like dragging hover guides or freehand drawing).
+**Action:** Always maintain a hidden, off-screen cache canvas for expensive baseline renders. Store a JSON-stringified dependency object (like images array length, crops, layout direction) and only re-calculate the base render when dependencies change. For temporary overlay renders on the main canvas, just `drawImage(cachedCanvas, 0, 0)` first, making the draw loop O(1) instead of O(N).

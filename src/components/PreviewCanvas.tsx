@@ -199,9 +199,14 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
   const [hoverX, setHoverX] = useState<number | null>(null);
 
   // Image preloading cache (prevents browser decoding on every mousemove, unlocking 60fps drag performance)
+// Image preloading cache (prevents browser decoding on every mousemove, unlocking 60fps drag performance)
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const baseCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const renderPipelineRef = useRef<(() => void) | null>(null);
+
+  // Cache for the stitched images to avoid redrawing O(N) images on every mouse interaction
+  const cachedStitchCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const cachedStitchDepsRef = useRef<string>('');
 
   // --- Zoom Controllers ---
   const handleZoomIn = () => setZoom(z => Math.min(3.0, z + 0.1));
@@ -249,11 +254,37 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
     }
   }, [images.length, direction, handleFitWidth, handleFitHeight]);
 
+
+
   // Core Render Loop: Builds the stitched image + statusbar + crops
   const renderStitchedImage = useCallback((): HTMLCanvasElement => {
-    const baseCanvas = baseCanvasRef.current || document.createElement('canvas');
-    baseCanvasRef.current = baseCanvas;
+    // Check if ALL images are fully loaded and cached.
+    const allLoaded = images.length > 0 && images.every(img => {
+      const cached = imageCacheRef.current.get(img.id);
+      return cached && cached.complete && cached.naturalWidth > 0;
+    });
 
+    // Create a dependency string to check if we need to redraw the heavy stitch base
+    const depsString = JSON.stringify({
+      images: images.map(img => ({ id: img.id, cropL: img.cropLeft, cropR: img.cropRight, cropT: img.cropTop, cropB: img.cropBottom })),
+      direction,
+      overlaps,
+      gap,
+      statusBar,
+      allLoaded // Cache invalidates if images finish loading
+    });
+
+    if (!cachedStitchCanvasRef.current) {
+      cachedStitchCanvasRef.current = document.createElement('canvas');
+    }
+
+    // If dependencies haven't changed and we have a cached canvas, just return it directly!
+    // No copying, no clearRect, making it O(1) instantly.
+    if (cachedStitchDepsRef.current === depsString && allLoaded) {
+      return cachedStitchCanvasRef.current;
+    }
+
+    const baseCanvas = cachedStitchCanvasRef.current;
     const ctx = baseCanvas.getContext('2d');
     if (!ctx || images.length === 0) return baseCanvas;
 
@@ -338,7 +369,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
     // Draw images
     imgPositions.forEach((pos) => {
-      if (pos.imgEl.complete) {
+      if (pos.imgEl.complete && pos.imgEl.naturalWidth > 0) {
         ctx.drawImage(
           pos.imgEl,
           pos.cropL, pos.cropT, pos.visibleW, pos.visibleH,
@@ -353,8 +384,12 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
       drawStatusBar(ctx, baseCanvas.width, sbHeight, statusBar);
     }
 
+    // Update cache deps
+    cachedStitchDepsRef.current = depsString;
+
     return baseCanvas;
   }, [images, direction, overlaps, gap, statusBar]);
+
 
 
 
@@ -362,51 +397,60 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
   const renderPipeline = useCallback(() => {
     if (images.length === 0 || !canvasRef.current) return;
 
-    // Step A: Stitch images + Status bar + Crops
+    // Step A: Stitch images + Status bar + Crops (This returns a cached, unmutated canvas!)
     const baseStitchedCanvas = renderStitchedImage();
 
-    // Step B: Render annotations
-    const baseCtx = baseStitchedCanvas.getContext('2d');
-    if (baseCtx) {
+    // Step B: Create an intermediate layer to draw base image AND annotations so we don't mutate the cache
+    const layerCanvas = baseCanvasRef.current || document.createElement('canvas');
+    baseCanvasRef.current = layerCanvas;
+    layerCanvas.width = baseStitchedCanvas.width;
+    layerCanvas.height = baseStitchedCanvas.height;
+
+    const layerCtx = layerCanvas.getContext('2d');
+    if (layerCtx) {
+      // Draw the cached base image first
+      layerCtx.drawImage(baseStitchedCanvas, 0, 0);
+
+      // Render annotations
       annotations.forEach((anno) => {
-        drawSingleAnnotation(baseCtx, anno);
+        drawSingleAnnotation(layerCtx, anno);
       });
 
       // Render active pen/arrow/shape drawing
       if (isDrawing && startPoint && currentPoint && selectedTool !== 'cut-horizontal' && selectedTool !== 'cut-vertical' && dragMode === 'none') {
-        baseCtx.save();
-        baseCtx.strokeStyle = color;
-        baseCtx.fillStyle = color;
-        baseCtx.lineWidth = strokeWidth;
-        baseCtx.lineCap = 'round';
-        baseCtx.lineJoin = 'round';
+        layerCtx.save();
+        layerCtx.strokeStyle = color;
+        layerCtx.fillStyle = color;
+        layerCtx.lineWidth = strokeWidth;
+        layerCtx.lineCap = 'round';
+        layerCtx.lineJoin = 'round';
 
         if (selectedTool === 'pen' && penPoints.length > 1) {
-          baseCtx.beginPath();
-          baseCtx.moveTo(penPoints[0].x, penPoints[0].y);
+          layerCtx.beginPath();
+          layerCtx.moveTo(penPoints[0].x, penPoints[0].y);
           for (let p of penPoints) {
-            baseCtx.lineTo(p.x, p.y);
+            layerCtx.lineTo(p.x, p.y);
           }
-          baseCtx.stroke();
+          layerCtx.stroke();
         } else if (selectedTool === 'arrow') {
-          drawArrow(baseCtx, startPoint.x, startPoint.y, currentPoint.x, currentPoint.y, strokeWidth);
+          drawArrow(layerCtx, startPoint.x, startPoint.y, currentPoint.x, currentPoint.y, strokeWidth);
         } else if (selectedTool === 'rect') {
-          baseCtx.strokeRect(startPoint.x, startPoint.y, currentPoint.x - startPoint.x, currentPoint.y - startPoint.y);
+          layerCtx.strokeRect(startPoint.x, startPoint.y, currentPoint.x - startPoint.x, currentPoint.y - startPoint.y);
         } else if (selectedTool === 'blur') {
-          baseCtx.strokeStyle = '#c084fc';
-          baseCtx.lineWidth = 2;
-          baseCtx.setLineDash([6, 4]);
-          baseCtx.strokeRect(startPoint.x, startPoint.y, currentPoint.x - startPoint.x, currentPoint.y - startPoint.y);
+          layerCtx.strokeStyle = '#c084fc';
+          layerCtx.lineWidth = 2;
+          layerCtx.setLineDash([6, 4]);
+          layerCtx.strokeRect(startPoint.x, startPoint.y, currentPoint.x - startPoint.x, currentPoint.y - startPoint.y);
         }
-        baseCtx.restore();
+        layerCtx.restore();
       }
 
       // Render Cut seams / Split lines clearly when in Cut tab
       if (activeTab === 'cut') {
-        baseCtx.save();
-        baseCtx.strokeStyle = '#f43f5e'; // Rose color for seams
-        baseCtx.lineWidth = 2;
-        baseCtx.setLineDash([6, 3]);
+        layerCtx.save();
+        layerCtx.strokeStyle = '#f43f5e'; // Rose color for seams
+        layerCtx.lineWidth = 2;
+        layerCtx.setLineDash([6, 3]);
 
         const firstVisibleW = images[0].width - images[0].cropLeft - images[0].cropRight;
         const baseW = Math.max(50, firstVisibleW);
@@ -426,16 +470,16 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
             if (i > 0) {
               // Draw horizontal seam
-              baseCtx.beginPath();
-              baseCtx.moveTo(0, adjustedStartY);
-              baseCtx.lineTo(baseStitchedCanvas.width, adjustedStartY);
-              baseCtx.stroke();
+              layerCtx.beginPath();
+              layerCtx.moveTo(0, adjustedStartY);
+              layerCtx.lineTo(layerCanvas.width, adjustedStartY);
+              layerCtx.stroke();
 
               // Draw a small scissors icon/label
-              baseCtx.fillStyle = '#f43f5e';
-              baseCtx.font = 'bold 10px sans-serif';
-              baseCtx.textBaseline = 'bottom';
-              baseCtx.fillText(` ✂️ 分割线 ${i}`, 10, adjustedStartY - 3);
+              layerCtx.fillStyle = '#f43f5e';
+              layerCtx.font = 'bold 10px sans-serif';
+              layerCtx.textBaseline = 'bottom';
+              layerCtx.fillText(` ✂️ 分割线 ${i}`, 10, adjustedStartY - 3);
             }
             currentY = adjustedStartY + h + gap;
           } else {
@@ -446,62 +490,62 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
             if (i > 0) {
               // Draw vertical seam
-              baseCtx.beginPath();
-              baseCtx.moveTo(adjustedStartX, 0);
-              baseCtx.lineTo(adjustedStartX, baseStitchedCanvas.height);
-              baseCtx.stroke();
+              layerCtx.beginPath();
+              layerCtx.moveTo(adjustedStartX, 0);
+              layerCtx.lineTo(adjustedStartX, layerCanvas.height);
+              layerCtx.stroke();
 
               // Draw label
-              baseCtx.fillStyle = '#f43f5e';
-              baseCtx.font = 'bold 10px sans-serif';
-              baseCtx.textBaseline = 'bottom';
-              baseCtx.fillText(` ✂️ 分割线 ${i}`, adjustedStartX + 4, 18);
+              layerCtx.fillStyle = '#f43f5e';
+              layerCtx.font = 'bold 10px sans-serif';
+              layerCtx.textBaseline = 'bottom';
+              layerCtx.fillText(` ✂️ 分割线 ${i}`, adjustedStartX + 4, 18);
             }
             currentX = adjustedStartX + w + gap;
           }
         }
-        baseCtx.restore();
+        layerCtx.restore();
       }
 
       // Render active placement hover guide line
       if (activeTab === 'cut' && selectedTool === 'cut-horizontal' && hoverY !== null && !isDrawing) {
-        baseCtx.save();
-        baseCtx.strokeStyle = '#f43f5e';
-        baseCtx.lineWidth = 3;
-        baseCtx.setLineDash([8, 4]);
-        baseCtx.beginPath();
-        baseCtx.moveTo(0, hoverY);
-        baseCtx.lineTo(baseStitchedCanvas.width, hoverY);
+        layerCtx.save();
+        layerCtx.strokeStyle = '#f43f5e';
+        layerCtx.lineWidth = 3;
+        layerCtx.setLineDash([8, 4]);
+        layerCtx.beginPath();
+        layerCtx.moveTo(0, hoverY);
+        layerCtx.lineTo(layerCanvas.width, hoverY);
         
-        baseCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-        baseCtx.shadowBlur = 4;
-        baseCtx.stroke();
+        layerCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        layerCtx.shadowBlur = 4;
+        layerCtx.stroke();
 
-        baseCtx.fillStyle = '#f43f5e';
-        baseCtx.font = 'semibold 12px sans-serif';
-        baseCtx.textBaseline = 'bottom';
-        baseCtx.fillText(' ✂️ 点击切分图片 (水平线)', 10, hoverY - 4);
-        baseCtx.restore();
+        layerCtx.fillStyle = '#f43f5e';
+        layerCtx.font = 'semibold 12px sans-serif';
+        layerCtx.textBaseline = 'bottom';
+        layerCtx.fillText(' ✂️ 点击切分图片 (水平线)', 10, hoverY - 4);
+        layerCtx.restore();
       }
 
       if (activeTab === 'cut' && selectedTool === 'cut-vertical' && hoverX !== null && !isDrawing) {
-        baseCtx.save();
-        baseCtx.strokeStyle = '#3b82f6'; // Blue vertical line
-        baseCtx.lineWidth = 3;
-        baseCtx.setLineDash([8, 4]);
-        baseCtx.beginPath();
-        baseCtx.moveTo(hoverX, 0);
-        baseCtx.lineTo(hoverX, baseStitchedCanvas.height);
+        layerCtx.save();
+        layerCtx.strokeStyle = '#3b82f6'; // Blue vertical line
+        layerCtx.lineWidth = 3;
+        layerCtx.setLineDash([8, 4]);
+        layerCtx.beginPath();
+        layerCtx.moveTo(hoverX, 0);
+        layerCtx.lineTo(hoverX, layerCanvas.height);
         
-        baseCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-        baseCtx.shadowBlur = 4;
-        baseCtx.stroke();
+        layerCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        layerCtx.shadowBlur = 4;
+        layerCtx.stroke();
 
-        baseCtx.fillStyle = '#3b82f6';
-        baseCtx.font = 'semibold 12px sans-serif';
-        baseCtx.textBaseline = 'bottom';
-        baseCtx.fillText(' ✂️ 点击切分图片 (垂直线)', hoverX + 4, 20);
-        baseCtx.restore();
+        layerCtx.fillStyle = '#3b82f6';
+        layerCtx.font = 'semibold 12px sans-serif';
+        layerCtx.textBaseline = 'bottom';
+        layerCtx.fillText(' ✂️ 点击切分图片 (垂直线)', hoverX + 4, 20);
+        layerCtx.restore();
       }
     }
 
@@ -510,13 +554,13 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
     const shouldShowMockup = mockup.device !== 'none' && !isEditingMode;
 
     if (shouldShowMockup) {
-      drawMockup(canvasRef.current, baseStitchedCanvas, mockup);
+      drawMockup(canvasRef.current, layerCanvas, mockup);
     } else {
-      canvasRef.current.width = baseStitchedCanvas.width;
-      canvasRef.current.height = baseStitchedCanvas.height;
+      canvasRef.current.width = layerCanvas.width;
+      canvasRef.current.height = layerCanvas.height;
       const ctx = canvasRef.current.getContext('2d');
       if (ctx) {
-        ctx.drawImage(baseStitchedCanvas, 0, 0);
+        ctx.drawImage(layerCanvas, 0, 0);
       }
     }
   }, [
