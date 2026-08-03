@@ -443,6 +443,12 @@ function App() {
     const totalW = canvas.width;
     const slicesCount = Math.ceil(totalH / sliceH);
 
+    // SECURITY: Limit maximum slices to prevent browser crash / DoS
+    if (slicesCount > 500) {
+      alert(`切片数量过多 (${slicesCount} > 500)，请增加切片高度以防止浏览器崩溃 (Too many slices, please increase slice height)`);
+      return;
+    }
+
     const mime = exportConfig.format === 'png' ? 'image/png' : 'image/jpeg';
     const ext = exportConfig.format;
 

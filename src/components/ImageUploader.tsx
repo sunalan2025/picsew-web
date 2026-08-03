@@ -22,7 +22,23 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   };
 
   const addFiles = (files: File[]) => {
-    const validFiles = files.filter(f => f.type.startsWith('image/'));
+    // SECURITY: Limit number of files to prevent DoS
+    let filesToProcess = files;
+    if (images.length + filesToProcess.length > 50) {
+      alert('最多只能添加 50 张图片 (Maximum 50 images allowed)');
+      filesToProcess = filesToProcess.slice(0, Math.max(0, 50 - images.length));
+    }
+
+    // SECURITY: Limit file size to prevent memory exhaustion (50MB)
+    const MAX_FILE_SIZE = 50 * 1024 * 1024;
+    const validFiles = filesToProcess.filter(f => {
+      if (!f.type.startsWith('image/')) return false;
+      if (f.size > MAX_FILE_SIZE) {
+        alert(`图片 ${f.name} 过大，最大允许 50MB (Image too large, max 50MB)`);
+        return false;
+      }
+      return true;
+    });
     
     const loadPromises = validFiles.map(file => {
       return new Promise<StitchedImage>((resolve) => {
@@ -211,8 +227,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                 </div>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
                   <div>
-                    <label className="text-[10px] text-gray-500 font-medium">顶部 (Top)</label>
+                    <label htmlFor={`cropTop-${img.id}`} className="text-[10px] text-gray-500 font-medium">顶部 (Top)</label>
                     <input
+                      id={`cropTop-${img.id}`}
                       type="number"
                       value={img.cropTop}
                       onChange={(e) => updateCrop(img.id, 'cropTop', parseInt(e.target.value) || 0)}
@@ -220,8 +237,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-gray-500 font-medium">底部 (Bottom)</label>
+                    <label htmlFor={`cropBottom-${img.id}`} className="text-[10px] text-gray-500 font-medium">底部 (Bottom)</label>
                     <input
+                      id={`cropBottom-${img.id}`}
                       type="number"
                       value={img.cropBottom}
                       onChange={(e) => updateCrop(img.id, 'cropBottom', parseInt(e.target.value) || 0)}
@@ -229,8 +247,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-gray-500 font-medium">左侧 (Left)</label>
+                    <label htmlFor={`cropLeft-${img.id}`} className="text-[10px] text-gray-500 font-medium">左侧 (Left)</label>
                     <input
+                      id={`cropLeft-${img.id}`}
                       type="number"
                       value={img.cropLeft}
                       onChange={(e) => updateCrop(img.id, 'cropLeft', parseInt(e.target.value) || 0)}
@@ -238,8 +257,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-gray-500 font-medium">右侧 (Right)</label>
+                    <label htmlFor={`cropRight-${img.id}`} className="text-[10px] text-gray-500 font-medium">右侧 (Right)</label>
                     <input
+                      id={`cropRight-${img.id}`}
                       type="number"
                       value={img.cropRight}
                       onChange={(e) => updateCrop(img.id, 'cropRight', parseInt(e.target.value) || 0)}
