@@ -266,13 +266,13 @@ function App() {
 
       sliceA = {
         ...slice,
-        id: Math.random().toString(36).substring(2, 9),
+        id: crypto.randomUUID(),
         cropBottom: slice.height - splitPixel,
       };
 
       sliceB = {
         ...slice,
-        id: Math.random().toString(36).substring(2, 9),
+        id: crypto.randomUUID(),
         cropTop: splitPixel,
       };
     } else {
@@ -286,13 +286,13 @@ function App() {
 
       sliceA = {
         ...slice,
-        id: Math.random().toString(36).substring(2, 9),
+        id: crypto.randomUUID(),
         cropRight: slice.width - splitPixel,
       };
 
       sliceB = {
         ...slice,
-        id: Math.random().toString(36).substring(2, 9),
+        id: crypto.randomUUID(),
         cropLeft: splitPixel,
       };
     }
