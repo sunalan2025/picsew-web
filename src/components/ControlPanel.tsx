@@ -123,6 +123,16 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     '#000000', // Black
   ];
 
+  const colorNames: Record<string, string> = {
+    '#ff3b30': '红色 (Red)',
+    '#34c759': '绿色 (Green)',
+    '#007aff': '蓝色 (Blue)',
+    '#ffcc00': '黄色 (Yellow)',
+    '#af52de': '紫色 (Purple)',
+    '#ffffff': '白色 (White)',
+    '#000000': '黑色 (Black)'
+  };
+
   const updateOverlap = (index: number, val: number) => {
     const updated = [...overlaps];
     updated[index] = val;
@@ -375,21 +385,23 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 {/* Colors */}
                 {selectedTool !== 'select' && selectedTool !== 'blur' && (
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-400 block">边框/字体颜色</label>
-                    <div className="flex gap-2.5 flex-wrap">
+                    <label id="color-picker-label" className="text-xs font-bold text-gray-400 block">边框/字体颜色</label>
+                    <div role="group" aria-labelledby="color-picker-label" className="flex gap-2.5 flex-wrap">
                       {colors.map((c) => (
-                        <button
-                          key={c}
-                          onClick={() => setColor(c)}
-                          style={{ backgroundColor: c }}
-                          className={`w-6 h-6 rounded-full border flex items-center justify-center shadow-inner transition hover:scale-110 ${
-                            color === c ? 'border-primary-300 scale-105' : 'border-dark-700'
-                          }`}
-                        >
-                          {color === c && (
-                            <Check className={`w-3.5 h-3.5 ${c === '#ffffff' || c === '#ffcc00' ? 'text-black' : 'text-white'}`} />
-                          )}
-                        </button>
+                          <button
+                            key={c}
+                            onClick={() => setColor(c)}
+                            aria-label={`选择颜色: ${colorNames[c] || c}`}
+                            aria-pressed={color === c}
+                            style={{ backgroundColor: c }}
+                            className={`w-6 h-6 rounded-full border flex items-center justify-center shadow-inner transition hover:scale-110 focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-900 focus:outline-none ${
+                              color === c ? 'border-primary-300 scale-105' : 'border-dark-700'
+                            }`}
+                          >
+                            {color === c && (
+                              <Check className={`w-3.5 h-3.5 ${c === '#ffffff' || c === '#ffcc00' ? 'text-black' : 'text-white'}`} />
+                            )}
+                          </button>
                       ))}
                     </div>
                   </div>
