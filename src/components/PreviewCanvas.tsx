@@ -1062,6 +1062,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
                 <input
                   type="text"
                   autoFocus
+                  maxLength={100}
                   value={textInput.val}
                   onChange={(e) => setTextInput({ ...textInput, val: e.target.value })}
                   onKeyDown={(e) => {

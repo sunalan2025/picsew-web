@@ -484,6 +484,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                       <label className="text-xs font-bold text-gray-400">时间文本</label>
                       <input
                         type="text"
+                        maxLength={10}
                         value={statusBar.time}
                         onChange={(e) => setStatusBar({ ...statusBar, time: e.target.value })}
                         className="w-full bg-dark-800 border border-dark-700 rounded-lg py-1.5 px-3 text-xs text-gray-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-hidden font-mono"
