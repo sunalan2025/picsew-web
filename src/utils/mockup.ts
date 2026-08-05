@@ -16,8 +16,23 @@ export function drawMockup(
 
   if (device === 'none') {
     // Just copy content
-    targetCanvas.width = contentCanvas.width;
-    targetCanvas.height = contentCanvas.height;
+    let resized = false;
+    // PERFORMANCE OPTIMIZATION:
+    // Only set canvas dimensions if they've changed to avoid layout thrashing and implicit buffer clearing
+    if (targetCanvas.width !== contentCanvas.width) {
+      targetCanvas.width = contentCanvas.width;
+      resized = true;
+    }
+    if (targetCanvas.height !== contentCanvas.height) {
+      targetCanvas.height = contentCanvas.height;
+      resized = true;
+    }
+
+    // Explicitly clear the rect when dimensions haven't changed to ensure clean buffer for redrawing
+    if (!resized) {
+      ctx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+    }
+
     ctx.drawImage(contentCanvas, 0, 0);
     return;
   }
@@ -50,8 +65,21 @@ export function drawMockup(
   const canvasW = deviceW + padding * 2;
   const canvasH = deviceH + padding * 2;
 
-  targetCanvas.width = canvasW;
-  targetCanvas.height = canvasH;
+  let resized = false;
+  // PERFORMANCE OPTIMIZATION:
+  // Conditionally assign canvas dimension properties only on change to significantly reduce rendering latency
+  if (targetCanvas.width !== canvasW) {
+    targetCanvas.width = canvasW;
+    resized = true;
+  }
+  if (targetCanvas.height !== canvasH) {
+    targetCanvas.height = canvasH;
+    resized = true;
+  }
+
+  if (!resized) {
+    ctx.clearRect(0, 0, canvasW, canvasH);
+  }
 
   // --- Step 1: Draw Background ---
   ctx.save();
