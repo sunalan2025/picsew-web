@@ -39,6 +39,12 @@ interface PreviewCanvasProps {
   onResetAll: () => void;
 }
 
+// Reusable offscreen canvases for blur/pixelation effects to avoid garbage collection and GPU readback overhead
+const _tempCanvas = document.createElement('canvas');
+const _tempCtx = _tempCanvas.getContext('2d');
+const _pixelCanvas = document.createElement('canvas');
+const _pixelCtx = _pixelCanvas.getContext('2d');
+
 const drawArrow = (
   ctx: CanvasRenderingContext2D,
   fromx: number,
@@ -113,13 +119,17 @@ const drawSingleAnnotation = (ctx: CanvasRenderingContext2D, anno: Annotation) =
 
       if (w > 4 && h > 4) {
         try {
-          const imgData = ctx.getImageData(x, y, w, h);
-          const tempCanvas = document.createElement('canvas');
-          const tempCtx = tempCanvas.getContext('2d');
-          if (tempCtx) {
-            tempCanvas.width = w;
-            tempCanvas.height = h;
-            tempCtx.putImageData(imgData, 0, 0);
+          if (_tempCtx) {
+            // Only update dimensions if they change, to avoid clearing buffer unnecessarily
+            if (_tempCanvas.width !== w || _tempCanvas.height !== h) {
+              _tempCanvas.width = w;
+              _tempCanvas.height = h;
+            } else {
+              _tempCtx.clearRect(0, 0, w, h); // Clear if we didn't resize
+            }
+
+            // Draw directly from the source canvas to the temp canvas, avoiding GPU-CPU readback
+            _tempCtx.drawImage(ctx.canvas, x, y, w, h, 0, 0, w, h);
 
             ctx.save();
             if (anno.blurType === 'pixel') {
@@ -127,19 +137,23 @@ const drawSingleAnnotation = (ctx: CanvasRenderingContext2D, anno: Annotation) =
               const sw = Math.max(1, Math.round(w * scale));
               const sh = Math.max(1, Math.round(h * scale));
               
-              const pixelCanvas = document.createElement('canvas');
-              pixelCanvas.width = sw;
-              pixelCanvas.height = sh;
-              const pixelCtx = pixelCanvas.getContext('2d');
-              if (pixelCtx) {
-                pixelCtx.imageSmoothingEnabled = false;
-                pixelCtx.drawImage(tempCanvas, 0, 0, sw, sh);
+              if (_pixelCtx) {
+                if (_pixelCanvas.width !== sw || _pixelCanvas.height !== sh) {
+                  _pixelCanvas.width = sw;
+                  _pixelCanvas.height = sh;
+                } else {
+                  _pixelCtx.clearRect(0, 0, sw, sh);
+                }
+
+                _pixelCtx.imageSmoothingEnabled = false;
+                _pixelCtx.drawImage(_tempCanvas, 0, 0, sw, sh);
+
                 ctx.imageSmoothingEnabled = false;
-                ctx.drawImage(pixelCanvas, 0, 0, sw, sh, x, y, w, h);
+                ctx.drawImage(_pixelCanvas, 0, 0, sw, sh, x, y, w, h);
               }
             } else {
               ctx.filter = 'blur(12px)';
-              ctx.drawImage(tempCanvas, x, y, w, h);
+              ctx.drawImage(_tempCanvas, x, y, w, h);
             }
             ctx.restore();
           }
