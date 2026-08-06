@@ -123,6 +123,16 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     '#000000', // Black
   ];
 
+  const colorNames: Record<string, string> = {
+    '#ff3b30': '红色',
+    '#34c759': '绿色',
+    '#007aff': '蓝色',
+    '#ffcc00': '黄色',
+    '#af52de': '紫色',
+    '#ffffff': '白色',
+    '#000000': '黑色',
+  };
+
   const updateOverlap = (index: number, val: number) => {
     const updated = [...overlaps];
     updated[index] = val;
@@ -376,13 +386,15 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 {selectedTool !== 'select' && selectedTool !== 'blur' && (
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-400 block">边框/字体颜色</label>
-                    <div className="flex gap-2.5 flex-wrap">
+                    <div className="flex gap-2.5 flex-wrap" role="group" aria-label="选择颜色">
                       {colors.map((c) => (
                         <button
                           key={c}
                           onClick={() => setColor(c)}
                           style={{ backgroundColor: c }}
-                          className={`w-6 h-6 rounded-full border flex items-center justify-center shadow-inner transition hover:scale-110 ${
+                          aria-label={colorNames[c] || c}
+                          aria-pressed={color === c}
+                          className={`w-6 h-6 rounded-full border flex items-center justify-center shadow-inner transition hover:scale-110 focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
                             color === c ? 'border-primary-300 scale-105' : 'border-dark-700'
                           }`}
                         >
