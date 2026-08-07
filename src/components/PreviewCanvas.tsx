@@ -39,6 +39,12 @@ interface PreviewCanvasProps {
   onResetAll: () => void;
 }
 
+// ⚡ Bolt Performance Optimization:
+// Cache off-screen canvases at the module level for blur annotations to avoid garbage collection
+// thrashing from creating transient <canvas> elements on every render loop.
+const blurTempCanvas = document.createElement('canvas');
+const blurPixelCanvas = document.createElement('canvas');
+
 const drawArrow = (
   ctx: CanvasRenderingContext2D,
   fromx: number,
@@ -113,13 +119,17 @@ const drawSingleAnnotation = (ctx: CanvasRenderingContext2D, anno: Annotation) =
 
       if (w > 4 && h > 4) {
         try {
-          const imgData = ctx.getImageData(x, y, w, h);
-          const tempCanvas = document.createElement('canvas');
-          const tempCtx = tempCanvas.getContext('2d');
+          const tempCtx = blurTempCanvas.getContext('2d');
           if (tempCtx) {
-            tempCanvas.width = w;
-            tempCanvas.height = h;
-            tempCtx.putImageData(imgData, 0, 0);
+            // ⚡ Bolt Optimization:
+            // 1. Only resize canvas if dimensions actually changed to avoid implicit clear overhead
+            if (blurTempCanvas.width !== w) blurTempCanvas.width = w;
+            if (blurTempCanvas.height !== h) blurTempCanvas.height = h;
+            else tempCtx.clearRect(0, 0, w, h);
+
+            // 2. Use drawImage from source canvas instead of synchronous ctx.getImageData
+            // This prevents blocking the GPU-to-CPU pipeline and readbacks.
+            tempCtx.drawImage(ctx.canvas, x, y, w, h, 0, 0, w, h);
 
             ctx.save();
             if (anno.blurType === 'pixel') {
@@ -127,19 +137,21 @@ const drawSingleAnnotation = (ctx: CanvasRenderingContext2D, anno: Annotation) =
               const sw = Math.max(1, Math.round(w * scale));
               const sh = Math.max(1, Math.round(h * scale));
               
-              const pixelCanvas = document.createElement('canvas');
-              pixelCanvas.width = sw;
-              pixelCanvas.height = sh;
-              const pixelCtx = pixelCanvas.getContext('2d');
+              const pixelCtx = blurPixelCanvas.getContext('2d');
               if (pixelCtx) {
+                if (blurPixelCanvas.width !== sw) blurPixelCanvas.width = sw;
+                if (blurPixelCanvas.height !== sh) blurPixelCanvas.height = sh;
+                else pixelCtx.clearRect(0, 0, sw, sh);
+
                 pixelCtx.imageSmoothingEnabled = false;
-                pixelCtx.drawImage(tempCanvas, 0, 0, sw, sh);
+                pixelCtx.drawImage(blurTempCanvas, 0, 0, sw, sh);
+
                 ctx.imageSmoothingEnabled = false;
-                ctx.drawImage(pixelCanvas, 0, 0, sw, sh, x, y, w, h);
+                ctx.drawImage(blurPixelCanvas, 0, 0, sw, sh, x, y, w, h);
               }
             } else {
               ctx.filter = 'blur(12px)';
-              ctx.drawImage(tempCanvas, x, y, w, h);
+              ctx.drawImage(blurTempCanvas, x, y, w, h);
             }
             ctx.restore();
           }
