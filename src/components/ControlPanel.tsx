@@ -132,13 +132,21 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Navigation tabs */}
-      <div className="flex border-b border-dark-700/80 p-1 bg-dark-900/60 shrink-0 overflow-x-auto">
+      <div
+        className="flex border-b border-dark-700/80 p-1 bg-dark-900/60 shrink-0 overflow-x-auto"
+        role="tablist"
+        aria-label="控制面板选项卡"
+      >
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
+              role="tab"
+              aria-selected={isActive}
+              aria-controls={`panel-${tab.id}`}
+              id={`tab-${tab.id}`}
               onClick={() => {
                 setActiveTab(tab.id);
                 if (tab.id !== 'cut' && (selectedTool === 'cut-horizontal' || selectedTool === 'cut-vertical')) {
@@ -148,10 +156,10 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   setSelectedTool('pen');
                 }
               }}
-              className={`flex-1 flex flex-col items-center justify-center py-2 px-1.5 min-w-[50px] text-[10px] font-semibold rounded-lg transition-all ${
+              className={`flex-1 flex flex-col items-center justify-center py-2 px-1.5 min-w-[50px] text-[10px] font-semibold rounded-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset ${
                 isActive
                   ? 'bg-primary-500/15 text-primary-300 border border-primary-500/30'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-dark-800'
+                  : 'text-gray-400 hover:text-gray-200 hover:bg-dark-800 border border-transparent'
               }`}
             >
               <Icon className="w-3.5 h-3.5 mb-1" />
@@ -162,7 +170,12 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       </div>
 
       {/* Tab Panels */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
+      <div
+        className="flex-1 overflow-y-auto p-4 space-y-5"
+        role="tabpanel"
+        id={`panel-${activeTab}`}
+        aria-labelledby={`tab-${activeTab}`}
+      >
         {!hasImages && activeTab !== 'upload' && (
           <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 text-xs py-10">
             <ShieldAlert className="w-8 h-8 text-gray-600 mb-2" />
@@ -375,22 +388,42 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 {/* Colors */}
                 {selectedTool !== 'select' && selectedTool !== 'blur' && (
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-400 block">边框/字体颜色</label>
-                    <div className="flex gap-2.5 flex-wrap">
-                      {colors.map((c) => (
-                        <button
-                          key={c}
-                          onClick={() => setColor(c)}
-                          style={{ backgroundColor: c }}
-                          className={`w-6 h-6 rounded-full border flex items-center justify-center shadow-inner transition hover:scale-110 ${
-                            color === c ? 'border-primary-300 scale-105' : 'border-dark-700'
-                          }`}
-                        >
-                          {color === c && (
-                            <Check className={`w-3.5 h-3.5 ${c === '#ffffff' || c === '#ffcc00' ? 'text-black' : 'text-white'}`} />
-                          )}
-                        </button>
-                      ))}
+                    <label className="text-xs font-bold text-gray-400 block" id="color-picker-label">边框/字体颜色</label>
+                    <div
+                      className="flex gap-2.5 flex-wrap"
+                      role="group"
+                      aria-labelledby="color-picker-label"
+                    >
+                      {colors.map((c) => {
+                        let colorName = '未知颜色';
+                        switch (c) {
+                          case '#ff3b30': colorName = '红色'; break;
+                          case '#34c759': colorName = '绿色'; break;
+                          case '#007aff': colorName = '蓝色'; break;
+                          case '#ffcc00': colorName = '黄色'; break;
+                          case '#af52de': colorName = '紫色'; break;
+                          case '#ffffff': colorName = '白色'; break;
+                          case '#000000': colorName = '黑色'; break;
+                        }
+
+                        return (
+                          <button
+                            key={c}
+                            onClick={() => setColor(c)}
+                            style={{ backgroundColor: c }}
+                            aria-label={`选择${colorName}`}
+                            title={colorName}
+                            aria-pressed={color === c}
+                            className={`w-6 h-6 rounded-full border flex items-center justify-center shadow-inner transition hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-900 ${
+                              color === c ? 'border-primary-300 scale-105' : 'border-dark-700'
+                            }`}
+                          >
+                            {color === c && (
+                              <Check className={`w-3.5 h-3.5 ${c === '#ffffff' || c === '#ffcc00' ? 'text-black' : 'text-white'}`} />
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
