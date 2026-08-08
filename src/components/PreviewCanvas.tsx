@@ -937,8 +937,9 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
         <div className="flex items-center gap-1">
           <button
             onClick={handleZoomOut}
-            className="p-1.5 hover:bg-dark-800 rounded-lg text-gray-400 hover:text-gray-200 transition"
+            className="p-1.5 hover:bg-dark-800 rounded-lg text-gray-400 hover:text-gray-200 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
             title="缩小"
+            aria-label="缩小"
           >
             <ZoomOut className="w-4 h-4" />
           </button>
@@ -947,8 +948,9 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
           </span>
           <button
             onClick={handleZoomIn}
-            className="p-1.5 hover:bg-dark-800 rounded-lg text-gray-400 hover:text-gray-200 transition"
+            className="p-1.5 hover:bg-dark-800 rounded-lg text-gray-400 hover:text-gray-200 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
             title="放大"
+            aria-label="放大"
           >
             <ZoomIn className="w-4 h-4" />
           </button>
