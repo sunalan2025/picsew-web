@@ -41,7 +41,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     });
     
     const loadPromises = validFiles.map(file => {
-      return new Promise<StitchedImage>((resolve) => {
+      return new Promise<StitchedImage | null>((resolve) => {
         const reader = new FileReader();
         reader.onload = (event) => {
           const img = new Image();
@@ -58,14 +58,25 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
               cropRight: 0
             });
           };
+          img.onerror = () => {
+            console.error(`Failed to load image: ${file.name}`);
+            resolve(null);
+          };
           img.src = event.target?.result as string;
+        };
+        reader.onerror = () => {
+          console.error(`Failed to read file: ${file.name}`);
+          resolve(null);
         };
         reader.readAsDataURL(file);
       });
     });
 
-    Promise.all(loadPromises).then(newImages => {
-      onImagesChange([...images, ...newImages]);
+    Promise.all(loadPromises).then(results => {
+      const newImages = results.filter((img): img is StitchedImage => img !== null);
+      if (newImages.length > 0) {
+        onImagesChange([...images, ...newImages]);
+      }
     });
   };
 
