@@ -382,7 +382,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                           key={c}
                           onClick={() => setColor(c)}
                           style={{ backgroundColor: c }}
-                          className={`w-6 h-6 rounded-full border flex items-center justify-center shadow-inner transition hover:scale-110 ${
+                          aria-label={`选择颜色 ${c}`}
+                          aria-pressed={color === c}
+                          className={`w-6 h-6 rounded-full border flex items-center justify-center shadow-inner transition hover:scale-110 focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-900 focus:outline-none ${
                             color === c ? 'border-primary-300 scale-105' : 'border-dark-700'
                           }`}
                         >
