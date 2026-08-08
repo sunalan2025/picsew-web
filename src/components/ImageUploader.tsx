@@ -33,6 +33,13 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     const MAX_FILE_SIZE = 50 * 1024 * 1024;
     const validFiles = filesToProcess.filter(f => {
       if (!f.type.startsWith('image/')) return false;
+
+      // SECURITY: Block SVGs to prevent potential XSS/XXE vectors when rendered
+      if (f.type.includes('svg') || f.name.toLowerCase().endsWith('.svg')) {
+        alert(`不支持 SVG 格式图片以防止安全风险 (SVG images are blocked for security)`);
+        return false;
+      }
+
       if (f.size > MAX_FILE_SIZE) {
         alert(`图片 ${f.name} 过大，最大允许 50MB (Image too large, max 50MB)`);
         return false;
@@ -146,7 +153,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           ref={fileInputRef}
           onChange={handleFileChange}
           multiple
-          accept="image/*"
+          accept="image/png, image/jpeg, image/webp"
           className="hidden"
         />
         <div className="p-3 bg-primary-500/10 rounded-full text-primary-300 mb-3">
