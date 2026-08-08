@@ -203,6 +203,11 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
   const baseCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const renderPipelineRef = useRef<(() => void) | null>(null);
 
+  // Performance optimization: Cache the stitched background layer
+  // Avoids 60fps full redraws when dragging annotations or splitting images
+  const stitchedCacheCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const lastStitchDepsRef = useRef<string>('');
+
   // --- Zoom Controllers ---
   const handleZoomIn = () => setZoom(z => Math.min(3.0, z + 0.1));
   const handleZoomOut = () => setZoom(z => Math.max(0.1, z - 0.1));
@@ -256,6 +261,30 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
     const ctx = baseCanvas.getContext('2d');
     if (!ctx || images.length === 0) return baseCanvas;
+
+    const currentDeps = JSON.stringify({
+      images: images.map(img => `${img.id}-${img.cropTop}-${img.cropBottom}-${img.cropLeft}-${img.cropRight}`),
+      direction,
+      gap,
+      overlaps,
+      statusBar
+    });
+
+    let allLoaded = true;
+    for (const img of images) {
+      if (!imageCacheRef.current.get(img.id)?.complete) {
+        allLoaded = false;
+      }
+    }
+
+    if (stitchedCacheCanvasRef.current && lastStitchDepsRef.current === currentDeps && allLoaded) {
+      const cache = stitchedCacheCanvasRef.current;
+      if (baseCanvas.width !== cache.width) baseCanvas.width = cache.width;
+      if (baseCanvas.height !== cache.height) baseCanvas.height = cache.height;
+      ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
+      ctx.drawImage(cache, 0, 0);
+      return baseCanvas;
+    }
 
     // Normalize all images to the visible width of the first image
     const firstVisibleW = images[0].width - images[0].cropLeft - images[0].cropRight;
@@ -327,21 +356,22 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
     const targetW = direction === 'vertical' ? totalW : totalH;
     const targetH = direction === 'vertical' ? totalH : baseW;
 
-    if (baseCanvas.width !== targetW) {
-      baseCanvas.width = targetW;
-    }
-    if (baseCanvas.height !== targetH) {
-      baseCanvas.height = targetH;
-    }
+    const cacheCanvas = stitchedCacheCanvasRef.current || document.createElement('canvas');
+    stitchedCacheCanvasRef.current = cacheCanvas;
+    if (cacheCanvas.width !== targetW) cacheCanvas.width = targetW;
+    if (cacheCanvas.height !== targetH) cacheCanvas.height = targetH;
+
+    const cacheCtx = cacheCanvas.getContext('2d');
+    if (!cacheCtx) return baseCanvas;
 
     // Clean canvas
-    ctx.fillStyle = '#0f0f12';
-    ctx.fillRect(0, 0, baseCanvas.width, baseCanvas.height);
+    cacheCtx.fillStyle = '#0f0f12';
+    cacheCtx.fillRect(0, 0, cacheCanvas.width, cacheCanvas.height);
 
     // Draw images
     imgPositions.forEach((pos) => {
       if (pos.imgEl.complete) {
-        ctx.drawImage(
+        cacheCtx.drawImage(
           pos.imgEl,
           pos.cropL, pos.cropT, pos.visibleW, pos.visibleH,
           pos.x, pos.y, pos.w, pos.h
@@ -351,9 +381,18 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
     // Overlay Status Bar (Vertical only)
     if (statusBar.enabled && direction === 'vertical') {
-      const sbHeight = Math.round(baseCanvas.width * 0.05);
-      drawStatusBar(ctx, baseCanvas.width, sbHeight, statusBar);
+      const sbHeight = Math.round(cacheCanvas.width * 0.05);
+      drawStatusBar(cacheCtx, cacheCanvas.width, sbHeight, statusBar);
     }
+
+    if (allLoaded) {
+      lastStitchDepsRef.current = currentDeps;
+    }
+
+    if (baseCanvas.width !== cacheCanvas.width) baseCanvas.width = cacheCanvas.width;
+    if (baseCanvas.height !== cacheCanvas.height) baseCanvas.height = cacheCanvas.height;
+    ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
+    ctx.drawImage(cacheCanvas, 0, 0);
 
     return baseCanvas;
   }, [images, direction, overlaps, gap, statusBar]);
