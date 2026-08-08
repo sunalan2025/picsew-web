@@ -65,6 +65,9 @@ const drawArrow = (
   ctx.fill();
 };
 
+const tempBlurCanvas = document.createElement('canvas');
+const pixelBlurCanvas = document.createElement('canvas');
+
 const drawSingleAnnotation = (ctx: CanvasRenderingContext2D, anno: Annotation) => {
   ctx.save();
   ctx.strokeStyle = anno.color;
@@ -113,13 +116,14 @@ const drawSingleAnnotation = (ctx: CanvasRenderingContext2D, anno: Annotation) =
 
       if (w > 4 && h > 4) {
         try {
-          const imgData = ctx.getImageData(x, y, w, h);
-          const tempCanvas = document.createElement('canvas');
-          const tempCtx = tempCanvas.getContext('2d');
+          const tempCtx = tempBlurCanvas.getContext('2d');
           if (tempCtx) {
-            tempCanvas.width = w;
-            tempCanvas.height = h;
-            tempCtx.putImageData(imgData, 0, 0);
+            if (tempBlurCanvas.width !== w) tempBlurCanvas.width = w;
+            if (tempBlurCanvas.height !== h) tempBlurCanvas.height = h;
+            tempCtx.clearRect(0, 0, w, h);
+
+            // Draw from main canvas to temp canvas to avoid expensive getImageData readback
+            tempCtx.drawImage(ctx.canvas, x, y, w, h, 0, 0, w, h);
 
             ctx.save();
             if (anno.blurType === 'pixel') {
@@ -127,19 +131,20 @@ const drawSingleAnnotation = (ctx: CanvasRenderingContext2D, anno: Annotation) =
               const sw = Math.max(1, Math.round(w * scale));
               const sh = Math.max(1, Math.round(h * scale));
               
-              const pixelCanvas = document.createElement('canvas');
-              pixelCanvas.width = sw;
-              pixelCanvas.height = sh;
-              const pixelCtx = pixelCanvas.getContext('2d');
+              const pixelCtx = pixelBlurCanvas.getContext('2d');
               if (pixelCtx) {
+                if (pixelBlurCanvas.width !== sw) pixelBlurCanvas.width = sw;
+                if (pixelBlurCanvas.height !== sh) pixelBlurCanvas.height = sh;
+                pixelCtx.clearRect(0, 0, sw, sh);
+
                 pixelCtx.imageSmoothingEnabled = false;
-                pixelCtx.drawImage(tempCanvas, 0, 0, sw, sh);
+                pixelCtx.drawImage(tempBlurCanvas, 0, 0, sw, sh);
                 ctx.imageSmoothingEnabled = false;
-                ctx.drawImage(pixelCanvas, 0, 0, sw, sh, x, y, w, h);
+                ctx.drawImage(pixelBlurCanvas, 0, 0, sw, sh, x, y, w, h);
               }
             } else {
               ctx.filter = 'blur(12px)';
-              ctx.drawImage(tempCanvas, x, y, w, h);
+              ctx.drawImage(tempBlurCanvas, x, y, w, h);
             }
             ctx.restore();
           }
