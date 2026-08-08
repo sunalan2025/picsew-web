@@ -1,1 +1,5 @@
 ## 2026-08-02 - [Replace weak Math.random with crypto.randomUUID]\n**Vulnerability:** Weak pseudo-random number generator Math.random() used to create IDs.\n**Learning:** Math.random() provides low entropy and predictability, which could cause ID collisions or predictability problems.\n**Prevention:** Always use standard cryptographically secure alternatives like crypto.randomUUID() for ID and token generation.
+## 2025-02-27 - [Add strict Content Security Policy]
+**Vulnerability:** Missing Content Security Policy (CSP) headers leaving application vulnerable to basic Cross Site Scripting (XSS) and data exfiltration.
+**Learning:** Pure client-side single page applications (SPA) heavily process user data in memory, relying on features like data URI `blob:` and `data:`, making it crucial to configure CSP to strictly limit external scripts/connections while allowing specific in-app mechanisms to function.
+**Prevention:** Implement restrictive `default-src 'self'` policy up-front for all static HTML entry points, explicitly safelisting data schemes and development websockets (Vite) where required, to provide defense-in-depth against payload injection.
