@@ -6,3 +6,7 @@
 ## 2024-05-18 - Canvas Drawing Loop Optimization
 **Learning:** Re-rendering many high-resolution images to the canvas on every `mousemove` event (such as when drawing annotations) causes massive CPU spikes and severe frame drops.
 **Action:** Always implement a background layer caching mechanism (via off-screen canvas) for static content in interactive drawing tools so `mousemove` only redraws the active annotation and composite the cached background.
+
+## 2024-05-24 - Canvas getImageData Optimization
+**Learning:** Creating new off-screen `<canvas>` elements dynamically on every function call (especially for hot paths like auto-stitching algorithms) causes massive garbage collection thrashing and unnecessary DOM allocation. Furthermore, `getImageData` forces expensive GPU-to-CPU readbacks if the context is not explicitly optimized.
+**Action:** Use module-level variables to cache `<canvas>` elements across function calls. When initializing their contexts specifically for pixel reading, pass `{ willReadFrequently: true }` to keep the buffer in CPU memory.

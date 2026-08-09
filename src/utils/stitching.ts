@@ -1,3 +1,9 @@
+// Module-level cache for auto-stitching canvases to prevent DOM reallocation and garbage collection thrashing
+let overlapCanvasA: HTMLCanvasElement | null = null;
+let overlapCanvasB: HTMLCanvasElement | null = null;
+let overlapCtxA: CanvasRenderingContext2D | null = null;
+let overlapCtxB: CanvasRenderingContext2D | null = null;
+
 /**
  * Helper to load an image URL into an HTMLImageElement
  */
@@ -37,19 +43,48 @@ export function detectOverlap(
 
   if (maxOverlap < minOverlap) return 0;
 
-  // Create temporary canvases to extract pixel data
-  const canvasA = document.createElement('canvas');
-  const canvasB = document.createElement('canvas');
+  // Re-use module-level canvases to prevent DOM allocation on every call
+  if (!overlapCanvasA || !overlapCanvasB) {
+    overlapCanvasA = document.createElement('canvas');
+    overlapCanvasB = document.createElement('canvas');
+    // willReadFrequently optimizes context for getImageData readbacks by keeping the buffer in CPU memory
+    overlapCtxA = overlapCanvasA.getContext('2d', { willReadFrequently: true });
+    overlapCtxB = overlapCanvasB.getContext('2d', { willReadFrequently: true });
+  }
 
-  const ctxA = canvasA.getContext('2d');
-  const ctxB = canvasB.getContext('2d');
+  const canvasA = overlapCanvasA;
+  const canvasB = overlapCanvasB;
+  const ctxA = overlapCtxA;
+  const ctxB = overlapCtxB;
 
   if (!ctxA || !ctxB) return 0;
 
-  canvasA.width = sampleWidth;
-  canvasA.height = maxOverlap;
-  canvasB.width = sampleWidth;
-  canvasB.height = maxOverlap;
+  // Conditionally assign canvas dimensions only on change to avoid expensive layout thrashing and implicit buffer clearing
+  let resizedA = false;
+  if (canvasA.width !== sampleWidth) {
+    canvasA.width = sampleWidth;
+    resizedA = true;
+  }
+  if (canvasA.height !== maxOverlap) {
+    canvasA.height = maxOverlap;
+    resizedA = true;
+  }
+  if (!resizedA) {
+    ctxA.clearRect(0, 0, sampleWidth, maxOverlap);
+  }
+
+  let resizedB = false;
+  if (canvasB.width !== sampleWidth) {
+    canvasB.width = sampleWidth;
+    resizedB = true;
+  }
+  if (canvasB.height !== maxOverlap) {
+    canvasB.height = maxOverlap;
+    resizedB = true;
+  }
+  if (!resizedB) {
+    ctxB.clearRect(0, 0, sampleWidth, maxOverlap);
+  }
 
   // Draw the bottom portion of image 1
   const srcXA = Math.max(0, (width1 - sampleWidth) / 2);
