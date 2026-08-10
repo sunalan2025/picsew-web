@@ -14,7 +14,7 @@ import { ImageUploader } from './ImageUploader';
 interface ControlPanelProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  
+
   // Stitching
   direction: 'vertical' | 'horizontal';
   setDirection: (dir: 'vertical' | 'horizontal') => void;
@@ -170,12 +170,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       </div>
 
       {/* Tab Panels */}
-      <div
-        id={`panel-${activeTab}`}
-        role="tabpanel"
-        aria-labelledby={`tab-${activeTab}`}
-        className="flex-1 overflow-y-auto p-4 space-y-5"
-      >
+      <div className="flex-1 overflow-y-auto p-4 space-y-5">
         {!hasImages && activeTab !== 'upload' && (
           <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 text-xs py-10">
             <ShieldAlert className="w-8 h-8 text-gray-600 mb-2" />
@@ -334,7 +329,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                       <Split className="w-3.5 h-3.5" />
                       放置垂直分割线 (Vertical Split)
                     </button>
-                    
+
                     <button
                       onClick={() => setSelectedTool('select')}
                       className={`w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 border transition ${
