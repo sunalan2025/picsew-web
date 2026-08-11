@@ -339,7 +339,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 {/* Reset button */}
                 {onResetCropsAndSplits && (
                   <button
-                    onClick={onResetCropsAndSplits}
+                    onClick={() => {
+                      if (window.confirm("确定要重置所有裁剪与分割吗？")) {
+                        onResetCropsAndSplits();
+                      }
+                    }}
                     className="w-full flex items-center justify-center gap-1.5 py-2 bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-900/30 text-xs font-semibold rounded-lg transition mt-4"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -455,7 +459,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     </button>
                   </div>
                   <button
-                    onClick={onClearAnnotations}
+                    onClick={() => {
+                      if (window.confirm("确定要清除所有标注吗？")) {
+                        onClearAnnotations();
+                      }
+                    }}
                     className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-900/30 text-xs font-semibold rounded-lg transition"
                   >
                     <Trash2 className="w-3.5 h-3.5" />

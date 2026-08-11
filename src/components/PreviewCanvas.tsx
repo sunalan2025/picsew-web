@@ -1044,7 +1044,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
           <button
             onClick={onResetAll}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-900/30 rounded-lg text-xs font-semibold transition cursor-pointer select-none"
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-900/30 rounded-lg text-xs font-semibold transition cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-red-500 focus:outline-none"
             title="重置清空所有裁剪、分割和标注"
           >
             <RotateCcw className="w-3.5 h-3.5" />
