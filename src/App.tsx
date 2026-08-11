@@ -452,14 +452,17 @@ function App() {
     const mime = exportConfig.format === 'png' ? 'image/png' : 'image/jpeg';
     const ext = exportConfig.format;
 
-    for (let i = 0; i < slicesCount; i++) {
-      const currentSliceH = Math.min(sliceH, totalH - i * sliceH);
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = totalW;
-      tempCanvas.height = currentSliceH;
-      const tempCtx = tempCanvas.getContext('2d');
-      
-      if (tempCtx) {
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+
+    if (tempCtx) {
+      for (let i = 0; i < slicesCount; i++) {
+        const currentSliceH = Math.min(sliceH, totalH - i * sliceH);
+
+        if (tempCanvas.width !== totalW) tempCanvas.width = totalW;
+        if (tempCanvas.height !== currentSliceH) tempCanvas.height = currentSliceH;
+        else tempCtx.clearRect(0, 0, totalW, currentSliceH);
+
         tempCtx.drawImage(
           canvas,
           0, i * sliceH, totalW, currentSliceH,
