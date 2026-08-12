@@ -121,9 +121,12 @@ const drawSingleAnnotation = (ctx: CanvasRenderingContext2D, anno: Annotation) =
 
           const tempCtx = tempBlurCanvas.getContext('2d', { willReadFrequently: true });
           if (tempCtx) {
-            if (tempBlurCanvas.width !== w) tempBlurCanvas.width = w;
-            if (tempBlurCanvas.height !== h) tempBlurCanvas.height = h;
-            else tempCtx.clearRect(0, 0, w, h);
+            // PERFORMANCE OPTIMIZATION: Only call clearRect if canvas dimensions didn't change,
+            // because assigning width/height implicitly clears the buffer. Avoids redundant clears.
+            let tempResized = false;
+            if (tempBlurCanvas.width !== w) { tempBlurCanvas.width = w; tempResized = true; }
+            if (tempBlurCanvas.height !== h) { tempBlurCanvas.height = h; tempResized = true; }
+            if (!tempResized) tempCtx.clearRect(0, 0, w, h);
 
             // Draw from main canvas to temp canvas to avoid expensive getImageData readback
             tempCtx.drawImage(ctx.canvas, x, y, w, h, 0, 0, w, h);
@@ -136,9 +139,11 @@ const drawSingleAnnotation = (ctx: CanvasRenderingContext2D, anno: Annotation) =
               
               const pixelCtx = pixelBlurCanvas.getContext('2d', { willReadFrequently: true });
               if (pixelCtx) {
-                if (pixelBlurCanvas.width !== sw) pixelBlurCanvas.width = sw;
-                if (pixelBlurCanvas.height !== sh) pixelBlurCanvas.height = sh;
-                else pixelCtx.clearRect(0, 0, sw, sh);
+                // PERFORMANCE OPTIMIZATION: Only call clearRect if canvas dimensions didn't change.
+                let pixelResized = false;
+                if (pixelBlurCanvas.width !== sw) { pixelBlurCanvas.width = sw; pixelResized = true; }
+                if (pixelBlurCanvas.height !== sh) { pixelBlurCanvas.height = sh; pixelResized = true; }
+                if (!pixelResized) pixelCtx.clearRect(0, 0, sw, sh);
 
                 pixelCtx.imageSmoothingEnabled = false;
                 pixelCtx.drawImage(tempBlurCanvas, 0, 0, sw, sh);
@@ -287,9 +292,11 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
     if (stitchedCacheCanvasRef.current && lastStitchDepsRef.current === currentDeps && allLoaded) {
       const cache = stitchedCacheCanvasRef.current;
-      if (baseCanvas.width !== cache.width) baseCanvas.width = cache.width;
-      if (baseCanvas.height !== cache.height) baseCanvas.height = cache.height;
-      ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
+      // PERFORMANCE OPTIMIZATION: Track resize. Only clearRect if implicit dimension reset didn't happen.
+      let resized = false;
+      if (baseCanvas.width !== cache.width) { baseCanvas.width = cache.width; resized = true; }
+      if (baseCanvas.height !== cache.height) { baseCanvas.height = cache.height; resized = true; }
+      if (!resized) ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
       ctx.drawImage(cache, 0, 0);
       return baseCanvas;
     }
@@ -397,9 +404,11 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
       lastStitchDepsRef.current = currentDeps;
     }
 
-    if (baseCanvas.width !== cacheCanvas.width) baseCanvas.width = cacheCanvas.width;
-    if (baseCanvas.height !== cacheCanvas.height) baseCanvas.height = cacheCanvas.height;
-    ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
+    // PERFORMANCE OPTIMIZATION: Only clearRect if baseCanvas dimensions didn't change (avoiding double clear).
+    let baseResized = false;
+    if (baseCanvas.width !== cacheCanvas.width) { baseCanvas.width = cacheCanvas.width; baseResized = true; }
+    if (baseCanvas.height !== cacheCanvas.height) { baseCanvas.height = cacheCanvas.height; baseResized = true; }
+    if (!baseResized) ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
     ctx.drawImage(cacheCanvas, 0, 0);
 
     return baseCanvas;
