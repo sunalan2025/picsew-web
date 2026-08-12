@@ -116,8 +116,10 @@ function App() {
   // Revert all edits (crops, splits, annotations) back to the original uploaded state
   const handleResetAll = () => {
     if (history.length > 0) {
-      const firstState = history[0];
-      commitState(firstState.images, firstState.overlaps, firstState.annotations);
+      if (window.confirm("确定要重置并清空所有修改吗？")) {
+        const firstState = history[0];
+        commitState(firstState.images, firstState.overlaps, firstState.annotations);
+      }
     }
   };
 
