@@ -496,22 +496,24 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             {activeTab === 'statusbar' && (
               <div className="space-y-4">
                 {/* Toggle Enable */}
-                <div className="flex justify-between items-center bg-dark-800/40 p-2.5 rounded-lg border border-dark-700/40">
+                <label htmlFor="statusbar-enable" className="flex justify-between items-center bg-dark-800/40 p-2.5 rounded-lg border border-dark-700/40 cursor-pointer hover:bg-dark-800/60 transition-colors">
                   <span className="text-xs font-bold text-gray-300">状态栏美化覆盖</span>
                   <input
+                    id="statusbar-enable"
                     type="checkbox"
                     checked={statusBar.enabled}
                     onChange={(e) => setStatusBar({ ...statusBar, enabled: e.target.checked })}
-                    className="w-4 h-4 rounded text-primary-500 bg-dark-900 border-dark-700 focus:ring-primary-500 accent-primary-500"
+                    className="w-4 h-4 rounded text-primary-500 bg-dark-900 border-dark-700 focus:ring-primary-500 accent-primary-500 cursor-pointer"
                   />
-                </div>
+                </label>
 
                 {statusBar.enabled && (
                   <div className="space-y-4 animate-fade-in">
                     {/* Time Input */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-gray-400">时间文本</label>
+                      <label htmlFor="statusbar-time" className="text-xs font-bold text-gray-400 cursor-pointer">时间文本</label>
                       <input
+                        id="statusbar-time"
                         type="text"
                         maxLength={10}
                         value={statusBar.time}
@@ -593,8 +595,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               <div className="space-y-4">
                 {/* Select Device */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-400">套壳机型</label>
+                  <label htmlFor="mockup-device" className="text-xs font-bold text-gray-400 cursor-pointer">套壳机型</label>
                   <select
+                    id="mockup-device"
                     value={mockup.device}
                     onChange={(e) => setMockup({ ...mockup, device: e.target.value as any })}
                     className="w-full bg-dark-800 border border-dark-700 rounded-lg py-1.5 px-3 text-xs text-gray-200 focus:border-primary-500 outline-hidden"
@@ -708,15 +711,16 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     </div>
 
                     {/* Shadow toggle */}
-                    <div className="flex justify-between items-center bg-dark-800/40 p-2.5 rounded-lg border border-dark-700/40">
+                    <label htmlFor="mockup-shadow" className="flex justify-between items-center bg-dark-800/40 p-2.5 rounded-lg border border-dark-700/40 cursor-pointer hover:bg-dark-800/60 transition-colors">
                       <span className="text-xs font-bold text-gray-300">立体设备阴影</span>
                       <input
+                        id="mockup-shadow"
                         type="checkbox"
                         checked={mockup.shadow}
                         onChange={(e) => setMockup({ ...mockup, shadow: e.target.checked })}
-                        className="w-4 h-4 rounded accent-primary-500"
+                        className="w-4 h-4 rounded accent-primary-500 cursor-pointer"
                       />
-                    </div>
+                    </label>
                   </div>
                 )}
               </div>

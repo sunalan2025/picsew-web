@@ -10,3 +10,7 @@
 **Learning:** To interact with specific UI tools conditionally rendered in the Control Panel during Playwright verification (like testing confirmation dialogs), you must first ensure the relevant parent tab is clicked to reveal the buttons, and you must add `page.on("dialog", lambda dialog: dialog.accept())` to prevent the test from hanging on `window.confirm`.
 **Action:** Always ensure UI elements are rendered by their parent containers before interacting with them in verification scripts, and register dialog handlers when verifying native confirmation popups.
 
+
+## 2025-02-15 - Input and Label Associations & Checkbox Click Targets
+**Learning:** In `ControlPanel.tsx`, many labels were completely disconnected from their inputs, which hindered screen readers from associating the description with the interactive element. Additionally, boolean toggles (like "状态栏美化覆盖" and "立体设备阴影") used `<input type="checkbox">` wrapped inside simple `<div>` blocks. This layout resulted in extremely small click targets, as users had to click precisely on the checkbox itself rather than the descriptive text.
+**Action:** Always ensure that every form input (e.g. text inputs, selects, colors) has a matching `id` linked to a `<label htmlFor="...">`. For custom list-item checkboxes, convert the wrapping container from a `<div>` to a `<label>` (with `cursor-pointer`), allowing the entire row (including the text) to function as a large, accessible click target to toggle the checkbox.
