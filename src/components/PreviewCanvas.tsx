@@ -65,8 +65,8 @@ const drawArrow = (
   ctx.fill();
 };
 
-const tempBlurCanvas = document.createElement('canvas');
-const pixelBlurCanvas = document.createElement('canvas');
+let tempBlurCanvas: HTMLCanvasElement | null = null;
+let pixelBlurCanvas: HTMLCanvasElement | null = null;
 
 const drawSingleAnnotation = (ctx: CanvasRenderingContext2D, anno: Annotation) => {
   ctx.save();
@@ -116,11 +116,14 @@ const drawSingleAnnotation = (ctx: CanvasRenderingContext2D, anno: Annotation) =
 
       if (w > 4 && h > 4) {
         try {
-          const tempCtx = tempBlurCanvas.getContext('2d');
+          if (!tempBlurCanvas) tempBlurCanvas = document.createElement('canvas');
+          if (!pixelBlurCanvas) pixelBlurCanvas = document.createElement('canvas');
+
+          const tempCtx = tempBlurCanvas.getContext('2d', { willReadFrequently: true });
           if (tempCtx) {
             if (tempBlurCanvas.width !== w) tempBlurCanvas.width = w;
             if (tempBlurCanvas.height !== h) tempBlurCanvas.height = h;
-            tempCtx.clearRect(0, 0, w, h);
+            else tempCtx.clearRect(0, 0, w, h);
 
             // Draw from main canvas to temp canvas to avoid expensive getImageData readback
             tempCtx.drawImage(ctx.canvas, x, y, w, h, 0, 0, w, h);
@@ -131,11 +134,11 @@ const drawSingleAnnotation = (ctx: CanvasRenderingContext2D, anno: Annotation) =
               const sw = Math.max(1, Math.round(w * scale));
               const sh = Math.max(1, Math.round(h * scale));
               
-              const pixelCtx = pixelBlurCanvas.getContext('2d');
+              const pixelCtx = pixelBlurCanvas.getContext('2d', { willReadFrequently: true });
               if (pixelCtx) {
                 if (pixelBlurCanvas.width !== sw) pixelBlurCanvas.width = sw;
                 if (pixelBlurCanvas.height !== sh) pixelBlurCanvas.height = sh;
-                pixelCtx.clearRect(0, 0, sw, sh);
+                else pixelCtx.clearRect(0, 0, sw, sh);
 
                 pixelCtx.imageSmoothingEnabled = false;
                 pixelCtx.drawImage(tempBlurCanvas, 0, 0, sw, sh);

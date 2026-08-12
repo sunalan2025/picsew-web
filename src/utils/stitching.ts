@@ -11,6 +11,9 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+let cachedCanvasA: HTMLCanvasElement | null = null;
+let cachedCanvasB: HTMLCanvasElement | null = null;
+
 /**
  * Automatically detects the pixel overlap height between two images.
  * It takes a center vertical strip of both images to perform MAD (Mean Absolute Difference) matching.
@@ -38,18 +41,25 @@ export function detectOverlap(
   if (maxOverlap < minOverlap) return 0;
 
   // Create temporary canvases to extract pixel data
-  const canvasA = document.createElement('canvas');
-  const canvasB = document.createElement('canvas');
+  if (!cachedCanvasA) cachedCanvasA = document.createElement('canvas');
+  if (!cachedCanvasB) cachedCanvasB = document.createElement('canvas');
 
-  const ctxA = canvasA.getContext('2d');
-  const ctxB = canvasB.getContext('2d');
+  const canvasA = cachedCanvasA;
+  const canvasB = cachedCanvasB;
+
+  const ctxA = canvasA.getContext('2d', { willReadFrequently: true });
+  const ctxB = canvasB.getContext('2d', { willReadFrequently: true });
 
   if (!ctxA || !ctxB) return 0;
 
-  canvasA.width = sampleWidth;
-  canvasA.height = maxOverlap;
-  canvasB.width = sampleWidth;
-  canvasB.height = maxOverlap;
+  // Conditionally update canvas width/height to avoid expensive buffer re-allocation
+  if (canvasA.width !== sampleWidth) canvasA.width = sampleWidth;
+  if (canvasA.height !== maxOverlap) canvasA.height = maxOverlap;
+  else ctxA.clearRect(0, 0, sampleWidth, maxOverlap);
+
+  if (canvasB.width !== sampleWidth) canvasB.width = sampleWidth;
+  if (canvasB.height !== maxOverlap) canvasB.height = maxOverlap;
+  else ctxB.clearRect(0, 0, sampleWidth, maxOverlap);
 
   // Draw the bottom portion of image 1
   const srcXA = Math.max(0, (width1 - sampleWidth) / 2);
