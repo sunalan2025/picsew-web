@@ -132,13 +132,21 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Navigation tabs */}
-      <div className="flex border-b border-dark-700/80 p-1 bg-dark-900/60 shrink-0 overflow-x-auto">
+      <div
+        role="tablist"
+        aria-label="控制面板标签"
+        className="flex border-b border-dark-700/80 p-1 bg-dark-900/60 shrink-0 overflow-x-auto"
+      >
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
+              role="tab"
+              aria-selected={isActive}
+              aria-controls={`panel-${tab.id}`}
+              id={`tab-${tab.id}`}
               onClick={() => {
                 setActiveTab(tab.id);
                 if (tab.id !== 'cut' && (selectedTool === 'cut-horizontal' || selectedTool === 'cut-vertical')) {
@@ -148,7 +156,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   setSelectedTool('pen');
                 }
               }}
-              className={`flex-1 flex flex-col items-center justify-center py-2 px-1.5 min-w-[50px] text-[10px] font-semibold rounded-lg transition-all ${
+              className={`flex-1 flex flex-col items-center justify-center py-2 px-1.5 min-w-[50px] text-[10px] font-semibold rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
                 isActive
                   ? 'bg-primary-500/15 text-primary-300 border border-primary-500/30'
                   : 'text-gray-400 hover:text-gray-200 hover:bg-dark-800'
@@ -162,7 +170,12 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       </div>
 
       {/* Tab Panels */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
+      <div
+        role="tabpanel"
+        id={`panel-${activeTab}`}
+        aria-labelledby={`tab-${activeTab}`}
+        className="flex-1 overflow-y-auto p-4 space-y-5"
+      >
         {!hasImages && activeTab !== 'upload' && (
           <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 text-xs py-10">
             <ShieldAlert className="w-8 h-8 text-gray-600 mb-2" />
@@ -196,7 +209,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   <div className="flex gap-2">
                     <button
                       onClick={() => setDirection('vertical')}
-                      className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition ${
+                      aria-pressed={direction === 'vertical'}
+                      className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
                         direction === 'vertical'
                           ? 'bg-primary-600 text-white'
                           : 'bg-dark-800 text-gray-400 border border-dark-700/50 hover:bg-dark-700'
@@ -206,7 +220,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     </button>
                     <button
                       onClick={() => setDirection('horizontal')}
-                      className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition ${
+                      aria-pressed={direction === 'horizontal'}
+                      className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
                         direction === 'horizontal'
                           ? 'bg-primary-600 text-white'
                           : 'bg-dark-800 text-gray-400 border border-dark-700/50 hover:bg-dark-700'
@@ -300,7 +315,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   <div className="flex flex-col gap-2">
                     <button
                       onClick={() => setSelectedTool('cut-horizontal')}
-                      className={`w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 border transition ${
+                      aria-pressed={selectedTool === 'cut-horizontal'}
+                      className={`w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 border transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
                         selectedTool === 'cut-horizontal'
                           ? 'bg-red-600 border-red-500 text-white shadow-md'
                           : 'bg-dark-800 border-dark-700/60 text-gray-400 hover:bg-dark-700'
@@ -312,7 +328,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
                     <button
                       onClick={() => setSelectedTool('cut-vertical')}
-                      className={`w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 border transition ${
+                      aria-pressed={selectedTool === 'cut-vertical'}
+                      className={`w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 border transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
                         selectedTool === 'cut-vertical'
                           ? 'bg-blue-600 border-blue-500 text-white shadow-md'
                           : 'bg-dark-800 border-dark-700/60 text-gray-400 hover:bg-dark-700'
@@ -324,7 +341,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     
                     <button
                       onClick={() => setSelectedTool('select')}
-                      className={`w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 border transition ${
+                      aria-pressed={selectedTool === 'select'}
+                      className={`w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 border transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
                         selectedTool === 'select'
                           ? 'bg-primary-600 border-primary-500 text-white shadow-md'
                           : 'bg-dark-800 border-dark-700/60 text-gray-400 hover:bg-dark-700'
@@ -364,7 +382,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                       <button
                         key={t}
                         onClick={() => setSelectedTool(t)}
-                        className={`py-2 px-1 rounded-lg text-xs font-semibold border capitalize transition ${
+                        aria-pressed={selectedTool === t}
+                        className={`py-2 px-1 rounded-lg text-xs font-semibold border capitalize transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
                           selectedTool === t
                             ? 'bg-primary-600 border-primary-500 text-white shadow-md'
                             : 'bg-dark-800 border-dark-700/60 text-gray-400 hover:bg-dark-700'
