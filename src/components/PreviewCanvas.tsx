@@ -121,9 +121,16 @@ const drawSingleAnnotation = (ctx: CanvasRenderingContext2D, anno: Annotation) =
 
           const tempCtx = tempBlurCanvas.getContext('2d', { willReadFrequently: true });
           if (tempCtx) {
-            if (tempBlurCanvas.width !== w) tempBlurCanvas.width = w;
-            if (tempBlurCanvas.height !== h) tempBlurCanvas.height = h;
-            else tempCtx.clearRect(0, 0, w, h);
+            let tempResized = false;
+            if (tempBlurCanvas.width !== w) {
+              tempBlurCanvas.width = w;
+              tempResized = true;
+            }
+            if (tempBlurCanvas.height !== h) {
+              tempBlurCanvas.height = h;
+              tempResized = true;
+            }
+            if (!tempResized) tempCtx.clearRect(0, 0, w, h);
 
             // Draw from main canvas to temp canvas to avoid expensive getImageData readback
             tempCtx.drawImage(ctx.canvas, x, y, w, h, 0, 0, w, h);
@@ -136,9 +143,16 @@ const drawSingleAnnotation = (ctx: CanvasRenderingContext2D, anno: Annotation) =
               
               const pixelCtx = pixelBlurCanvas.getContext('2d', { willReadFrequently: true });
               if (pixelCtx) {
-                if (pixelBlurCanvas.width !== sw) pixelBlurCanvas.width = sw;
-                if (pixelBlurCanvas.height !== sh) pixelBlurCanvas.height = sh;
-                else pixelCtx.clearRect(0, 0, sw, sh);
+                let pixelResized = false;
+                if (pixelBlurCanvas.width !== sw) {
+                  pixelBlurCanvas.width = sw;
+                  pixelResized = true;
+                }
+                if (pixelBlurCanvas.height !== sh) {
+                  pixelBlurCanvas.height = sh;
+                  pixelResized = true;
+                }
+                if (!pixelResized) pixelCtx.clearRect(0, 0, sw, sh);
 
                 pixelCtx.imageSmoothingEnabled = false;
                 pixelCtx.drawImage(tempBlurCanvas, 0, 0, sw, sh);
@@ -397,9 +411,16 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
       lastStitchDepsRef.current = currentDeps;
     }
 
-    if (baseCanvas.width !== cacheCanvas.width) baseCanvas.width = cacheCanvas.width;
-    if (baseCanvas.height !== cacheCanvas.height) baseCanvas.height = cacheCanvas.height;
-    ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
+    let baseResized = false;
+    if (baseCanvas.width !== cacheCanvas.width) {
+      baseCanvas.width = cacheCanvas.width;
+      baseResized = true;
+    }
+    if (baseCanvas.height !== cacheCanvas.height) {
+      baseCanvas.height = cacheCanvas.height;
+      baseResized = true;
+    }
+    if (!baseResized) ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
     ctx.drawImage(cacheCanvas, 0, 0);
 
     return baseCanvas;
