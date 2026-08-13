@@ -53,6 +53,13 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         reader.onload = (event) => {
           const img = new Image();
           img.onload = () => {
+            // SECURITY: Prevent image bomb (pixel flood) DoS attacks
+            if (img.naturalWidth * img.naturalHeight > 36000000) {
+              alert(`图片 ${file.name} 像素尺寸过大，可能导致浏览器内存溢出 (Image dimensions too large)`);
+              resolve(null);
+              return;
+            }
+
             resolve({
               id: crypto.randomUUID(),
               name: file.name,
