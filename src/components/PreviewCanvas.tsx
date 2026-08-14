@@ -121,9 +121,10 @@ const drawSingleAnnotation = (ctx: CanvasRenderingContext2D, anno: Annotation) =
 
           const tempCtx = tempBlurCanvas.getContext('2d', { willReadFrequently: true });
           if (tempCtx) {
-            if (tempBlurCanvas.width !== w) tempBlurCanvas.width = w;
-            if (tempBlurCanvas.height !== h) tempBlurCanvas.height = h;
-            else tempCtx.clearRect(0, 0, w, h);
+            let resizedTemp = false;
+            if (tempBlurCanvas.width !== w) { tempBlurCanvas.width = w; resizedTemp = true; }
+            if (tempBlurCanvas.height !== h) { tempBlurCanvas.height = h; resizedTemp = true; }
+            if (!resizedTemp) tempCtx.clearRect(0, 0, w, h);
 
             // Draw from main canvas to temp canvas to avoid expensive getImageData readback
             tempCtx.drawImage(ctx.canvas, x, y, w, h, 0, 0, w, h);
@@ -136,9 +137,10 @@ const drawSingleAnnotation = (ctx: CanvasRenderingContext2D, anno: Annotation) =
               
               const pixelCtx = pixelBlurCanvas.getContext('2d', { willReadFrequently: true });
               if (pixelCtx) {
-                if (pixelBlurCanvas.width !== sw) pixelBlurCanvas.width = sw;
-                if (pixelBlurCanvas.height !== sh) pixelBlurCanvas.height = sh;
-                else pixelCtx.clearRect(0, 0, sw, sh);
+                let resizedPixel = false;
+                if (pixelBlurCanvas.width !== sw) { pixelBlurCanvas.width = sw; resizedPixel = true; }
+                if (pixelBlurCanvas.height !== sh) { pixelBlurCanvas.height = sh; resizedPixel = true; }
+                if (!resizedPixel) pixelCtx.clearRect(0, 0, sw, sh);
 
                 pixelCtx.imageSmoothingEnabled = false;
                 pixelCtx.drawImage(tempBlurCanvas, 0, 0, sw, sh);
@@ -287,9 +289,10 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
     if (stitchedCacheCanvasRef.current && lastStitchDepsRef.current === currentDeps && allLoaded) {
       const cache = stitchedCacheCanvasRef.current;
-      if (baseCanvas.width !== cache.width) baseCanvas.width = cache.width;
-      if (baseCanvas.height !== cache.height) baseCanvas.height = cache.height;
-      ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
+      let resizedBase = false;
+      if (baseCanvas.width !== cache.width) { baseCanvas.width = cache.width; resizedBase = true; }
+      if (baseCanvas.height !== cache.height) { baseCanvas.height = cache.height; resizedBase = true; }
+      if (!resizedBase) ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
       ctx.drawImage(cache, 0, 0);
       return baseCanvas;
     }
@@ -366,13 +369,18 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
     const cacheCanvas = stitchedCacheCanvasRef.current || document.createElement('canvas');
     stitchedCacheCanvasRef.current = cacheCanvas;
-    if (cacheCanvas.width !== targetW) cacheCanvas.width = targetW;
-    if (cacheCanvas.height !== targetH) cacheCanvas.height = targetH;
+    let resizedCache = false;
+    if (cacheCanvas.width !== targetW) { cacheCanvas.width = targetW; resizedCache = true; }
+    if (cacheCanvas.height !== targetH) { cacheCanvas.height = targetH; resizedCache = true; }
 
     const cacheCtx = cacheCanvas.getContext('2d');
     if (!cacheCtx) return baseCanvas;
 
-    // Clean canvas
+    // Clean canvas - only if not resized (resizing implicitly clears to transparent black)
+    // We fill it with the dark background color.
+    if (!resizedCache) {
+      cacheCtx.clearRect(0, 0, cacheCanvas.width, cacheCanvas.height);
+    }
     cacheCtx.fillStyle = '#0f0f12';
     cacheCtx.fillRect(0, 0, cacheCanvas.width, cacheCanvas.height);
 
@@ -397,9 +405,10 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
       lastStitchDepsRef.current = currentDeps;
     }
 
-    if (baseCanvas.width !== cacheCanvas.width) baseCanvas.width = cacheCanvas.width;
-    if (baseCanvas.height !== cacheCanvas.height) baseCanvas.height = cacheCanvas.height;
-    ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
+    let resizedBase = false;
+    if (baseCanvas.width !== cacheCanvas.width) { baseCanvas.width = cacheCanvas.width; resizedBase = true; }
+    if (baseCanvas.height !== cacheCanvas.height) { baseCanvas.height = cacheCanvas.height; resizedBase = true; }
+    if (!resizedBase) ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
     ctx.drawImage(cacheCanvas, 0, 0);
 
     return baseCanvas;
