@@ -235,10 +235,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 {/* Gap */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-xs font-bold text-gray-400">
-                    <span>接缝间距 (Gap)</span>
+                    <label htmlFor="gap-input">接缝间距 (Gap)</label>
                     <span className="text-primary-300 font-mono">{gap} px</span>
                   </div>
                   <input
+                    id="gap-input"
                     type="range"
                     min="0"
                     max="60"
@@ -497,8 +498,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               <div className="space-y-4">
                 {/* Toggle Enable */}
                 <div className="flex justify-between items-center bg-dark-800/40 p-2.5 rounded-lg border border-dark-700/40">
-                  <span className="text-xs font-bold text-gray-300">状态栏美化覆盖</span>
+                  <label htmlFor="statusbar-toggle" className="text-xs font-bold text-gray-300">状态栏美化覆盖</label>
                   <input
+                    id="statusbar-toggle"
                     type="checkbox"
                     checked={statusBar.enabled}
                     onChange={(e) => setStatusBar({ ...statusBar, enabled: e.target.checked })}
@@ -510,8 +512,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   <div className="space-y-4 animate-fade-in">
                     {/* Time Input */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-gray-400">时间文本</label>
+                      <label htmlFor="time-input" className="text-xs font-bold text-gray-400">时间文本</label>
                       <input
+                        id="time-input"
                         type="text"
                         maxLength={10}
                         value={statusBar.time}
@@ -524,10 +527,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     {/* Battery Slider */}
                     <div className="space-y-1.5">
                       <div className="flex justify-between text-xs text-gray-400 font-bold">
-                        <span>电量比例</span>
+                        <label htmlFor="battery-slider">电量比例</label>
                         <span className="text-primary-300 font-mono">{statusBar.battery}%</span>
                       </div>
                       <input
+                        id="battery-slider"
                         type="range"
                         min="0"
                         max="100"
