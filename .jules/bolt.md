@@ -6,3 +6,7 @@
 ## 2024-05-18 - Canvas Drawing Loop Optimization
 **Learning:** Re-rendering many high-resolution images to the canvas on every `mousemove` event (such as when drawing annotations) causes massive CPU spikes and severe frame drops.
 **Action:** Always implement a background layer caching mechanism (via off-screen canvas) for static content in interactive drawing tools so `mousemove` only redraws the active annotation and composite the cached background.
+
+## 2025-02-23 - Render Loop Re-evaluation CPU spikes
+**Learning:** Computing expensive operations like `JSON.stringify` directly inside the closure body of high-frequency dependency loops or `useCallback` hooks (like `renderStitchedImage`) causes unnecessary CPU spikes during interactive events, such as moving the mouse or drawing annotations.
+**Action:** Extract expensive variable generation into a separate `useMemo` dependency tracker and pass its result directly into the rendering loop or computation closure.

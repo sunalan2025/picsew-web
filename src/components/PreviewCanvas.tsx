@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ZoomIn, ZoomOut, Maximize2, Minimize2, Undo2, RotateCcw
 } from 'lucide-react';
@@ -262,6 +262,16 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
     }
   }, [images.length, direction, handleFitWidth, handleFitHeight]);
 
+  const stitchDeps = useMemo(() => {
+    return JSON.stringify({
+      images: images.map(img => `${img.id}-${img.cropTop}-${img.cropBottom}-${img.cropLeft}-${img.cropRight}`),
+      direction,
+      gap,
+      overlaps,
+      statusBar
+    });
+  }, [images, direction, gap, overlaps, statusBar]);
+
   // Core Render Loop: Builds the stitched image + statusbar + crops
   const renderStitchedImage = useCallback((): HTMLCanvasElement => {
     const baseCanvas = baseCanvasRef.current || document.createElement('canvas');
@@ -270,13 +280,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
     const ctx = baseCanvas.getContext('2d');
     if (!ctx || images.length === 0) return baseCanvas;
 
-    const currentDeps = JSON.stringify({
-      images: images.map(img => `${img.id}-${img.cropTop}-${img.cropBottom}-${img.cropLeft}-${img.cropRight}`),
-      direction,
-      gap,
-      overlaps,
-      statusBar
-    });
+    const currentDeps = stitchDeps;
 
     let allLoaded = true;
     for (const img of images) {
@@ -287,9 +291,12 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
     if (stitchedCacheCanvasRef.current && lastStitchDepsRef.current === currentDeps && allLoaded) {
       const cache = stitchedCacheCanvasRef.current;
-      if (baseCanvas.width !== cache.width) baseCanvas.width = cache.width;
-      if (baseCanvas.height !== cache.height) baseCanvas.height = cache.height;
-      ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
+      let resized = false;
+      if (baseCanvas.width !== cache.width) { baseCanvas.width = cache.width; resized = true; }
+      if (baseCanvas.height !== cache.height) { baseCanvas.height = cache.height; resized = true; }
+      if (!resized) {
+        ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
+      }
       ctx.drawImage(cache, 0, 0);
       return baseCanvas;
     }
@@ -366,8 +373,8 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
     const cacheCanvas = stitchedCacheCanvasRef.current || document.createElement('canvas');
     stitchedCacheCanvasRef.current = cacheCanvas;
-    if (cacheCanvas.width !== targetW) cacheCanvas.width = targetW;
-    if (cacheCanvas.height !== targetH) cacheCanvas.height = targetH;
+    if (cacheCanvas.width !== targetW) { cacheCanvas.width = targetW; }
+    if (cacheCanvas.height !== targetH) { cacheCanvas.height = targetH; }
 
     const cacheCtx = cacheCanvas.getContext('2d');
     if (!cacheCtx) return baseCanvas;
@@ -397,13 +404,16 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
       lastStitchDepsRef.current = currentDeps;
     }
 
-    if (baseCanvas.width !== cacheCanvas.width) baseCanvas.width = cacheCanvas.width;
-    if (baseCanvas.height !== cacheCanvas.height) baseCanvas.height = cacheCanvas.height;
-    ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
+    let baseResized = false;
+    if (baseCanvas.width !== cacheCanvas.width) { baseCanvas.width = cacheCanvas.width; baseResized = true; }
+    if (baseCanvas.height !== cacheCanvas.height) { baseCanvas.height = cacheCanvas.height; baseResized = true; }
+    if (!baseResized) {
+      ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
+    }
     ctx.drawImage(cacheCanvas, 0, 0);
 
     return baseCanvas;
-  }, [images, direction, overlaps, gap, statusBar]);
+  }, [images, direction, overlaps, gap, statusBar, stitchDeps]);
 
 
 
