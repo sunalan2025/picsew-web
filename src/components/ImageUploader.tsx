@@ -53,6 +53,14 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         reader.onload = (event) => {
           const img = new Image();
           img.onload = () => {
+            // SECURITY: Validate uncompressed pixel footprint to prevent Image Bomb / Pixel Flood OOM DoS
+            const MAX_PIXELS = 50000000; // 50 Megapixels
+            if (img.naturalWidth * img.naturalHeight > MAX_PIXELS) {
+              alert(`图片 ${file.name} 像素过大，可能导致内存溢出 (Image pixel dimensions too large)`);
+              resolve(null);
+              return;
+            }
+
             resolve({
               id: crypto.randomUUID(),
               name: file.name,
