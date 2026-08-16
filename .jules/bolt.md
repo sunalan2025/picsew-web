@@ -6,3 +6,7 @@
 ## 2024-05-18 - Canvas Drawing Loop Optimization
 **Learning:** Re-rendering many high-resolution images to the canvas on every `mousemove` event (such as when drawing annotations) causes massive CPU spikes and severe frame drops.
 **Action:** Always implement a background layer caching mechanism (via off-screen canvas) for static content in interactive drawing tools so `mousemove` only redraws the active annotation and composite the cached background.
+
+## 2024-09-04 - JSON.stringify rendering loop optimization
+**Learning:** In interactive canvas environments like `PreviewCanvas.tsx`, embedding `JSON.stringify` within hot paths (like `useCallback` functions evaluated during `mousemove` event loops) causes unnecessary continuous serialization and CPU spikes, even when the underlying data dependencies haven't changed.
+**Action:** Always hoist expensive dependency hash calculations (`JSON.stringify`) into a dedicated `useMemo` hook bound strictly to their actual input values. This guarantees the string serialization only executes when state actually updates, drastically reducing the cost of checking for cache hits during high-frequency interactive events.
