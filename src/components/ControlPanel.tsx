@@ -496,27 +496,28 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             {activeTab === 'statusbar' && (
               <div className="space-y-4">
                 {/* Toggle Enable */}
-                <div className="flex justify-between items-center bg-dark-800/40 p-2.5 rounded-lg border border-dark-700/40">
+                <label className="flex justify-between items-center bg-dark-800/40 p-2.5 rounded-lg border border-dark-700/40 cursor-pointer hover:bg-dark-800/60 transition">
                   <span className="text-xs font-bold text-gray-300">状态栏美化覆盖</span>
                   <input
                     type="checkbox"
                     checked={statusBar.enabled}
                     onChange={(e) => setStatusBar({ ...statusBar, enabled: e.target.checked })}
-                    className="w-4 h-4 rounded text-primary-500 bg-dark-900 border-dark-700 focus:ring-primary-500 accent-primary-500"
+                    className="w-4 h-4 rounded text-primary-500 bg-dark-900 border-dark-700 focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none accent-primary-500"
                   />
-                </div>
+                </label>
 
                 {statusBar.enabled && (
                   <div className="space-y-4 animate-fade-in">
                     {/* Time Input */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-gray-400">时间文本</label>
+                      <label htmlFor="statusBarTime" className="text-xs font-bold text-gray-400 cursor-pointer">时间文本</label>
                       <input
+                        id="statusBarTime"
                         type="text"
                         maxLength={10}
                         value={statusBar.time}
                         onChange={(e) => setStatusBar({ ...statusBar, time: e.target.value })}
-                        className="w-full bg-dark-800 border border-dark-700 rounded-lg py-1.5 px-3 text-xs text-gray-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-hidden font-mono"
+                        className="w-full bg-dark-800 border border-dark-700 rounded-lg py-1.5 px-3 text-xs text-gray-200 focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none font-mono"
                         placeholder="9:41"
                       />
                     </div>
@@ -593,11 +594,12 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               <div className="space-y-4">
                 {/* Select Device */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-400">套壳机型</label>
+                  <label htmlFor="mockupDevice" className="text-xs font-bold text-gray-400 cursor-pointer">套壳机型</label>
                   <select
+                    id="mockupDevice"
                     value={mockup.device}
                     onChange={(e) => setMockup({ ...mockup, device: e.target.value as any })}
-                    className="w-full bg-dark-800 border border-dark-700 rounded-lg py-1.5 px-3 text-xs text-gray-200 focus:border-primary-500 outline-hidden"
+                    className="w-full bg-dark-800 border border-dark-700 rounded-lg py-1.5 px-3 text-xs text-gray-200 focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
                   >
                     <option value="none">无套壳</option>
                     <option value="iphone15">iPhone 15 Pro (灵动岛)</option>
@@ -708,15 +710,15 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     </div>
 
                     {/* Shadow toggle */}
-                    <div className="flex justify-between items-center bg-dark-800/40 p-2.5 rounded-lg border border-dark-700/40">
+                    <label className="flex justify-between items-center bg-dark-800/40 p-2.5 rounded-lg border border-dark-700/40 cursor-pointer hover:bg-dark-800/60 transition">
                       <span className="text-xs font-bold text-gray-300">立体设备阴影</span>
                       <input
                         type="checkbox"
                         checked={mockup.shadow}
                         onChange={(e) => setMockup({ ...mockup, shadow: e.target.checked })}
-                        className="w-4 h-4 rounded accent-primary-500"
+                        className="w-4 h-4 rounded focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none accent-primary-500"
                       />
-                    </div>
+                    </label>
                   </div>
                 )}
               </div>
@@ -772,14 +774,15 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   </label>
                   <div className="space-y-1.5 bg-dark-850 p-2.5 rounded-lg border border-dark-700/40">
                     <div className="flex justify-between text-[11px] text-gray-400">
-                      <span>等高切片高度 (0 = 不分切)</span>
+                      <label htmlFor="exportScale" className="cursor-pointer">等高切片高度 (0 = 不分切)</label>
                       <span className="text-primary-300 font-mono">{exportConfig.scale === 0 ? '不切' : `${exportConfig.scale} px`}</span>
                     </div>
                     <input
+                      id="exportScale"
                       type="number"
                       value={exportConfig.scale}
                       onChange={(e) => setExportConfig({ ...exportConfig, scale: Math.max(0, parseInt(e.target.value) || 0) })}
-                      className="w-full bg-dark-800 border border-dark-700 rounded-md py-1.5 px-2.5 text-xs text-gray-200 mt-1 focus:border-primary-500 outline-hidden font-mono"
+                      className="w-full bg-dark-800 border border-dark-700 rounded-md py-1.5 px-2.5 text-xs text-gray-200 mt-1 focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none font-mono"
                       placeholder="例如 1200"
                     />
                   </div>

@@ -10,3 +10,7 @@
 **Learning:** To interact with specific UI tools conditionally rendered in the Control Panel during Playwright verification (like testing confirmation dialogs), you must first ensure the relevant parent tab is clicked to reveal the buttons, and you must add `page.on("dialog", lambda dialog: dialog.accept())` to prevent the test from hanging on `window.confirm`.
 **Action:** Always ensure UI elements are rendered by their parent containers before interacting with them in verification scripts, and register dialog handlers when verifying native confirmation popups.
 
+
+## 2024-05-24 - Form Accessibility Hit Areas & Focus
+**Learning:** Found multiple instances where interactive toggles (like "状态栏美化覆盖" and "立体设备阴影") were styled within generic `div` containers and simple text spans instead of semantic `<label>` elements. This breaks native checkable hit areas, making it hard to click the text to toggle the checkboxes, reducing mobile and mouse usability. Additionally, some standard inputs were missing `id`/`htmlFor` pairings and keyboard focus outlines.
+**Action:** Always wrap checkbox controls and their text descriptors in a semantic `<label>` container (or use `htmlFor`). Consistently apply `focus-visible:ring-2` to all interactive inputs across standard control panels to maintain keyboard navigation functionality.
