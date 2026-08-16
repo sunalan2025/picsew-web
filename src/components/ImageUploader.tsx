@@ -53,6 +53,18 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         reader.onload = (event) => {
           const img = new Image();
           img.onload = () => {
+            // SECURITY: Prevent Image Bomb / Pixel Flood DoS attacks.
+            // File size limits are not enough to prevent memory exhaustion when decoding
+            // highly compressed images (like a 10KB zip bomb but for images).
+            // Reject images with a pixel footprint larger than 40M pixels (~160MB in uncompressed RGBA memory).
+            const MAX_PIXELS = 40000000;
+            if (img.naturalWidth * img.naturalHeight > MAX_PIXELS) {
+              alert(`图片 ${file.name} 尺寸过大 (超大像素炸弹)，为防止内存溢出已拒绝加载。(Image exceeds safe pixel limits)`);
+              console.error(`Rejected image bomb: ${file.name} (${img.naturalWidth}x${img.naturalHeight} pixels)`);
+              resolve(null);
+              return;
+            }
+
             resolve({
               id: crypto.randomUUID(),
               name: file.name,
