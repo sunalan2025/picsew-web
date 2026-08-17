@@ -6,3 +6,7 @@
 ## 2024-05-18 - Canvas Drawing Loop Optimization
 **Learning:** Re-rendering many high-resolution images to the canvas on every `mousemove` event (such as when drawing annotations) causes massive CPU spikes and severe frame drops.
 **Action:** Always implement a background layer caching mechanism (via off-screen canvas) for static content in interactive drawing tools so `mousemove` only redraws the active annotation and composite the cached background.
+
+## 2024-08-17 - Render Loop Serialization
+**Learning:** Calling `JSON.stringify` on complex object/array structures inside high-frequency render loops (like React `useCallback` functions tied to canvas drawing or mouse events) causes unnecessary CPU spikes and GC pressure, even if the result isn't always used to trigger a cache invalidation.
+**Action:** When computing dependency strings or checksums for cache invalidation within a render loop, wrap the serialization in a `useMemo` hook with explicit React dependencies so the stringification only executes when the underlying data actually changes, not on every render frame.

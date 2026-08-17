@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ZoomIn, ZoomOut, Maximize2, Minimize2, Undo2, RotateCcw
 } from 'lucide-react';
@@ -262,6 +262,17 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
     }
   }, [images.length, direction, handleFitWidth, handleFitHeight]);
 
+  // Performance optimization: Memoize expensive stringification
+  const currentDeps = useMemo(() => {
+    return JSON.stringify({
+      images: images.map(img => `${img.id}-${img.cropTop}-${img.cropBottom}-${img.cropLeft}-${img.cropRight}`),
+      direction,
+      gap,
+      overlaps,
+      statusBar
+    });
+  }, [images, direction, gap, overlaps, statusBar]);
+
   // Core Render Loop: Builds the stitched image + statusbar + crops
   const renderStitchedImage = useCallback((): HTMLCanvasElement => {
     const baseCanvas = baseCanvasRef.current || document.createElement('canvas');
@@ -269,14 +280,6 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
     const ctx = baseCanvas.getContext('2d');
     if (!ctx || images.length === 0) return baseCanvas;
-
-    const currentDeps = JSON.stringify({
-      images: images.map(img => `${img.id}-${img.cropTop}-${img.cropBottom}-${img.cropLeft}-${img.cropRight}`),
-      direction,
-      gap,
-      overlaps,
-      statusBar
-    });
 
     let allLoaded = true;
     for (const img of images) {
@@ -403,7 +406,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
     ctx.drawImage(cacheCanvas, 0, 0);
 
     return baseCanvas;
-  }, [images, direction, overlaps, gap, statusBar]);
+  }, [images, direction, overlaps, gap, statusBar, currentDeps]);
 
 
 
