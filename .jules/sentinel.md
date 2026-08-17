@@ -12,3 +12,7 @@
 **Vulnerability:** Client-Side File Signature Validation Regression
 **Learning:** Client-side magic byte parsing often breaks perfectly valid image uploads (e.g. GIFs, SVGs, or JPEGs with different APP markers) and offers no real protection since the browser securely sandboxes image decoders anyway.
 **Prevention:** Avoid implementing complex client-side magic byte validation for user-uploaded images; rely on other defense-in-depth methods (like CSP or strict size limits) instead.
+## 2026-08-16 - [Fix Pixel Flood DoS Vulnerability in Image Upload]
+**Vulnerability:** Client-Side DoS via Image Bomb (Pixel Flood)
+**Learning:** Checking file size is insufficient to prevent DoS attacks against canvas elements. An image can be highly compressed (e.g., a few KB) but have massive dimensions. When drawn to a `<canvas>`, the browser allocates memory for the uncompressed pixel data, causing Out-of-Memory (OOM) crashes.
+**Prevention:** Always validate the uncompressed pixel footprint (`naturalWidth * naturalHeight`) of user-uploaded images against a safe limit before loading them into memory or rendering them to a `<canvas>`.
