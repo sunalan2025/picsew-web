@@ -10,3 +10,7 @@
 **Learning:** To interact with specific UI tools conditionally rendered in the Control Panel during Playwright verification (like testing confirmation dialogs), you must first ensure the relevant parent tab is clicked to reveal the buttons, and you must add `page.on("dialog", lambda dialog: dialog.accept())` to prevent the test from hanging on `window.confirm`.
 **Action:** Always ensure UI elements are rendered by their parent containers before interacting with them in verification scripts, and register dialog handlers when verifying native confirmation popups.
 
+
+## 2024-05-18 - [Add Form Labels to Checkboxes]
+**Learning:** Found checkboxes using `<span>` for text instead of `<label>`, requiring precise clicks on the checkbox itself.
+**Action:** Replaced `<span>` with `<label>` and explicitly associated them with the `<input>` elements using `htmlFor` and `id` to expand the clickable hit area, making it easier to use. Also added `cursor-pointer` to visually indicate the expanded hit area. Always ensure all inputs have associated labels for accessibility and improved UX.
