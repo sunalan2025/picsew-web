@@ -53,6 +53,17 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         reader.onload = (event) => {
           const img = new Image();
           img.onload = () => {
+            // SECURITY: Prevent OOM DoS via pixel flooding (image bomb)
+            // A small compressed image might expand to consume massive memory
+            const pixelFootprint = img.naturalWidth * img.naturalHeight;
+            const MAX_PIXELS = 64000000; // ~256MB RAM max per image (assuming 4 bytes/pixel)
+
+            if (pixelFootprint > MAX_PIXELS) {
+              console.error(`Security Warning: Image ${file.name} uncompressed dimensions (${img.naturalWidth}x${img.naturalHeight}) exceed maximum allowed pixels to prevent memory exhaustion.`);
+              resolve(null);
+              return;
+            }
+
             resolve({
               id: crypto.randomUUID(),
               name: file.name,
