@@ -497,8 +497,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               <div className="space-y-4">
                 {/* Toggle Enable */}
                 <div className="flex justify-between items-center bg-dark-800/40 p-2.5 rounded-lg border border-dark-700/40">
-                  <span className="text-xs font-bold text-gray-300">状态栏美化覆盖</span>
+                  <label htmlFor="statusbar-enable" className="text-xs font-bold text-gray-300 cursor-pointer select-none">状态栏美化覆盖</label>
                   <input
+                    id="statusbar-enable"
                     type="checkbox"
                     checked={statusBar.enabled}
                     onChange={(e) => setStatusBar({ ...statusBar, enabled: e.target.checked })}
@@ -510,8 +511,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   <div className="space-y-4 animate-fade-in">
                     {/* Time Input */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-gray-400">时间文本</label>
+                      <label htmlFor="statusbar-time" className="text-xs font-bold text-gray-400">时间文本</label>
                       <input
+                        id="statusbar-time"
                         type="text"
                         maxLength={10}
                         value={statusBar.time}
@@ -593,8 +595,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               <div className="space-y-4">
                 {/* Select Device */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-400">套壳机型</label>
+                  <label htmlFor="mockup-device" className="text-xs font-bold text-gray-400">套壳机型</label>
                   <select
+                    id="mockup-device"
                     value={mockup.device}
                     onChange={(e) => setMockup({ ...mockup, device: e.target.value as any })}
                     className="w-full bg-dark-800 border border-dark-700 rounded-lg py-1.5 px-3 text-xs text-gray-200 focus:border-primary-500 outline-hidden"
@@ -658,8 +661,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     {/* Background settings based on type */}
                     {mockup.bgColorType === 'solid' && (
                       <div className="space-y-1.5 bg-dark-850 p-2 rounded-lg border border-dark-700/40">
-                        <label className="text-[11px] text-gray-400 font-semibold block">选择背景纯色</label>
+                        <label htmlFor="mockup-bgsolid" className="text-[11px] text-gray-400 font-semibold block cursor-pointer">选择背景纯色</label>
                         <input
+                          id="mockup-bgsolid"
                           type="color"
                           value={mockup.bgSolid}
                           onChange={(e) => setMockup({ ...mockup, bgSolid: e.target.value })}
@@ -671,8 +675,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     {mockup.bgColorType === 'gradient' && (
                       <div className="grid grid-cols-2 gap-2 bg-dark-850 p-2 rounded-lg border border-dark-700/40">
                         <div>
-                          <label className="text-[11px] text-gray-400 font-semibold">渐变起点</label>
+                          <label htmlFor="mockup-bggradientstart" className="text-[11px] text-gray-400 font-semibold cursor-pointer">渐变起点</label>
                           <input
+                            id="mockup-bggradientstart"
                             type="color"
                             value={mockup.bgGradientStart}
                             onChange={(e) => setMockup({ ...mockup, bgGradientStart: e.target.value })}
@@ -680,8 +685,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] text-gray-400 font-semibold">渐变终点</label>
+                          <label htmlFor="mockup-bggradientend" className="text-[11px] text-gray-400 font-semibold cursor-pointer">渐变终点</label>
                           <input
+                            id="mockup-bggradientend"
                             type="color"
                             value={mockup.bgGradientEnd}
                             onChange={(e) => setMockup({ ...mockup, bgGradientEnd: e.target.value })}
@@ -709,12 +715,13 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
                     {/* Shadow toggle */}
                     <div className="flex justify-between items-center bg-dark-800/40 p-2.5 rounded-lg border border-dark-700/40">
-                      <span className="text-xs font-bold text-gray-300">立体设备阴影</span>
+                      <label htmlFor="mockup-shadow" className="text-xs font-bold text-gray-300 cursor-pointer select-none">立体设备阴影</label>
                       <input
+                        id="mockup-shadow"
                         type="checkbox"
                         checked={mockup.shadow}
                         onChange={(e) => setMockup({ ...mockup, shadow: e.target.checked })}
-                        className="w-4 h-4 rounded accent-primary-500"
+                        className="w-4 h-4 rounded accent-primary-500 cursor-pointer"
                       />
                     </div>
                   </div>

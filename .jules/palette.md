@@ -10,3 +10,7 @@
 **Learning:** To interact with specific UI tools conditionally rendered in the Control Panel during Playwright verification (like testing confirmation dialogs), you must first ensure the relevant parent tab is clicked to reveal the buttons, and you must add `page.on("dialog", lambda dialog: dialog.accept())` to prevent the test from hanging on `window.confirm`.
 **Action:** Always ensure UI elements are rendered by their parent containers before interacting with them in verification scripts, and register dialog handlers when verifying native confirmation popups.
 
+
+## 2025-02-18 - Expand hit areas for form inputs
+**Learning:** Forms and control panels with inputs (checkboxes, color pickers, text inputs) that lack explicit id and <label htmlFor="..."> associations have small clickable hit areas, degrading accessibility, especially for touch users.
+**Action:** Always explicitly associate <label> with inputs using htmlFor and id to expand clickable areas.
