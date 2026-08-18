@@ -270,13 +270,14 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
     const ctx = baseCanvas.getContext('2d');
     if (!ctx || images.length === 0) return baseCanvas;
 
-    const currentDeps = JSON.stringify({
-      images: images.map(img => `${img.id}-${img.cropTop}-${img.cropBottom}-${img.cropLeft}-${img.cropRight}`),
-      direction,
-      gap,
-      overlaps,
-      statusBar
-    });
+    let currentDeps = direction + '|' + gap + '|' + statusBar.enabled + '|' + statusBar.style;
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i];
+      currentDeps += '|' + img.id + '|' + img.cropTop + '|' + img.cropBottom + '|' + img.cropLeft + '|' + img.cropRight;
+    }
+    for (let i = 0; i < overlaps.length; i++) {
+      currentDeps += '|' + overlaps[i];
+    }
 
     let allLoaded = true;
     for (const img of images) {
