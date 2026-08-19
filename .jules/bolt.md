@@ -6,3 +6,7 @@
 ## 2024-05-18 - Canvas Drawing Loop Optimization
 **Learning:** Re-rendering many high-resolution images to the canvas on every `mousemove` event (such as when drawing annotations) causes massive CPU spikes and severe frame drops.
 **Action:** Always implement a background layer caching mechanism (via off-screen canvas) for static content in interactive drawing tools so `mousemove` only redraws the active annotation and composite the cached background.
+
+## 2024-08-20 - Precise Canvas Dimension Updates
+**Learning:** Naively using `else clearRect` when conditionally updating canvas dimensions (`if (canvas.width !== target) canvas.width = target; else clearRect()`) can still result in double-clearing if `height` changes but `width` doesn't, causing severe layout thrashing and visual ghosting during interactive tools like drawing.
+**Action:** Always use an explicit tracking variable (`let resized = false`) and update it when either width or height changes. Only call `clearRect` if `!resized`.

@@ -53,13 +53,15 @@ export function detectOverlap(
   if (!ctxA || !ctxB) return 0;
 
   // Conditionally update canvas width/height to avoid expensive buffer re-allocation
-  if (canvasA.width !== sampleWidth) canvasA.width = sampleWidth;
-  if (canvasA.height !== maxOverlap) canvasA.height = maxOverlap;
-  else ctxA.clearRect(0, 0, sampleWidth, maxOverlap);
+  let resizedA = false;
+  if (canvasA.width !== sampleWidth) { canvasA.width = sampleWidth; resizedA = true; }
+  if (canvasA.height !== maxOverlap) { canvasA.height = maxOverlap; resizedA = true; }
+  if (!resizedA) ctxA.clearRect(0, 0, sampleWidth, maxOverlap);
 
-  if (canvasB.width !== sampleWidth) canvasB.width = sampleWidth;
-  if (canvasB.height !== maxOverlap) canvasB.height = maxOverlap;
-  else ctxB.clearRect(0, 0, sampleWidth, maxOverlap);
+  let resizedB = false;
+  if (canvasB.width !== sampleWidth) { canvasB.width = sampleWidth; resizedB = true; }
+  if (canvasB.height !== maxOverlap) { canvasB.height = maxOverlap; resizedB = true; }
+  if (!resizedB) ctxB.clearRect(0, 0, sampleWidth, maxOverlap);
 
   // Draw the bottom portion of image 1
   const srcXA = Math.max(0, (width1 - sampleWidth) / 2);
