@@ -497,12 +497,13 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               <div className="space-y-4">
                 {/* Toggle Enable */}
                 <div className="flex justify-between items-center bg-dark-800/40 p-2.5 rounded-lg border border-dark-700/40">
-                  <span className="text-xs font-bold text-gray-300">状态栏美化覆盖</span>
+                  <label htmlFor="status-bar-toggle" className="text-xs font-bold text-gray-300 cursor-pointer">状态栏美化覆盖</label>
                   <input
+                    id="status-bar-toggle"
                     type="checkbox"
                     checked={statusBar.enabled}
                     onChange={(e) => setStatusBar({ ...statusBar, enabled: e.target.checked })}
-                    className="w-4 h-4 rounded text-primary-500 bg-dark-900 border-dark-700 focus:ring-primary-500 accent-primary-500"
+                    className="w-4 h-4 rounded text-primary-500 bg-dark-900 border-dark-700 focus:ring-primary-500 accent-primary-500 cursor-pointer"
                   />
                 </div>
 
@@ -593,11 +594,12 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               <div className="space-y-4">
                 {/* Select Device */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-400">套壳机型</label>
+                  <label htmlFor="mockup-device-select" className="text-xs font-bold text-gray-400">套壳机型</label>
                   <select
+                    id="mockup-device-select"
                     value={mockup.device}
                     onChange={(e) => setMockup({ ...mockup, device: e.target.value as any })}
-                    className="w-full bg-dark-800 border border-dark-700 rounded-lg py-1.5 px-3 text-xs text-gray-200 focus:border-primary-500 outline-hidden"
+                    className="w-full bg-dark-800 border border-dark-700 rounded-lg py-1.5 px-3 text-xs text-gray-200 focus:border-primary-500 outline-hidden cursor-pointer"
                   >
                     <option value="none">无套壳</option>
                     <option value="iphone15">iPhone 15 Pro (灵动岛)</option>
@@ -709,12 +711,13 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
                     {/* Shadow toggle */}
                     <div className="flex justify-between items-center bg-dark-800/40 p-2.5 rounded-lg border border-dark-700/40">
-                      <span className="text-xs font-bold text-gray-300">立体设备阴影</span>
+                      <label htmlFor="mockup-shadow-toggle" className="text-xs font-bold text-gray-300 cursor-pointer">立体设备阴影</label>
                       <input
+                        id="mockup-shadow-toggle"
                         type="checkbox"
                         checked={mockup.shadow}
                         onChange={(e) => setMockup({ ...mockup, shadow: e.target.checked })}
-                        className="w-4 h-4 rounded accent-primary-500"
+                        className="w-4 h-4 rounded accent-primary-500 cursor-pointer"
                       />
                     </div>
                   </div>
@@ -772,10 +775,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   </label>
                   <div className="space-y-1.5 bg-dark-850 p-2.5 rounded-lg border border-dark-700/40">
                     <div className="flex justify-between text-[11px] text-gray-400">
-                      <span>等高切片高度 (0 = 不分切)</span>
+                      <label htmlFor="export-slice-height">等高切片高度 (0 = 不分切)</label>
                       <span className="text-primary-300 font-mono">{exportConfig.scale === 0 ? '不切' : `${exportConfig.scale} px`}</span>
                     </div>
                     <input
+                      id="export-slice-height"
                       type="number"
                       value={exportConfig.scale}
                       onChange={(e) => setExportConfig({ ...exportConfig, scale: Math.max(0, parseInt(e.target.value) || 0) })}
