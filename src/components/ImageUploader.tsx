@@ -53,6 +53,14 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         reader.onload = (event) => {
           const img = new Image();
           img.onload = () => {
+            // SECURITY: Prevent OOM DoS (Image Bomb) by limiting total pixels
+            const MAX_PIXELS = 50_000_000;
+            if (img.naturalWidth * img.naturalHeight > MAX_PIXELS) {
+              console.error(`Image ${file.name} exceeds maximum allowed pixel footprint of ${MAX_PIXELS}`);
+              resolve(null);
+              return;
+            }
+
             resolve({
               id: crypto.randomUUID(),
               name: file.name,

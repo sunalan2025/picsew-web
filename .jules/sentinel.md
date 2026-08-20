@@ -12,3 +12,7 @@
 **Vulnerability:** Client-Side File Signature Validation Regression
 **Learning:** Client-side magic byte parsing often breaks perfectly valid image uploads (e.g. GIFs, SVGs, or JPEGs with different APP markers) and offers no real protection since the browser securely sandboxes image decoders anyway.
 **Prevention:** Avoid implementing complex client-side magic byte validation for user-uploaded images; rely on other defense-in-depth methods (like CSP or strict size limits) instead.
+## 2024-05-24 - [Fix Client-Side OOM DoS via Image Bomb]
+**Vulnerability:** Application allowed unlimited pixel footprint in user uploaded images, resulting in Potential OOM (Out Of Memory) DoS attacks on client machines.
+**Learning:** Checking file size is insufficient to prevent image bombs because highly compressed malicious images can expand into massive pixel arrays in memory during rendering.
+**Prevention:** Always validate the uncompressed pixel footprint (e.g., `img.naturalWidth * img.naturalHeight`) of uploaded images against a safe threshold before fully processing them.
