@@ -99,9 +99,13 @@ function App() {
 
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push({
-      images: JSON.parse(JSON.stringify(newImgs)),
+      // ⚡ Bolt: Use targeted shallow cloning instead of expensive JSON.parse(JSON.stringify())
+      // which blocks the main thread on large image state structures containing base64 data
+      images: newImgs.map(img => ({ ...img })),
       overlaps: [...newOverlaps],
-      annotations: JSON.parse(JSON.stringify(newAnnos))
+      annotations: newAnnos.map(anno =>
+        anno.type === 'pen' ? { ...anno, points: anno.points.map(p => ({ ...p })) } : { ...anno }
+      )
     });
 
     // Capping undo history to at most 5 steps back (meaning max 6 states total: initial state + 5 edits)

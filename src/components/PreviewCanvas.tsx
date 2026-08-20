@@ -270,13 +270,10 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
     const ctx = baseCanvas.getContext('2d');
     if (!ctx || images.length === 0) return baseCanvas;
 
-    const currentDeps = JSON.stringify({
-      images: images.map(img => `${img.id}-${img.cropTop}-${img.cropBottom}-${img.cropLeft}-${img.cropRight}`),
-      direction,
-      gap,
-      overlaps,
-      statusBar
-    });
+    // ⚡ Bolt: Use direct string concatenation instead of JSON.stringify for dependency tracking
+    // Avoids expensive serialization inside the high-frequency renderStitchedImage loop
+    const currentDeps = images.map(img => `${img.id}-${img.cropTop}-${img.cropBottom}-${img.cropLeft}-${img.cropRight}`).join(',') +
+      `-${direction}-${gap}-${overlaps.join(',')}-${statusBar.enabled}-${statusBar.time}-${statusBar.battery}-${statusBar.wifi}-${statusBar.style}`;
 
     let allLoaded = true;
     for (const img of images) {
