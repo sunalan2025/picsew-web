@@ -136,6 +136,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       {/* Upload Zone */}
       <div
         role="button"
+        aria-label="上传图片区域"
         tabIndex={0}
         onDragOver={handleDragOver}
         onDrop={handleDrop}

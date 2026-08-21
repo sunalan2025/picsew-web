@@ -1124,13 +1124,15 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
                 <div className="flex justify-end gap-1.5">
                   <button
                     onClick={() => setTextInput(null)}
-                    className="px-1.5 py-0.5 text-[10px] text-gray-400 hover:bg-dark-700 rounded"
+                    aria-label="取消文字标注"
+                    className="px-1.5 py-0.5 text-[10px] text-gray-400 hover:bg-dark-700 rounded focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
                   >
                     取消
                   </button>
                   <button
                     onClick={saveTextInput}
-                    className="px-1.5 py-0.5 text-[10px] bg-primary-600 text-white rounded hover:bg-primary-500"
+                    aria-label="确定文字标注"
+                    className="px-1.5 py-0.5 text-[10px] bg-primary-600 text-white rounded hover:bg-primary-500 focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
                   >
                     确定
                   </button>

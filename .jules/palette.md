@@ -10,3 +10,6 @@
 **Learning:** To interact with specific UI tools conditionally rendered in the Control Panel during Playwright verification (like testing confirmation dialogs), you must first ensure the relevant parent tab is clicked to reveal the buttons, and you must add `page.on("dialog", lambda dialog: dialog.accept())` to prevent the test from hanging on `window.confirm`.
 **Action:** Always ensure UI elements are rendered by their parent containers before interacting with them in verification scripts, and register dialog handlers when verifying native confirmation popups.
 
+## 2025-02-13 - [Interactive Element Accessibility and Tooltips]
+**Learning:** Custom UI controls and inline dynamic forms often lack critical keyboard focus indicators (focus-visible) and ARIA labels. Users rely on visual tooltips (title) to understand the state of disabled buttons.
+**Action:** Ensure `focus-visible:ring-2` and `focus:outline-none` are universally applied to all interactive elements, and provide `title` attributes that explain why a button might be disabled.

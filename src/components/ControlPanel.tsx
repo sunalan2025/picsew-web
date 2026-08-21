@@ -463,7 +463,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     <button
                       onClick={onUndo}
                       disabled={!canUndo}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-dark-800 hover:bg-dark-700 text-gray-300 disabled:text-gray-600 disabled:hover:bg-dark-800 text-xs font-semibold rounded-lg border border-dark-750 transition"
+                      title={!canUndo ? "没有可以撤销的操作" : "撤销"}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-dark-800 hover:bg-dark-700 text-gray-300 disabled:text-gray-600 disabled:hover:bg-dark-800 text-xs font-semibold rounded-lg border border-dark-750 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
                     >
                       <Undo className="w-3.5 h-3.5" />
                       撤销
@@ -471,7 +472,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     <button
                       onClick={onRedo}
                       disabled={!canRedo}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-dark-800 hover:bg-dark-700 text-gray-300 disabled:text-gray-600 disabled:hover:bg-dark-800 text-xs font-semibold rounded-lg border border-dark-750 transition"
+                      title={!canRedo ? "没有可以重做的操作" : "重做"}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-dark-800 hover:bg-dark-700 text-gray-300 disabled:text-gray-600 disabled:hover:bg-dark-800 text-xs font-semibold rounded-lg border border-dark-750 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
                     >
                       <Redo className="w-3.5 h-3.5" />
                       重做
@@ -483,7 +485,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                         onClearAnnotations();
                       }
                     }}
-                    className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-900/30 text-xs font-semibold rounded-lg transition"
+                    title="清除所有标注"
+                    className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-900/30 text-xs font-semibold rounded-lg transition focus-visible:ring-2 focus-visible:ring-red-500 focus:outline-none"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     清除所有标注
