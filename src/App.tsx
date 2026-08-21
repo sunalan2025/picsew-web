@@ -98,10 +98,20 @@ function App() {
     setAnnotations(newAnnos);
 
     const newHistory = history.slice(0, historyIndex + 1);
+
+    // Performance: Avoid JSON.stringify on large objects (especially image sources in base64)
+    // Shallow copy is enough for images, and careful deep copy for annotations points if needed
+    const copiedAnnos = newAnnos.map(anno => {
+      if (anno.type === 'pen') {
+        return { ...anno, points: [...anno.points] };
+      }
+      return { ...anno };
+    });
+
     newHistory.push({
-      images: JSON.parse(JSON.stringify(newImgs)),
+      images: newImgs.map(img => ({ ...img })),
       overlaps: [...newOverlaps],
-      annotations: JSON.parse(JSON.stringify(newAnnos))
+      annotations: copiedAnnos
     });
 
     // Capping undo history to at most 5 steps back (meaning max 6 states total: initial state + 5 edits)

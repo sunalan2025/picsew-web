@@ -270,13 +270,8 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
     const ctx = baseCanvas.getContext('2d');
     if (!ctx || images.length === 0) return baseCanvas;
 
-    const currentDeps = JSON.stringify({
-      images: images.map(img => `${img.id}-${img.cropTop}-${img.cropBottom}-${img.cropLeft}-${img.cropRight}`),
-      direction,
-      gap,
-      overlaps,
-      statusBar
-    });
+    // Performance: string concatenation is much faster than JSON.stringify in render loops
+    const currentDeps = `${images.map(img => `${img.id}-${img.cropTop}-${img.cropBottom}-${img.cropLeft}-${img.cropRight}`).join('|')}-${direction}-${gap}-${overlaps.join(',')}-${statusBar.enabled}-${statusBar.time}-${statusBar.battery}-${statusBar.wifi}-${statusBar.style}`;
 
     let allLoaded = true;
     for (const img of images) {
