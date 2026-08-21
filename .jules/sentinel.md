@@ -12,3 +12,7 @@
 **Vulnerability:** Client-Side File Signature Validation Regression
 **Learning:** Client-side magic byte parsing often breaks perfectly valid image uploads (e.g. GIFs, SVGs, or JPEGs with different APP markers) and offers no real protection since the browser securely sandboxes image decoders anyway.
 **Prevention:** Avoid implementing complex client-side magic byte validation for user-uploaded images; rely on other defense-in-depth methods (like CSP or strict size limits) instead.
+## 2024-05-24 - Reject with Error in Promise handling
+**Vulnerability:** Resolving with `null` when a security violation (e.g., Image Bomb pixel footprint check) happens within a Promise.
+**Learning:** If the enclosing system doesn't explicitly handle `null` type responses gracefully (and expects an object), resolving with `null` will either break compilation (TypeScript errors) or cause runtime `TypeError` crashes when consumers access properties (like `image.id`).
+**Prevention:** Instead of resolving with `null`, reject the Promise (e.g., `reject(new Error(...))`) so the error can be handled explicitly by the application's error boundaries or `.catch` blocks.
