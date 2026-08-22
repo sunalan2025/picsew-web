@@ -53,6 +53,15 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         reader.onload = (event) => {
           const img = new Image();
           img.onload = () => {
+            // SECURITY: Prevent OOM DoS (Image Bomb/Pixel Flood) by checking uncompressed footprint
+            // Max ~50 million pixels (e.g., ~7000x7000)
+            const MAX_PIXELS = 50000000;
+            if (img.naturalWidth * img.naturalHeight > MAX_PIXELS) {
+              console.error(`Security blocked: Image ${file.name} uncompressed size too large. (Image Bomb protection)`);
+              resolve(null);
+              return;
+            }
+
             resolve({
               id: crypto.randomUUID(),
               name: file.name,
