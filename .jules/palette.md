@@ -10,3 +10,6 @@
 **Learning:** To interact with specific UI tools conditionally rendered in the Control Panel during Playwright verification (like testing confirmation dialogs), you must first ensure the relevant parent tab is clicked to reveal the buttons, and you must add `page.on("dialog", lambda dialog: dialog.accept())` to prevent the test from hanging on `window.confirm`.
 **Action:** Always ensure UI elements are rendered by their parent containers before interacting with them in verification scripts, and register dialog handlers when verifying native confirmation popups.
 
+## 2024-08-22 - Checkbox hit area expansion
+**Learning:** In ControlPanel.tsx, the toggle options ("状态栏美化覆盖" and "立体设备阴影") were structured as separate `<span>` and `<input type="checkbox">` elements. This required users to precisely click the tiny 16x16px checkbox to toggle the feature, leading to poor UX and accessibility.
+**Action:** Always wrap checkbox/radio descriptive texts in a semantic `<label htmlFor="id">` tag and link it to the input's `id`. This automatically delegates clicks from the text to the input, drastically expanding the clickable hit area. Ensure `cursor-pointer` is applied to provide visual feedback that the text is interactive.
