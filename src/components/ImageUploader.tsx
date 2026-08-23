@@ -53,6 +53,15 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         reader.onload = (event) => {
           const img = new Image();
           img.onload = () => {
+            // SECURITY: Prevent OOM Image Bombs/Pixel Floods by checking uncompressed pixel footprint
+            const MAX_PIXELS = 50 * 1024 * 1024; // 50 Megapixels
+            const pixelCount = img.naturalWidth * img.naturalHeight;
+            if (pixelCount > MAX_PIXELS) {
+              console.error(`Image ${file.name} exceeds maximum pixel footprint (${pixelCount} pixels)`);
+              resolve(null);
+              return;
+            }
+
             resolve({
               id: crypto.randomUUID(),
               name: file.name,
