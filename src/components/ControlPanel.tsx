@@ -235,10 +235,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 {/* Gap */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-xs font-bold text-gray-400">
-                    <span>接缝间距 (Gap)</span>
+                    <label htmlFor="stitch-gap-slider" className="cursor-pointer select-none">接缝间距 (Gap)</label>
                     <span className="text-primary-300 font-mono">{gap} px</span>
                   </div>
                   <input
+                    id="stitch-gap-slider"
                     type="range"
                     min="0"
                     max="60"
@@ -497,12 +498,13 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               <div className="space-y-4">
                 {/* Toggle Enable */}
                 <div className="flex justify-between items-center bg-dark-800/40 p-2.5 rounded-lg border border-dark-700/40">
-                  <span className="text-xs font-bold text-gray-300">状态栏美化覆盖</span>
+                  <label htmlFor="statusbar-toggle" className="text-xs font-bold text-gray-300 cursor-pointer select-none">状态栏美化覆盖</label>
                   <input
+                    id="statusbar-toggle"
                     type="checkbox"
                     checked={statusBar.enabled}
                     onChange={(e) => setStatusBar({ ...statusBar, enabled: e.target.checked })}
-                    className="w-4 h-4 rounded text-primary-500 bg-dark-900 border-dark-700 focus:ring-primary-500 accent-primary-500"
+                    className="w-4 h-4 rounded text-primary-500 bg-dark-900 border-dark-700 focus:ring-primary-500 accent-primary-500 cursor-pointer"
                   />
                 </div>
 
@@ -524,16 +526,17 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     {/* Battery Slider */}
                     <div className="space-y-1.5">
                       <div className="flex justify-between text-xs text-gray-400 font-bold">
-                        <span>电量比例</span>
+                        <label htmlFor="statusbar-battery-slider" className="cursor-pointer select-none">电量比例</label>
                         <span className="text-primary-300 font-mono">{statusBar.battery}%</span>
                       </div>
                       <input
+                        id="statusbar-battery-slider"
                         type="range"
                         min="0"
                         max="100"
                         value={statusBar.battery}
                         onChange={(e) => setStatusBar({ ...statusBar, battery: parseInt(e.target.value) })}
-                        className="w-full h-1 bg-dark-800 rounded accent-primary-500"
+                        className="w-full h-1 bg-dark-800 rounded accent-primary-500 cursor-pointer"
                       />
                     </div>
 
@@ -694,27 +697,29 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     {/* Padding slider */}
                     <div className="space-y-1.5">
                       <div className="flex justify-between text-xs text-gray-400 font-bold">
-                        <span>套壳边距 (Padding)</span>
+                        <label htmlFor="mockup-padding-slider" className="cursor-pointer select-none">套壳边距 (Padding)</label>
                         <span className="text-primary-300 font-mono">{mockup.padding} px</span>
                       </div>
                       <input
+                        id="mockup-padding-slider"
                         type="range"
                         min="0"
                         max="120"
                         value={mockup.padding}
                         onChange={(e) => setMockup({ ...mockup, padding: parseInt(e.target.value) })}
-                        className="w-full h-1 bg-dark-800 rounded accent-primary-500"
+                        className="w-full h-1 bg-dark-800 rounded accent-primary-500 cursor-pointer"
                       />
                     </div>
 
                     {/* Shadow toggle */}
                     <div className="flex justify-between items-center bg-dark-800/40 p-2.5 rounded-lg border border-dark-700/40">
-                      <span className="text-xs font-bold text-gray-300">立体设备阴影</span>
+                      <label htmlFor="mockup-shadow-toggle" className="text-xs font-bold text-gray-300 cursor-pointer select-none">立体设备阴影</label>
                       <input
+                        id="mockup-shadow-toggle"
                         type="checkbox"
                         checked={mockup.shadow}
                         onChange={(e) => setMockup({ ...mockup, shadow: e.target.checked })}
-                        className="w-4 h-4 rounded accent-primary-500"
+                        className="w-4 h-4 rounded accent-primary-500 cursor-pointer"
                       />
                     </div>
                   </div>
@@ -749,17 +754,18 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 {exportConfig.format === 'jpeg' && (
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-xs text-gray-400 font-bold">
-                      <span>JPEG 压缩质量</span>
+                      <label htmlFor="export-quality-slider" className="cursor-pointer select-none">JPEG 压缩质量</label>
                       <span className="text-primary-300 font-mono">{Math.round(exportConfig.quality * 100)}%</span>
                     </div>
                     <input
+                      id="export-quality-slider"
                       type="range"
                       min="0.4"
                       max="1.0"
                       step="0.05"
                       value={exportConfig.quality}
                       onChange={(e) => setExportConfig({ ...exportConfig, quality: parseFloat(e.target.value) })}
-                      className="w-full h-1 bg-dark-800 rounded accent-primary-500"
+                      className="w-full h-1 bg-dark-800 rounded accent-primary-500 cursor-pointer"
                     />
                   </div>
                 )}
