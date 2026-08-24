@@ -99,9 +99,15 @@ function App() {
 
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push({
-      images: JSON.parse(JSON.stringify(newImgs)),
+      images: newImgs.map(img => ({ ...img })),
       overlaps: [...newOverlaps],
-      annotations: JSON.parse(JSON.stringify(newAnnos))
+      annotations: newAnnos.map(anno => {
+        // Deep clone the points array for pen annotations to prevent reference mutation
+        if (anno.type === 'pen') {
+          return { ...anno, points: anno.points.map(p => ({ ...p })) };
+        }
+        return { ...anno };
+      })
     });
 
     // Capping undo history to at most 5 steps back (meaning max 6 states total: initial state + 5 edits)
