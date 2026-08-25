@@ -235,10 +235,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 {/* Gap */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-xs font-bold text-gray-400">
-                    <span>接缝间距 (Gap)</span>
+                    <label htmlFor="stitch-gap" className="cursor-pointer">接缝间距 (Gap)</label>
                     <span className="text-primary-300 font-mono">{gap} px</span>
                   </div>
                   <input
+                    id="stitch-gap"
                     type="range"
                     min="0"
                     max="60"
@@ -270,12 +271,13 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                       {overlaps.map((val, idx) => (
                         <div key={idx} className="space-y-1.5 bg-dark-850 p-2.5 rounded-lg border border-dark-700/35">
                           <div className="flex justify-between items-center text-[11px]">
-                            <span className="text-gray-400 font-medium truncate max-w-[170px]">
+                            <label htmlFor={`overlap-${idx}`} className="text-gray-400 font-medium truncate max-w-[170px] cursor-pointer">
                               连接点 {idx + 1}: {imageNames[idx]} ⬇️ {imageNames[idx + 1]}
-                            </span>
+                            </label>
                             <span className="text-primary-300 font-mono font-bold">{val} px</span>
                           </div>
                           <input
+                            id={`overlap-${idx}`}
                             type="range"
                             min="0"
                             max="500"
@@ -426,31 +428,33 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     {selectedTool !== 'text' ? (
                       <div className="space-y-1.5">
                         <div className="flex justify-between text-xs text-gray-400 font-semibold">
-                          <span>线条粗细</span>
+                          <label htmlFor="stroke-width" className="cursor-pointer">线条粗细</label>
                           <span>{strokeWidth} px</span>
                         </div>
                         <input
+                          id="stroke-width"
                           type="range"
                           min="2"
                           max="20"
                           value={strokeWidth}
                           onChange={(e) => setStrokeWidth(parseInt(e.target.value))}
-                          className="w-full h-1 bg-dark-800 rounded accent-primary-500"
+                          className="w-full h-1 bg-dark-800 rounded accent-primary-500 cursor-pointer"
                         />
                       </div>
                     ) : (
                       <div className="space-y-1.5">
                         <div className="flex justify-between text-xs text-gray-400 font-semibold">
-                          <span>字号大小</span>
+                          <label htmlFor="font-size" className="cursor-pointer">字号大小</label>
                           <span>{fontSize} px</span>
                         </div>
                         <input
+                          id="font-size"
                           type="range"
                           min="12"
                           max="72"
                           value={fontSize}
                           onChange={(e) => setFontSize(parseInt(e.target.value))}
-                          className="w-full h-1 bg-dark-800 rounded accent-primary-500"
+                          className="w-full h-1 bg-dark-800 rounded accent-primary-500 cursor-pointer"
                         />
                       </div>
                     )}
@@ -497,12 +501,13 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               <div className="space-y-4">
                 {/* Toggle Enable */}
                 <div className="flex justify-between items-center bg-dark-800/40 p-2.5 rounded-lg border border-dark-700/40">
-                  <span className="text-xs font-bold text-gray-300">状态栏美化覆盖</span>
+                  <label htmlFor="statusbar-enable" className="text-xs font-bold text-gray-300 cursor-pointer">状态栏美化覆盖</label>
                   <input
+                    id="statusbar-enable"
                     type="checkbox"
                     checked={statusBar.enabled}
                     onChange={(e) => setStatusBar({ ...statusBar, enabled: e.target.checked })}
-                    className="w-4 h-4 rounded text-primary-500 bg-dark-900 border-dark-700 focus:ring-primary-500 accent-primary-500"
+                    className="w-4 h-4 rounded text-primary-500 bg-dark-900 border-dark-700 focus:ring-primary-500 accent-primary-500 cursor-pointer"
                   />
                 </div>
 
@@ -510,8 +515,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   <div className="space-y-4 animate-fade-in">
                     {/* Time Input */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-gray-400">时间文本</label>
+                      <label htmlFor="statusbar-time" className="text-xs font-bold text-gray-400 cursor-pointer">时间文本</label>
                       <input
+                        id="statusbar-time"
                         type="text"
                         maxLength={10}
                         value={statusBar.time}
@@ -524,16 +530,17 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     {/* Battery Slider */}
                     <div className="space-y-1.5">
                       <div className="flex justify-between text-xs text-gray-400 font-bold">
-                        <span>电量比例</span>
+                        <label htmlFor="statusbar-battery" className="cursor-pointer">电量比例</label>
                         <span className="text-primary-300 font-mono">{statusBar.battery}%</span>
                       </div>
                       <input
+                        id="statusbar-battery"
                         type="range"
                         min="0"
                         max="100"
                         value={statusBar.battery}
                         onChange={(e) => setStatusBar({ ...statusBar, battery: parseInt(e.target.value) })}
-                        className="w-full h-1 bg-dark-800 rounded accent-primary-500"
+                        className="w-full h-1 bg-dark-800 rounded accent-primary-500 cursor-pointer"
                       />
                     </div>
 
@@ -658,8 +665,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     {/* Background settings based on type */}
                     {mockup.bgColorType === 'solid' && (
                       <div className="space-y-1.5 bg-dark-850 p-2 rounded-lg border border-dark-700/40">
-                        <label className="text-[11px] text-gray-400 font-semibold block">选择背景纯色</label>
+                        <label htmlFor="mockup-bg-solid" className="text-[11px] text-gray-400 font-semibold block cursor-pointer">选择背景纯色</label>
                         <input
+                          id="mockup-bg-solid"
                           type="color"
                           value={mockup.bgSolid}
                           onChange={(e) => setMockup({ ...mockup, bgSolid: e.target.value })}
@@ -671,8 +679,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     {mockup.bgColorType === 'gradient' && (
                       <div className="grid grid-cols-2 gap-2 bg-dark-850 p-2 rounded-lg border border-dark-700/40">
                         <div>
-                          <label className="text-[11px] text-gray-400 font-semibold">渐变起点</label>
+                          <label htmlFor="mockup-bg-grad-start" className="text-[11px] text-gray-400 font-semibold cursor-pointer">渐变起点</label>
                           <input
+                            id="mockup-bg-grad-start"
                             type="color"
                             value={mockup.bgGradientStart}
                             onChange={(e) => setMockup({ ...mockup, bgGradientStart: e.target.value })}
@@ -680,8 +689,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] text-gray-400 font-semibold">渐变终点</label>
+                          <label htmlFor="mockup-bg-grad-end" className="text-[11px] text-gray-400 font-semibold cursor-pointer">渐变终点</label>
                           <input
+                            id="mockup-bg-grad-end"
                             type="color"
                             value={mockup.bgGradientEnd}
                             onChange={(e) => setMockup({ ...mockup, bgGradientEnd: e.target.value })}
@@ -694,27 +704,29 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     {/* Padding slider */}
                     <div className="space-y-1.5">
                       <div className="flex justify-between text-xs text-gray-400 font-bold">
-                        <span>套壳边距 (Padding)</span>
+                        <label htmlFor="mockup-padding" className="cursor-pointer">套壳边距 (Padding)</label>
                         <span className="text-primary-300 font-mono">{mockup.padding} px</span>
                       </div>
                       <input
+                        id="mockup-padding"
                         type="range"
                         min="0"
                         max="120"
                         value={mockup.padding}
                         onChange={(e) => setMockup({ ...mockup, padding: parseInt(e.target.value) })}
-                        className="w-full h-1 bg-dark-800 rounded accent-primary-500"
+                        className="w-full h-1 bg-dark-800 rounded accent-primary-500 cursor-pointer"
                       />
                     </div>
 
                     {/* Shadow toggle */}
                     <div className="flex justify-between items-center bg-dark-800/40 p-2.5 rounded-lg border border-dark-700/40">
-                      <span className="text-xs font-bold text-gray-300">立体设备阴影</span>
+                      <label htmlFor="mockup-shadow" className="text-xs font-bold text-gray-300 cursor-pointer">立体设备阴影</label>
                       <input
+                        id="mockup-shadow"
                         type="checkbox"
                         checked={mockup.shadow}
                         onChange={(e) => setMockup({ ...mockup, shadow: e.target.checked })}
-                        className="w-4 h-4 rounded accent-primary-500"
+                        className="w-4 h-4 rounded accent-primary-500 cursor-pointer"
                       />
                     </div>
                   </div>
@@ -749,17 +761,18 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 {exportConfig.format === 'jpeg' && (
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-xs text-gray-400 font-bold">
-                      <span>JPEG 压缩质量</span>
+                      <label htmlFor="export-quality" className="cursor-pointer">JPEG 压缩质量</label>
                       <span className="text-primary-300 font-mono">{Math.round(exportConfig.quality * 100)}%</span>
                     </div>
                     <input
+                      id="export-quality"
                       type="range"
                       min="0.4"
                       max="1.0"
                       step="0.05"
                       value={exportConfig.quality}
                       onChange={(e) => setExportConfig({ ...exportConfig, quality: parseFloat(e.target.value) })}
-                      className="w-full h-1 bg-dark-800 rounded accent-primary-500"
+                      className="w-full h-1 bg-dark-800 rounded accent-primary-500 cursor-pointer"
                     />
                   </div>
                 )}
@@ -772,10 +785,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   </label>
                   <div className="space-y-1.5 bg-dark-850 p-2.5 rounded-lg border border-dark-700/40">
                     <div className="flex justify-between text-[11px] text-gray-400">
-                      <span>等高切片高度 (0 = 不分切)</span>
+                      <label htmlFor="export-scale" className="cursor-pointer">等高切片高度 (0 = 不分切)</label>
                       <span className="text-primary-300 font-mono">{exportConfig.scale === 0 ? '不切' : `${exportConfig.scale} px`}</span>
                     </div>
                     <input
+                      id="export-scale"
                       type="number"
                       value={exportConfig.scale}
                       onChange={(e) => setExportConfig({ ...exportConfig, scale: Math.max(0, parseInt(e.target.value) || 0) })}

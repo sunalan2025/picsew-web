@@ -10,3 +10,6 @@
 **Learning:** To interact with specific UI tools conditionally rendered in the Control Panel during Playwright verification (like testing confirmation dialogs), you must first ensure the relevant parent tab is clicked to reveal the buttons, and you must add `page.on("dialog", lambda dialog: dialog.accept())` to prevent the test from hanging on `window.confirm`.
 **Action:** Always ensure UI elements are rendered by their parent containers before interacting with them in verification scripts, and register dialog handlers when verifying native confirmation popups.
 
+## 2026-08-25 - Expand clickable hit areas for form inputs
+**Learning:** In React components containing custom sliders and checkboxes (like the ControlPanel here), using generic `<span>` or `<label>` elements without a corresponding `htmlFor` attribute mapping to the input's `id` severely limits accessibility. It forces users (especially those on mobile or using screen readers) to precisely click the small input control itself.
+**Action:** Always wrap or associate text labels next to inputs with a `<label htmlFor="...">` tag, and assign a unique `id` to the `<input>`. This small change makes the entire text area clickable, vastly improving the interaction experience.
