@@ -53,6 +53,16 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         reader.onload = (event) => {
           const img = new Image();
           img.onload = () => {
+            // SECURITY: Validate uncompressed pixel footprint to prevent Image Bomb / Pixel Flood OOM DoS
+            // A 10000x10000 image takes ~400MB uncompressed memory. Limit to ~25 Megapixels (e.g. 5000x5000)
+            const MAX_PIXELS = 25000000;
+            if (img.naturalWidth * img.naturalHeight > MAX_PIXELS) {
+              console.error(`Image ${file.name} dimensions too large, preventing memory exhaustion.`);
+              alert(`图片 ${file.name} 尺寸过大 (超过2500万像素)，已阻止加载以防止内存耗尽 (Image dimensions too large)`);
+              resolve(null);
+              return;
+            }
+
             resolve({
               id: crypto.randomUUID(),
               name: file.name,
