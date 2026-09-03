@@ -121,9 +121,10 @@ const drawSingleAnnotation = (ctx: CanvasRenderingContext2D, anno: Annotation) =
 
           const tempCtx = tempBlurCanvas.getContext('2d', { willReadFrequently: true });
           if (tempCtx) {
-            if (tempBlurCanvas.width !== w) tempBlurCanvas.width = w;
-            if (tempBlurCanvas.height !== h) tempBlurCanvas.height = h;
-            else tempCtx.clearRect(0, 0, w, h);
+            let resized = false;
+            if (tempBlurCanvas.width !== w) { tempBlurCanvas.width = w; resized = true; }
+            if (tempBlurCanvas.height !== h) { tempBlurCanvas.height = h; resized = true; }
+            if (!resized) tempCtx.clearRect(0, 0, w, h);
 
             // Draw from main canvas to temp canvas to avoid expensive getImageData readback
             tempCtx.drawImage(ctx.canvas, x, y, w, h, 0, 0, w, h);
@@ -136,9 +137,10 @@ const drawSingleAnnotation = (ctx: CanvasRenderingContext2D, anno: Annotation) =
               
               const pixelCtx = pixelBlurCanvas.getContext('2d', { willReadFrequently: true });
               if (pixelCtx) {
-                if (pixelBlurCanvas.width !== sw) pixelBlurCanvas.width = sw;
-                if (pixelBlurCanvas.height !== sh) pixelBlurCanvas.height = sh;
-                else pixelCtx.clearRect(0, 0, sw, sh);
+                let pResized = false;
+                if (pixelBlurCanvas.width !== sw) { pixelBlurCanvas.width = sw; pResized = true; }
+                if (pixelBlurCanvas.height !== sh) { pixelBlurCanvas.height = sh; pResized = true; }
+                if (!pResized) pixelCtx.clearRect(0, 0, sw, sh);
 
                 pixelCtx.imageSmoothingEnabled = false;
                 pixelCtx.drawImage(tempBlurCanvas, 0, 0, sw, sh);
@@ -270,13 +272,13 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
     const ctx = baseCanvas.getContext('2d');
     if (!ctx || images.length === 0) return baseCanvas;
 
-    const currentDeps = JSON.stringify({
-      images: images.map(img => `${img.id}-${img.cropTop}-${img.cropBottom}-${img.cropLeft}-${img.cropRight}`),
+    const currentDeps = [
+      images.map(img => `${img.id}-${img.cropTop}-${img.cropBottom}-${img.cropLeft}-${img.cropRight}`).join(','),
       direction,
       gap,
-      overlaps,
-      statusBar
-    });
+      overlaps.join(','),
+      `${statusBar.enabled}-${statusBar.time}-${statusBar.battery}-${statusBar.wifi}-${statusBar.style}`
+    ].join('|');
 
     let allLoaded = true;
     for (const img of images) {
@@ -287,9 +289,10 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
     if (stitchedCacheCanvasRef.current && lastStitchDepsRef.current === currentDeps && allLoaded) {
       const cache = stitchedCacheCanvasRef.current;
-      if (baseCanvas.width !== cache.width) baseCanvas.width = cache.width;
-      if (baseCanvas.height !== cache.height) baseCanvas.height = cache.height;
-      ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
+      let bResized = false;
+      if (baseCanvas.width !== cache.width) { baseCanvas.width = cache.width; bResized = true; }
+      if (baseCanvas.height !== cache.height) { baseCanvas.height = cache.height; bResized = true; }
+      if (!bResized) ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
       ctx.drawImage(cache, 0, 0);
       return baseCanvas;
     }
@@ -397,9 +400,10 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
       lastStitchDepsRef.current = currentDeps;
     }
 
-    if (baseCanvas.width !== cacheCanvas.width) baseCanvas.width = cacheCanvas.width;
-    if (baseCanvas.height !== cacheCanvas.height) baseCanvas.height = cacheCanvas.height;
-    ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
+    let bcResized = false;
+    if (baseCanvas.width !== cacheCanvas.width) { baseCanvas.width = cacheCanvas.width; bcResized = true; }
+    if (baseCanvas.height !== cacheCanvas.height) { baseCanvas.height = cacheCanvas.height; bcResized = true; }
+    if (!bcResized) ctx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
     ctx.drawImage(cacheCanvas, 0, 0);
 
     return baseCanvas;
