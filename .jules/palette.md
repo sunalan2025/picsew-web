@@ -10,3 +10,7 @@
 **Learning:** To interact with specific UI tools conditionally rendered in the Control Panel during Playwright verification (like testing confirmation dialogs), you must first ensure the relevant parent tab is clicked to reveal the buttons, and you must add `page.on("dialog", lambda dialog: dialog.accept())` to prevent the test from hanging on `window.confirm`.
 **Action:** Always ensure UI elements are rendered by their parent containers before interacting with them in verification scripts, and register dialog handlers when verifying native confirmation popups.
 
+
+## 2025-02-15 - Missing Explicit Drag State Visual Feedback in Custom Dropzones
+**Learning:** The application uses a custom drag-and-drop div for image uploads (`ImageUploader.tsx`) but lacked explicit visual feedback when users dragged files over the dropzone. Without a change in visual state (like borders highlighting or text updating to "Release to drop"), users are unsure if the interface is ready to accept the files, leading to a poor interaction experience.
+**Action:** Always implement explicit visual states (`isDragging` state bound to `onDragOver` and `onDragLeave`) on custom dropzones. Use this state to dynamically update CSS classes (e.g., highlighting borders or backgrounds) and update helper text to provide clear, actionable feedback to users.
