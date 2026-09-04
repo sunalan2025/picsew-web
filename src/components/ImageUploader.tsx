@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Upload, X, ChevronUp, ChevronDown, Crop } from 'lucide-react';
 import type { StitchedImage } from '../types';
 
@@ -14,6 +14,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   onAutoStitchTrigger
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -99,10 +100,17 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    setIsDragging(false);
     if (e.dataTransfer.files) {
       addFiles(Array.from(e.dataTransfer.files));
     }
@@ -148,6 +156,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         role="button"
         tabIndex={0}
         onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
         onKeyDown={(e) => {
@@ -156,7 +165,11 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             fileInputRef.current?.click();
           }
         }}
-        className="border-2 border-dashed border-dark-700 hover:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none rounded-2xl p-6 mb-4 flex flex-col items-center justify-center cursor-pointer transition-colors duration-200 glass-card text-center"
+        className={`border-2 border-dashed focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none rounded-2xl p-6 mb-4 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 glass-card text-center ${
+          isDragging
+            ? 'border-primary-500 bg-primary-500/20 scale-[1.02]'
+            : 'border-dark-700 hover:border-primary-500'
+        }`}
       >
         <input
           type="file"
@@ -169,7 +182,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         <div className="p-3 bg-primary-500/10 rounded-full text-primary-300 mb-3">
           <Upload className="w-6 h-6" />
         </div>
-        <p className="text-sm font-medium text-gray-200">点击或将图片拖拽至此</p>
+        <p className="text-sm font-medium text-gray-200">
+          {isDragging ? '松开即可添加图片' : '点击或将图片拖拽至此'}
+        </p>
         <p className="text-xs text-gray-400 mt-1">支持所有图片格式</p>
       </div>
 
