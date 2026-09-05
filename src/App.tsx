@@ -507,8 +507,9 @@ function App() {
         <div className="flex items-center gap-2 md:gap-4 text-[10px] md:text-xs text-gray-400 font-medium">
           <button
             onClick={() => setDirection(d => d === 'vertical' ? 'horizontal' : 'vertical')}
-            className="flex items-center gap-1 px-2 md:px-3 py-1 md:py-1.5 bg-dark-800 hover:bg-dark-700 border border-dark-700/60 rounded-xl font-semibold text-gray-300 hover:text-white transition cursor-pointer select-none"
+            className="flex items-center gap-1 px-2 md:px-3 py-1 md:py-1.5 bg-dark-800 hover:bg-dark-700 border border-dark-700/60 rounded-xl font-semibold text-gray-300 hover:text-white transition cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
             title="点击切换画布模式"
+            aria-label="切换画布方向"
           >
             <Grid className="w-3.5 h-3.5 text-primary-400" />
             <span>画布: {direction === 'vertical' ? '纵向' : '横向'}</span>
