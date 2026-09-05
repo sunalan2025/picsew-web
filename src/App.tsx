@@ -138,21 +138,34 @@ function App() {
       // Automatically detect overlap for new additions
       const oldLen = images.length;
       const newLen = newImgs.length;
+      const startIdx = oldLen > 1 ? oldLen - 1 : 0;
 
-      for (let i = oldLen > 1 ? oldLen - 1 : 0; i < newLen - 1; i++) {
+      if (startIdx < newLen - 1) {
+        let prevImgA: HTMLImageElement | null = null;
         try {
-          const imgA = await loadImage(newImgs[i].src);
-          const imgB = await loadImage(newImgs[i + 1].src);
-          const detected = detectOverlap(imgA, imgB);
-
-          if (newOverlaps.length <= i) {
-             newOverlaps.push(detected);
-          } else {
-             newOverlaps[i] = detected;
-          }
+          prevImgA = await loadImage(newImgs[startIdx].src);
         } catch (e) {
-          console.error("Error pre-calculating overlap", e);
-          if (newOverlaps.length <= i) newOverlaps.push(0);
+          console.error("Error pre-calculating overlap, failed to load first image", e);
+        }
+
+        for (let i = startIdx; i < newLen - 1; i++) {
+          try {
+            if (!prevImgA) prevImgA = await loadImage(newImgs[i].src);
+            const imgB = await loadImage(newImgs[i + 1].src);
+            const detected = detectOverlap(prevImgA, imgB);
+
+            prevImgA = imgB; // Cache for next iteration
+
+            if (newOverlaps.length <= i) {
+               newOverlaps.push(detected);
+            } else {
+               newOverlaps[i] = detected;
+            }
+          } catch (e) {
+            console.error("Error pre-calculating overlap", e);
+            if (newOverlaps.length <= i) newOverlaps.push(0);
+            prevImgA = null; // Reset on error
+          }
         }
       }
       newOverlaps = newOverlaps.slice(0, newLen - 1);
@@ -167,11 +180,13 @@ function App() {
     
     try {
       const newOverlaps: number[] = [];
+      let prevImgA = await loadImage(images[0].src);
+
       for (let i = 0; i < images.length - 1; i++) {
-        const imgA = await loadImage(images[i].src);
         const imgB = await loadImage(images[i + 1].src);
-        const detected = detectOverlap(imgA, imgB);
+        const detected = detectOverlap(prevImgA, imgB);
         newOverlaps.push(detected);
+        prevImgA = imgB; // Cache for next iteration
       }
       
       // Reset crops of all images when smart-stitching
