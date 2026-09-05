@@ -10,3 +10,7 @@
 **Learning:** To interact with specific UI tools conditionally rendered in the Control Panel during Playwright verification (like testing confirmation dialogs), you must first ensure the relevant parent tab is clicked to reveal the buttons, and you must add `page.on("dialog", lambda dialog: dialog.accept())` to prevent the test from hanging on `window.confirm`.
 **Action:** Always ensure UI elements are rendered by their parent containers before interacting with them in verification scripts, and register dialog handlers when verifying native confirmation popups.
 
+
+## 2025-02-15 - Missing keyboard focus indicators on custom toolbar utility buttons
+**Learning:** Destructive actions (like reset canvas, clear annotations) and custom toolbar utility buttons (like zoom and undo) often lack visual focus indicators (`focus-visible:ring`), making keyboard navigation invisible and confusing for keyboard users.
+**Action:** Always ensure that all custom utility buttons, including destructive actions and toggle buttons in toolbars or control panels, include standard focus-visible styles (e.g. `focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none`).
