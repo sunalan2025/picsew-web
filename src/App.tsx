@@ -167,10 +167,14 @@ function App() {
     
     try {
       const newOverlaps: number[] = [];
+      let prevImgB: HTMLImageElement | null = null;
+
       for (let i = 0; i < images.length - 1; i++) {
-        const imgA = await loadImage(images[i].src);
+        const imgA = prevImgB || await loadImage(images[i].src);
         const imgB = await loadImage(images[i + 1].src);
         const detected = detectOverlap(imgA, imgB);
+
+        prevImgB = imgB;
         newOverlaps.push(detected);
       }
       
