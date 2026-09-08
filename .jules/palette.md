@@ -10,3 +10,6 @@
 **Learning:** To interact with specific UI tools conditionally rendered in the Control Panel during Playwright verification (like testing confirmation dialogs), you must first ensure the relevant parent tab is clicked to reveal the buttons, and you must add `page.on("dialog", lambda dialog: dialog.accept())` to prevent the test from hanging on `window.confirm`.
 **Action:** Always ensure UI elements are rendered by their parent containers before interacting with them in verification scripts, and register dialog handlers when verifying native confirmation popups.
 
+## 2025-02-15 - Missing accessibility labels and keyboard focus on canvas overlay buttons
+**Learning:** Some custom overlay buttons (like the canvas zoom reset, and text annotation input cancel/confirm buttons) lacked `title` and `aria-label` attributes, making them difficult for screen reader users to identify. They also lacked `focus-visible` styling, making keyboard navigation hard to track visually.
+**Action:** Always ensure that all icon-only or poorly labeled utility buttons have explicit `title` and `aria-label` attributes. Furthermore, always apply `focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none` (or similar contrast-appropriate rings) to interactive elements for keyboard accessibility.
