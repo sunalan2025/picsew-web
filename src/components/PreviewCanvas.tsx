@@ -1030,7 +1030,9 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
           <button
             onClick={handleResetZoom}
-            className="px-2.5 py-1 bg-dark-850 hover:bg-dark-800 text-gray-400 hover:text-gray-200 rounded-lg text-xs font-semibold border border-dark-700/30 transition"
+            className="px-2.5 py-1 bg-dark-850 hover:bg-dark-800 text-gray-400 hover:text-gray-200 rounded-lg text-xs font-semibold border border-dark-700/30 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
+            title="恢复原始比例 1:1"
+            aria-label="恢复原始比例 1:1"
           >
             1:1 原始
           </button>
@@ -1128,13 +1130,17 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
                 <div className="flex justify-end gap-1.5">
                   <button
                     onClick={() => setTextInput(null)}
-                    className="px-1.5 py-0.5 text-[10px] text-gray-400 hover:bg-dark-700 rounded"
+                    className="px-1.5 py-0.5 text-[10px] text-gray-400 hover:bg-dark-700 rounded focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
+                    title="取消输入文字"
+                    aria-label="取消输入文字"
                   >
                     取消
                   </button>
                   <button
                     onClick={saveTextInput}
-                    className="px-1.5 py-0.5 text-[10px] bg-primary-600 text-white rounded hover:bg-primary-500"
+                    className="px-1.5 py-0.5 text-[10px] bg-primary-600 text-white rounded hover:bg-primary-500 focus-visible:ring-2 focus-visible:ring-white focus:outline-none"
+                    title="确定保存文字"
+                    aria-label="确定保存文字"
                   >
                     确定
                   </button>
