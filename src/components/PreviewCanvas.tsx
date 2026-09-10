@@ -1012,7 +1012,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={handleFitWidth}
-            className="flex items-center gap-1 px-2.5 py-1 bg-dark-805 hover:bg-dark-800 text-gray-300 hover:text-white rounded-lg text-xs font-medium border border-dark-750 transition"
+            className="flex items-center gap-1 px-2.5 py-1 bg-dark-805 hover:bg-dark-800 text-gray-300 hover:text-white rounded-lg text-xs font-medium border border-dark-750 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
             title="铺满宽度"
           >
             <Maximize2 className="w-3.5 h-3.5 text-primary-400" />
@@ -1021,7 +1021,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
           <button
             onClick={handleFitHeight}
-            className="flex items-center gap-1 px-2.5 py-1 bg-dark-805 hover:bg-dark-800 text-gray-300 hover:text-white rounded-lg text-xs font-medium border border-dark-750 transition"
+            className="flex items-center gap-1 px-2.5 py-1 bg-dark-805 hover:bg-dark-800 text-gray-300 hover:text-white rounded-lg text-xs font-medium border border-dark-750 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
             title="完整高度"
           >
             <Minimize2 className="w-3.5 h-3.5 text-pink-400" />
@@ -1030,7 +1030,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
           <button
             onClick={handleResetZoom}
-            className="px-2.5 py-1 bg-dark-850 hover:bg-dark-800 text-gray-400 hover:text-gray-200 rounded-lg text-xs font-semibold border border-dark-700/30 transition"
+            className="px-2.5 py-1 bg-dark-850 hover:bg-dark-800 text-gray-400 hover:text-gray-200 rounded-lg text-xs font-semibold border border-dark-700/30 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
           >
             1:1 原始
           </button>
@@ -1042,7 +1042,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
           <button
             onClick={onUndo}
             disabled={!canUndo}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-dark-805 hover:bg-dark-800 disabled:opacity-40 disabled:hover:bg-dark-805 text-gray-300 hover:text-white disabled:text-gray-500 rounded-lg text-xs font-semibold border border-dark-750 transition cursor-pointer disabled:cursor-not-allowed select-none"
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-dark-805 hover:bg-dark-800 disabled:opacity-40 disabled:hover:bg-dark-805 text-gray-300 hover:text-white disabled:text-gray-500 rounded-lg text-xs font-semibold border border-dark-750 transition cursor-pointer disabled:cursor-not-allowed select-none focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
             title="撤回最近一步 (最多可撤回5步)"
           >
             <Undo2 className="w-3.5 h-3.5 text-primary-400" />
