@@ -177,7 +177,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       {images.length > 1 && (
         <button
           onClick={onAutoStitchTrigger}
-          className="w-full bg-linear-to-r from-primary-600 to-primary-400 hover:from-primary-700 hover:to-primary-500 text-white font-medium py-2.5 px-4 rounded-xl shadow-lg transition-all duration-200 mb-4 text-sm"
+          className="w-full bg-linear-to-r from-primary-600 to-primary-400 hover:from-primary-700 hover:to-primary-500 text-white font-medium py-2.5 px-4 rounded-xl shadow-lg transition-all duration-200 mb-4 text-sm focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
         >
           🚀 智能一键拼接
         </button>
