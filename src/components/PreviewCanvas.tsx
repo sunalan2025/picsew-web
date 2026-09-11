@@ -1012,7 +1012,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={handleFitWidth}
-            className="flex items-center gap-1 px-2.5 py-1 bg-dark-805 hover:bg-dark-800 text-gray-300 hover:text-white rounded-lg text-xs font-medium border border-dark-750 transition"
+            className="flex items-center gap-1 px-2.5 py-1 bg-dark-805 hover:bg-dark-800 text-gray-300 hover:text-white rounded-lg text-xs font-medium border border-dark-750 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
             title="铺满宽度"
           >
             <Maximize2 className="w-3.5 h-3.5 text-primary-400" />
@@ -1021,7 +1021,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
           <button
             onClick={handleFitHeight}
-            className="flex items-center gap-1 px-2.5 py-1 bg-dark-805 hover:bg-dark-800 text-gray-300 hover:text-white rounded-lg text-xs font-medium border border-dark-750 transition"
+            className="flex items-center gap-1 px-2.5 py-1 bg-dark-805 hover:bg-dark-800 text-gray-300 hover:text-white rounded-lg text-xs font-medium border border-dark-750 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
             title="完整高度"
           >
             <Minimize2 className="w-3.5 h-3.5 text-pink-400" />
@@ -1030,7 +1030,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
           <button
             onClick={handleResetZoom}
-            className="px-2.5 py-1 bg-dark-850 hover:bg-dark-800 text-gray-400 hover:text-gray-200 rounded-lg text-xs font-semibold border border-dark-700/30 transition"
+            className="px-2.5 py-1 bg-dark-850 hover:bg-dark-800 text-gray-400 hover:text-gray-200 rounded-lg text-xs font-semibold border border-dark-700/30 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
           >
             1:1 原始
           </button>
@@ -1128,13 +1128,13 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
                 <div className="flex justify-end gap-1.5">
                   <button
                     onClick={() => setTextInput(null)}
-                    className="px-1.5 py-0.5 text-[10px] text-gray-400 hover:bg-dark-700 rounded"
+                    className="px-1.5 py-0.5 text-[10px] text-gray-400 hover:bg-dark-700 rounded focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
                   >
                     取消
                   </button>
                   <button
                     onClick={saveTextInput}
-                    className="px-1.5 py-0.5 text-[10px] bg-primary-600 text-white rounded hover:bg-primary-500"
+                    className="px-1.5 py-0.5 text-[10px] bg-primary-600 text-white rounded hover:bg-primary-500 focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
                   >
                     确定
                   </button>
