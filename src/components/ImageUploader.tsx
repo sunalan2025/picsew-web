@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { Upload, X, ChevronUp, ChevronDown, Crop } from 'lucide-react';
 import type { StitchedImage } from '../types';
+import { showToast } from '../utils/toast';
 
 interface ImageUploaderProps {
   images: StitchedImage[];
@@ -25,7 +26,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     // SECURITY: Limit number of files to prevent DoS
     let filesToProcess = files;
     if (images.length + filesToProcess.length > 50) {
-      alert('最多只能添加 50 张图片 (Maximum 50 images allowed)');
+      showToast('最多只能添加 50 张图片 (Maximum 50 images allowed)');
       filesToProcess = filesToProcess.slice(0, Math.max(0, 50 - images.length));
     }
 
@@ -36,12 +37,12 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
       // SECURITY: Block SVGs to prevent potential XSS/XXE vectors when rendered
       if (f.type.includes('svg') || f.name.toLowerCase().endsWith('.svg')) {
-        alert(`不支持 SVG 格式图片以防止安全风险 (SVG images are blocked for security)`);
+        showToast(`不支持 SVG 格式图片以防止安全风险 (SVG images are blocked for security)`);
         return false;
       }
 
       if (f.size > MAX_FILE_SIZE) {
-        alert(`图片 ${f.name} 过大，最大允许 50MB (Image too large, max 50MB)`);
+        showToast(`图片 ${f.name} 过大，最大允许 50MB (Image too large, max 50MB)`);
         return false;
       }
       return true;
@@ -58,7 +59,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             const MAX_PIXELS = 25000000;
             if (img.naturalWidth * img.naturalHeight > MAX_PIXELS) {
               console.error(`Image ${file.name} dimensions too large, preventing memory exhaustion.`);
-              alert(`图片 ${file.name} 尺寸过大 (超过2500万像素)，已阻止加载以防止内存耗尽 (Image dimensions too large)`);
+              showToast(`图片 ${file.name} 尺寸过大 (超过2500万像素)，已阻止加载以防止内存耗尽 (Image dimensions too large)`);
               resolve(null);
               return;
             }

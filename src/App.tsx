@@ -16,6 +16,7 @@ import { PreviewCanvas } from './components/PreviewCanvas';
 import { detectOverlap, loadImage } from './utils/stitching';
 import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
+import { showToast } from './utils/toast';
 
 interface HistoryState {
   images: StitchedImage[];
@@ -188,7 +189,7 @@ function App() {
       setActiveTab('stitch');
     } catch (err) {
       console.error('Error during auto stitching', err);
-      alert('自动拼接算法出错，请尝试拖动手动微调！');
+      showToast('自动拼接算法出错，请尝试拖动手动微调！');
     } finally {
       setIsStitching(false);
     }
@@ -267,7 +268,7 @@ function App() {
       const splitPixel = Math.round(slice.cropTop + dyVisible);
 
       if (splitPixel <= slice.cropTop + minMargin || splitPixel >= slice.height - slice.cropBottom - minMargin) {
-        alert("太靠近边缘了，无法切分！");
+        showToast("太靠近边缘了，无法切分！");
         return;
       }
 
@@ -287,7 +288,7 @@ function App() {
       const splitPixel = Math.round(slice.cropLeft + dxVisible);
 
       if (splitPixel <= slice.cropLeft + minMargin || splitPixel >= slice.width - slice.cropRight - minMargin) {
-        alert("太靠近边缘了，无法切分！");
+        showToast("太靠近边缘了，无法切分！");
         return;
       }
 
@@ -452,7 +453,7 @@ function App() {
 
     // SECURITY: Limit maximum slices to prevent browser crash / DoS
     if (slicesCount > 500) {
-      alert(`切片数量过多 (${slicesCount} > 500)，请增加切片高度以防止浏览器崩溃 (Too many slices, please increase slice height)`);
+      showToast(`切片数量过多 (${slicesCount} > 500)，请增加切片高度以防止浏览器崩溃 (Too many slices, please increase slice height)`);
       return;
     }
 
