@@ -6,3 +6,6 @@
 ## 2024-05-18 - Canvas Drawing Loop Optimization
 **Learning:** Re-rendering many high-resolution images to the canvas on every `mousemove` event (such as when drawing annotations) causes massive CPU spikes and severe frame drops.
 **Action:** Always implement a background layer caching mechanism (via off-screen canvas) for static content in interactive drawing tools so `mousemove` only redraws the active annotation and composite the cached background.
+## 2026-09-12 - Prevent Redundant Image Decoding in Auto-Stitch Loops
+**Learning:** In auto-stitch detection sequences, the image parsing flow re-decoded (`loadImage()`) identical image blobs unnecessarily across consecutive overlap pairs. This created significant async parsing blockages that scaled negatively with image batch size. Furthermore, when implementing caching optimization, variables tracking previous iteration state must be explicitly cleared (`prevImg = null`) in loop `catch` blocks to prevent stale objects from corrupting recovery sequences and incorrectly applying offsets on subsequent items.
+**Action:** Always maintain sequential image decodes manually instead of via array mapping, and conditionally cache previous parsed image node references if looping. Ensure loop continuation failure modes explicitly reset the local cache before proceding.
