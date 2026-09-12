@@ -351,7 +351,11 @@ function App() {
     if (content instanceof Blob) {
       if (isAndroidApp) {
         const reader = new FileReader();
+        reader.onerror = () => {
+          console.error("Native blob reading failed");
+        };
         reader.onloadend = () => {
+          if (!reader.result) return;
           const base64 = (reader.result as string).split(',')[1];
           try {
             (window as any).AndroidApp.saveBase64File(base64, mimeType, filename);
