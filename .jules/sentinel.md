@@ -12,3 +12,7 @@
 **Vulnerability:** Client-Side File Signature Validation Regression
 **Learning:** Client-side magic byte parsing often breaks perfectly valid image uploads (e.g. GIFs, SVGs, or JPEGs with different APP markers) and offers no real protection since the browser securely sandboxes image decoders anyway.
 **Prevention:** Avoid implementing complex client-side magic byte validation for user-uploaded images; rely on other defense-in-depth methods (like CSP or strict size limits) instead.
+## 2025-10-18 - [Fix infinitely pending promises in native file reading]
+**Vulnerability:** Unhandled FileReader and Image loading errors resulting in infinitely pending Promises or silently crashing execution.
+**Learning:** Using `FileReader` or `Image` without proper `onerror` handlers can cause silent crashes or unhandled exceptions in event listeners (like `.result` being null inside `onloadend`).
+**Prevention:** Always implement explicit error handlers in native browser APIs (like FileReader and HTMLImageElement) and check state (e.g., `if (!reader.result) return;`) before accessing the result.

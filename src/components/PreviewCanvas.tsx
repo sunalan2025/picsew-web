@@ -330,6 +330,10 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
           imgEl = new Image();
           imgEl.src = img.src;
           imgEl.onload = () => renderPipelineRef.current?.();
+          imgEl.onerror = () => {
+            console.error(`Failed to load image cache for ${img.name}`);
+            imageCacheRef.current.delete(img.id);
+          };
           imageCacheRef.current.set(img.id, imgEl);
         }
 
@@ -351,6 +355,10 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
           imgEl = new Image();
           imgEl.src = img.src;
           imgEl.onload = () => renderPipelineRef.current?.();
+          imgEl.onerror = () => {
+            console.error(`Failed to load image cache for ${img.name}`);
+            imageCacheRef.current.delete(img.id);
+          };
           imageCacheRef.current.set(img.id, imgEl);
         }
 
