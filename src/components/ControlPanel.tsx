@@ -552,10 +552,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                           <button
                             key={net}
                             onClick={() => setStatusBar({ ...statusBar, wifi: net })}
-                            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${
+                            aria-pressed={statusBar.wifi === net}
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
                               statusBar.wifi === net
                                 ? 'bg-primary-600 text-white'
-                                : 'bg-dark-800 text-gray-400 border border-dark-700/50'
+                                : 'bg-dark-800 text-gray-400 border border-dark-700/50 hover:bg-dark-700'
                             }`}
                           >
                             {net === 'wifi' ? 'Wi-Fi' : net === 'cellular' ? '蜂窝网' : '无'}
@@ -570,20 +571,22 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                       <div className="flex gap-2">
                         <button
                           onClick={() => setStatusBar({ ...statusBar, style: 'light' })}
-                          className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${
+                          aria-pressed={statusBar.style === 'light'}
+                          className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
                             statusBar.style === 'light'
                               ? 'bg-primary-600 text-white'
-                              : 'bg-dark-800 text-gray-400 border border-dark-700/50'
+                              : 'bg-dark-800 text-gray-400 border border-dark-700/50 hover:bg-dark-700'
                           }`}
                         >
                           白色 (深背景用)
                         </button>
                         <button
                           onClick={() => setStatusBar({ ...statusBar, style: 'dark' })}
-                          className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${
+                          aria-pressed={statusBar.style === 'dark'}
+                          className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
                             statusBar.style === 'dark'
                               ? 'bg-primary-600 text-white'
-                              : 'bg-dark-800 text-gray-400 border border-dark-700/50'
+                              : 'bg-dark-800 text-gray-400 border border-dark-700/50 hover:bg-dark-700'
                           }`}
                         >
                           黑色 (浅背景用)
@@ -600,8 +603,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               <div className="space-y-4">
                 {/* Select Device */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-400">套壳机型</label>
+                  <label htmlFor="mockup-device" className="text-xs font-bold text-gray-400 cursor-pointer">套壳机型</label>
                   <select
+                    id="mockup-device"
                     value={mockup.device}
                     onChange={(e) => setMockup({ ...mockup, device: e.target.value as any })}
                     className="w-full bg-dark-800 border border-dark-700 rounded-lg py-1.5 px-3 text-xs text-gray-200 focus:border-primary-500 outline-hidden"
@@ -621,7 +625,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                       <div className="flex gap-2">
                         <button
                           onClick={() => setMockup({ ...mockup, extendBottom: true })}
-                          className={`flex-1 py-2 px-2.5 rounded-lg text-xs font-semibold leading-4 transition ${
+                          aria-pressed={mockup.extendBottom}
+                          className={`flex-1 py-2 px-2.5 rounded-lg text-xs font-semibold leading-4 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
                             mockup.extendBottom
                               ? 'bg-primary-600 text-white'
                               : 'bg-dark-800 text-gray-400 border border-dark-700/50 hover:bg-dark-700'
@@ -631,7 +636,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                         </button>
                         <button
                           onClick={() => setMockup({ ...mockup, extendBottom: false })}
-                          className={`flex-1 py-2 px-2.5 rounded-lg text-xs font-semibold leading-4 transition ${
+                          aria-pressed={!mockup.extendBottom}
+                          className={`flex-1 py-2 px-2.5 rounded-lg text-xs font-semibold leading-4 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
                             !mockup.extendBottom
                               ? 'bg-primary-600 text-white'
                               : 'bg-dark-800 text-gray-400 border border-dark-700/50 hover:bg-dark-700'
@@ -650,10 +656,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                           <button
                             key={bg}
                             onClick={() => setMockup({ ...mockup, bgColorType: bg })}
-                            className={`py-1.5 rounded-lg text-xs font-semibold transition ${
+                            aria-pressed={mockup.bgColorType === bg}
+                            className={`py-1.5 rounded-lg text-xs font-semibold transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
                               mockup.bgColorType === bg
                                 ? 'bg-primary-600 text-white'
-                                : 'bg-dark-800 text-gray-400 border border-dark-700/50'
+                                : 'bg-dark-800 text-gray-400 border border-dark-700/50 hover:bg-dark-700'
                             }`}
                           >
                             {bg === 'gradient' ? '多彩渐变' : bg === 'solid' ? '纯色' : '截图毛玻璃'}
@@ -745,10 +752,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                       <button
                         key={fmt}
                         onClick={() => setExportConfig({ ...exportConfig, format: fmt })}
-                        className={`flex-1 py-1.5 rounded-lg text-xs font-semibold capitalize transition ${
+                        aria-pressed={exportConfig.format === fmt}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-semibold capitalize transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
                           exportConfig.format === fmt
                             ? 'bg-primary-600 text-white'
-                            : 'bg-dark-800 text-gray-400 border border-dark-700/50'
+                            : 'bg-dark-800 text-gray-400 border border-dark-700/50 hover:bg-dark-700'
                         }`}
                       >
                         {fmt}
@@ -808,20 +816,22 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   <div className="flex gap-2">
                     <button
                       onClick={() => setExportConfig({ ...exportConfig, pdfPageMode: 'single' })}
-                      className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold leading-4 transition ${
+                      aria-pressed={exportConfig.pdfPageMode === 'single'}
+                      className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold leading-4 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
                         exportConfig.pdfPageMode === 'single'
                           ? 'bg-primary-600 text-white'
-                          : 'bg-dark-800 text-gray-400 border border-dark-700/50'
+                          : 'bg-dark-800 text-gray-400 border border-dark-700/50 hover:bg-dark-700'
                       }`}
                     >
                       单页长图 PDF
                     </button>
                     <button
                       onClick={() => setExportConfig({ ...exportConfig, pdfPageMode: 'multi' })}
-                      className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold leading-4 transition ${
+                      aria-pressed={exportConfig.pdfPageMode === 'multi'}
+                      className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold leading-4 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
                         exportConfig.pdfPageMode === 'multi'
                           ? 'bg-primary-600 text-white'
-                          : 'bg-dark-800 text-gray-400 border border-dark-700/50'
+                          : 'bg-dark-800 text-gray-400 border border-dark-700/50 hover:bg-dark-700'
                       }`}
                     >
                       自动分页 (A4 比例)
