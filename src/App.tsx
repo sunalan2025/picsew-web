@@ -139,10 +139,12 @@ function App() {
       const oldLen = images.length;
       const newLen = newImgs.length;
 
+      let cachedImgB: HTMLImageElement | null = null;
       for (let i = oldLen > 1 ? oldLen - 1 : 0; i < newLen - 1; i++) {
         try {
-          const imgA = await loadImage(newImgs[i].src);
+          const imgA = cachedImgB || await loadImage(newImgs[i].src);
           const imgB = await loadImage(newImgs[i + 1].src);
+          cachedImgB = imgB;
           const detected = detectOverlap(imgA, imgB);
 
           if (newOverlaps.length <= i) {
@@ -151,6 +153,7 @@ function App() {
              newOverlaps[i] = detected;
           }
         } catch (e) {
+          cachedImgB = null;
           console.error("Error pre-calculating overlap", e);
           if (newOverlaps.length <= i) newOverlaps.push(0);
         }
@@ -167,9 +170,11 @@ function App() {
     
     try {
       const newOverlaps: number[] = [];
+      let _cachedImgB: HTMLImageElement | null = null;
       for (let i = 0; i < images.length - 1; i++) {
-        const imgA = await loadImage(images[i].src);
+        const imgA = _cachedImgB || await loadImage(images[i].src);
         const imgB = await loadImage(images[i + 1].src);
+        _cachedImgB = imgB;
         const detected = detectOverlap(imgA, imgB);
         newOverlaps.push(detected);
       }
