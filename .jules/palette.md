@@ -10,3 +10,7 @@
 **Learning:** To interact with specific UI tools conditionally rendered in the Control Panel during Playwright verification (like testing confirmation dialogs), you must first ensure the relevant parent tab is clicked to reveal the buttons, and you must add `page.on("dialog", lambda dialog: dialog.accept())` to prevent the test from hanging on `window.confirm`.
 **Action:** Always ensure UI elements are rendered by their parent containers before interacting with them in verification scripts, and register dialog handlers when verifying native confirmation popups.
 
+
+## 2023-11-20 - Ensure All Interactive Elements Receive Focus Indicators
+**Learning:** Adding focus indicators (`focus-visible`) to some buttons but not others creates a jarring and broken keyboard navigation experience, especially in custom toolbars (like canvas zoom controllers or floating menus) where native focus indicators might be suppressed.
+**Action:** When auditing custom component groups (like toolbars or overlays), ensure *all* interactive `<button>` elements have explicit and consistent focus indicators (e.g., `focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none`) applied to their styles.
