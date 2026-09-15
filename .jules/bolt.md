@@ -6,3 +6,7 @@
 ## 2024-05-18 - Canvas Drawing Loop Optimization
 **Learning:** Re-rendering many high-resolution images to the canvas on every `mousemove` event (such as when drawing annotations) causes massive CPU spikes and severe frame drops.
 **Action:** Always implement a background layer caching mechanism (via off-screen canvas) for static content in interactive drawing tools so `mousemove` only redraws the active annotation and composite the cached background.
+
+## 2024-05-19 - Redundant Image Decoding Overhead
+**Learning:** When iterating over image sources in loops (e.g., for sequential processing or overlap detection like `detectOverlap`), redundant decoding of the same image source (via `await loadImage`) multiple times causes significant asynchronous decoding overhead.
+**Action:** Always cache the parsed `HTMLImageElement` reference from the previous iteration (e.g., in a `prevImg` variable outside the loop) and explicitly reset it in catch blocks. This significantly reduces redundant image decoding calls during sequential processing.
