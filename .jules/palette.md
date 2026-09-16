@@ -10,3 +10,6 @@
 **Learning:** To interact with specific UI tools conditionally rendered in the Control Panel during Playwright verification (like testing confirmation dialogs), you must first ensure the relevant parent tab is clicked to reveal the buttons, and you must add `page.on("dialog", lambda dialog: dialog.accept())` to prevent the test from hanging on `window.confirm`.
 **Action:** Always ensure UI elements are rendered by their parent containers before interacting with them in verification scripts, and register dialog handlers when verifying native confirmation popups.
 
+## 2026-09-16 - Added Keyboard Focus States to Interactive Elements
+**Learning:** Many interactive buttons in the application (ControlPanel, PreviewCanvas, ImageUploader) lacked visible focus indicators, making keyboard navigation difficult or impossible for accessibility users.
+**Action:** Applied `focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none` to standard interactive elements, and `ring-red-500` to destructive actions (e.g., reset, clear) to provide clear, accessible keyboard focus states without disrupting pointer user experience.

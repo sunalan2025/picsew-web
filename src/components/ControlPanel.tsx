@@ -254,7 +254,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   <div className="pt-2 pb-1">
                     <button
                       onClick={onAutoStitchTrigger}
-                      className="w-full bg-linear-to-r from-primary-600 to-primary-400 hover:from-primary-700 hover:to-primary-500 text-white font-medium py-2 px-3 rounded-lg shadow-sm transition-all duration-200 text-xs flex items-center justify-center gap-1"
+                      className="w-full bg-linear-to-r from-primary-600 to-primary-400 hover:from-primary-700 hover:to-primary-500 text-white font-medium py-2 px-3 rounded-lg shadow-sm transition-all duration-200 text-xs flex items-center justify-center gap-1 focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
                     >
                       ✨ 智能自动对齐 (Auto Align)
                     </button>
@@ -364,7 +364,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                         onResetCropsAndSplits();
                       }
                     }}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-900/30 text-xs font-semibold rounded-lg transition mt-4"
+                    className="w-full flex items-center justify-center gap-1.5 py-2 bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-900/30 text-xs font-semibold rounded-lg transition mt-4 focus-visible:ring-2 focus-visible:ring-red-500 focus:outline-none"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     重置所有裁剪与分割
@@ -467,7 +467,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     <button
                       onClick={onUndo}
                       disabled={!canUndo}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-dark-800 hover:bg-dark-700 text-gray-300 disabled:text-gray-600 disabled:hover:bg-dark-800 text-xs font-semibold rounded-lg border border-dark-750 transition"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-dark-800 hover:bg-dark-700 text-gray-300 disabled:text-gray-600 disabled:hover:bg-dark-800 text-xs font-semibold rounded-lg border border-dark-750 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
                     >
                       <Undo className="w-3.5 h-3.5" />
                       撤销
@@ -475,7 +475,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     <button
                       onClick={onRedo}
                       disabled={!canRedo}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-dark-800 hover:bg-dark-700 text-gray-300 disabled:text-gray-600 disabled:hover:bg-dark-800 text-xs font-semibold rounded-lg border border-dark-750 transition"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-dark-800 hover:bg-dark-700 text-gray-300 disabled:text-gray-600 disabled:hover:bg-dark-800 text-xs font-semibold rounded-lg border border-dark-750 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
                     >
                       <Redo className="w-3.5 h-3.5" />
                       重做
@@ -487,7 +487,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                         onClearAnnotations();
                       }
                     }}
-                    className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-900/30 text-xs font-semibold rounded-lg transition"
+                    className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-900/30 text-xs font-semibold rounded-lg transition focus-visible:ring-2 focus-visible:ring-red-500 focus:outline-none"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     清除所有标注
@@ -833,7 +833,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 <div className="space-y-2.5 pt-4 border-t border-dark-700/60">
                   <button
                     onClick={onDownloadImage}
-                    className="w-full flex items-center justify-center gap-2 bg-linear-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 text-white font-medium py-2 px-4 rounded-xl shadow-lg transition duration-200 text-sm"
+                    className="w-full flex items-center justify-center gap-2 bg-linear-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 text-white font-medium py-2 px-4 rounded-xl shadow-lg transition duration-200 text-sm focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
                   >
                     <Download className="w-4 h-4" />
                     下载长截图图片
@@ -841,7 +841,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
                   <button
                     onClick={onDownloadPDF}
-                    className="w-full flex items-center justify-center gap-2 bg-dark-800 hover:bg-dark-750 text-gray-200 font-medium py-2 px-4 rounded-xl border border-dark-700 transition duration-200 text-sm"
+                    className="w-full flex items-center justify-center gap-2 bg-dark-800 hover:bg-dark-750 text-gray-200 font-medium py-2 px-4 rounded-xl border border-dark-700 transition duration-200 text-sm focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
                   >
                     <FileText className="w-4 h-4 text-orange-400" />
                     导出 PDF 电子书
@@ -850,7 +850,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   {exportConfig.scale > 0 && (
                     <button
                       onClick={onDownloadZip}
-                      className="w-full flex items-center justify-center gap-2 bg-dark-800 hover:bg-dark-750 text-gray-200 font-medium py-2 px-4 rounded-xl border border-dark-700 transition duration-200 text-sm animate-pulse"
+                      className="w-full flex items-center justify-center gap-2 bg-dark-800 hover:bg-dark-750 text-gray-200 font-medium py-2 px-4 rounded-xl border border-dark-700 transition duration-200 text-sm animate-pulse focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
                     >
                       <Split className="w-4 h-4 text-green-400" />
                       打包下载分段切片 (.zip)
