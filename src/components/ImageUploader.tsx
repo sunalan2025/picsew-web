@@ -31,17 +31,22 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
     // SECURITY: Limit file size to prevent memory exhaustion (50MB)
     const MAX_FILE_SIZE = 50 * 1024 * 1024;
+
+    let svgBlockedCount = 0;
+    let oversizedCount = 0;
+    let dimensionErrors = 0;
+
     const validFiles = filesToProcess.filter(f => {
       if (!f.type.startsWith('image/')) return false;
 
       // SECURITY: Block SVGs to prevent potential XSS/XXE vectors when rendered
       if (f.type.includes('svg') || f.name.toLowerCase().endsWith('.svg')) {
-        alert(`不支持 SVG 格式图片以防止安全风险 (SVG images are blocked for security)`);
+        svgBlockedCount++;
         return false;
       }
 
       if (f.size > MAX_FILE_SIZE) {
-        alert(`图片 ${f.name} 过大，最大允许 50MB (Image too large, max 50MB)`);
+        oversizedCount++;
         return false;
       }
       return true;
@@ -51,6 +56,10 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       return new Promise<StitchedImage | null>((resolve) => {
         const reader = new FileReader();
         reader.onload = (event) => {
+          if (!event.target?.result) {
+             resolve(null);
+             return;
+          }
           const img = new Image();
           img.onload = () => {
             // SECURITY: Validate uncompressed pixel footprint to prevent Image Bomb / Pixel Flood OOM DoS
@@ -58,7 +67,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             const MAX_PIXELS = 25000000;
             if (img.naturalWidth * img.naturalHeight > MAX_PIXELS) {
               console.error(`Image ${file.name} dimensions too large, preventing memory exhaustion.`);
-              alert(`图片 ${file.name} 尺寸过大 (超过2500万像素)，已阻止加载以防止内存耗尽 (Image dimensions too large)`);
+              dimensionErrors++;
               resolve(null);
               return;
             }
@@ -89,7 +98,21 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       });
     });
 
+    if (svgBlockedCount > 0 || oversizedCount > 0) {
+      setTimeout(() => {
+         let msg = '';
+         if (svgBlockedCount > 0) msg += `不支持 SVG 格式图片以防止安全风险，已阻止 ${svgBlockedCount} 张图片。\n`;
+         if (oversizedCount > 0) msg += `图片最大允许 50MB，已阻止 ${oversizedCount} 张过大图片。\n`;
+         alert(msg.trim());
+      }, 0);
+    }
+
     Promise.all(loadPromises).then(results => {
+      if (dimensionErrors > 0) {
+        setTimeout(() => {
+          alert(`图片尺寸过大 (超过2500万像素)，已阻止 ${dimensionErrors} 张图片加载以防止内存耗尽。`);
+        }, 0);
+      }
       const newImages = results.filter((img): img is StitchedImage => img !== null);
       if (newImages.length > 0) {
         onImagesChange([...images, ...newImages]);
