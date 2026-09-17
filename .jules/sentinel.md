@@ -12,3 +12,7 @@
 **Vulnerability:** Client-Side File Signature Validation Regression
 **Learning:** Client-side magic byte parsing often breaks perfectly valid image uploads (e.g. GIFs, SVGs, or JPEGs with different APP markers) and offers no real protection since the browser securely sandboxes image decoders anyway.
 **Prevention:** Avoid implementing complex client-side magic byte validation for user-uploaded images; rely on other defense-in-depth methods (like CSP or strict size limits) instead.
+## 2025-09-17 - DoS vulnerability (UI flooding) via synchronous alerts
+**Vulnerability:** Client-side DoS (UI flooding) where a user uploading multiple invalid files gets locked into closing 50 sequential alerts.
+**Learning:** `alert()` dialogues inside a loop or `.map`/`.filter` operations block the main browser thread sequentially, and a malicious or uninformed user could accidentally trigger a large batch of alerts.
+**Prevention:** Aggregate validation errors during batch processing and present a single summary alert or non-blocking notification per error category after the loop completes.

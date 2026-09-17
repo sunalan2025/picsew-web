@@ -31,22 +31,33 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
     // SECURITY: Limit file size to prevent memory exhaustion (50MB)
     const MAX_FILE_SIZE = 50 * 1024 * 1024;
+    const svgErrors: string[] = [];
+    const sizeErrors: string[] = [];
+
     const validFiles = filesToProcess.filter(f => {
       if (!f.type.startsWith('image/')) return false;
 
       // SECURITY: Block SVGs to prevent potential XSS/XXE vectors when rendered
       if (f.type.includes('svg') || f.name.toLowerCase().endsWith('.svg')) {
-        alert(`不支持 SVG 格式图片以防止安全风险 (SVG images are blocked for security)`);
+        svgErrors.push(f.name);
         return false;
       }
 
       if (f.size > MAX_FILE_SIZE) {
-        alert(`图片 ${f.name} 过大，最大允许 50MB (Image too large, max 50MB)`);
+        sizeErrors.push(f.name);
         return false;
       }
       return true;
     });
+
+    if (svgErrors.length > 0) {
+      alert(`不支持 SVG 格式图片以防止安全风险 (SVG images are blocked for security):\n${svgErrors.join(', ')}`);
+    }
+    if (sizeErrors.length > 0) {
+      alert(`图片过大，最大允许 50MB (Images too large, max 50MB):\n${sizeErrors.join(', ')}`);
+    }
     
+    const pixelErrors: string[] = [];
     const loadPromises = validFiles.map(file => {
       return new Promise<StitchedImage | null>((resolve) => {
         const reader = new FileReader();
@@ -58,7 +69,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             const MAX_PIXELS = 25000000;
             if (img.naturalWidth * img.naturalHeight > MAX_PIXELS) {
               console.error(`Image ${file.name} dimensions too large, preventing memory exhaustion.`);
-              alert(`图片 ${file.name} 尺寸过大 (超过2500万像素)，已阻止加载以防止内存耗尽 (Image dimensions too large)`);
+              pixelErrors.push(file.name);
               resolve(null);
               return;
             }
@@ -90,6 +101,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     });
 
     Promise.all(loadPromises).then(results => {
+      if (pixelErrors.length > 0) {
+         alert(`图片尺寸过大 (超过2500万像素)，已阻止加载以防止内存耗尽 (Image dimensions too large):\n${pixelErrors.join(', ')}`);
+      }
       const newImages = results.filter((img): img is StitchedImage => img !== null);
       if (newImages.length > 0) {
         onImagesChange([...images, ...newImages]);
