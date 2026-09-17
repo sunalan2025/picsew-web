@@ -139,9 +139,11 @@ function App() {
       const oldLen = images.length;
       const newLen = newImgs.length;
 
+      let cachedImgA: HTMLImageElement | null = null;
+
       for (let i = oldLen > 1 ? oldLen - 1 : 0; i < newLen - 1; i++) {
         try {
-          const imgA = await loadImage(newImgs[i].src);
+          const imgA = cachedImgA || await loadImage(newImgs[i].src);
           const imgB = await loadImage(newImgs[i + 1].src);
           const detected = detectOverlap(imgA, imgB);
 
@@ -150,9 +152,13 @@ function App() {
           } else {
              newOverlaps[i] = detected;
           }
+
+          // Cache B to be used as A in the next iteration
+          cachedImgA = imgB;
         } catch (e) {
           console.error("Error pre-calculating overlap", e);
           if (newOverlaps.length <= i) newOverlaps.push(0);
+          cachedImgA = null; // Reset cache on error
         }
       }
       newOverlaps = newOverlaps.slice(0, newLen - 1);
@@ -167,11 +173,14 @@ function App() {
     
     try {
       const newOverlaps: number[] = [];
+      let cachedImgA: HTMLImageElement | null = null;
       for (let i = 0; i < images.length - 1; i++) {
-        const imgA = await loadImage(images[i].src);
+        const imgA = cachedImgA || await loadImage(images[i].src);
         const imgB = await loadImage(images[i + 1].src);
         const detected = detectOverlap(imgA, imgB);
         newOverlaps.push(detected);
+
+        cachedImgA = imgB; // Cache B to be used as A in the next iteration
       }
       
       // Reset crops of all images when smart-stitching
