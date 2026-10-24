@@ -25,3 +25,8 @@ dist-ssr
 
 # Build outputs
 Picsew_v1.0.0.apk
+
+# AI agent files
+.jules/
+*AGENT*.md
+*JULES*.md
