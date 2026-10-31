@@ -11,6 +11,7 @@ import type {
   StitchedImage
 } from '../types';
 import { ImageUploader } from './ImageUploader';
+import { clampOverlapsToVisibleImages } from '../utils/imageState';
 
 interface ControlPanelProps {
   hideTabNavigation?: boolean;
@@ -24,6 +25,7 @@ interface ControlPanelProps {
   setGap: (gap: number) => void;
   overlaps: number[];
   setOverlaps: (overlaps: number[]) => void;
+  onOverlapCommit?: () => void;
   uncertainSeams?: number[];
   focusedSeamIndex?: number | null;
   onInspectSeam?: (index: number) => void;
@@ -84,6 +86,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   setGap,
   overlaps,
   setOverlaps,
+  onOverlapCommit,
   uncertainSeams = [],
   focusedSeamIndex = null,
   onInspectSeam,
@@ -143,6 +146,14 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     '#000000', // Black
   ];
 
+  // A stable physical maximum is essential: max={value+200} makes a range
+  // thumb chase its moving endpoint and prevents precise positioning.
+  const maxOverlapFor = (index: number): number => {
+    if (!images || images.length < index + 2) return Math.max(500, overlaps[index] || 0);
+    return clampOverlapsToVisibleImages(
+      images, Array(images.length - 1).fill(Number.MAX_SAFE_INTEGER), direction
+    )[index];
+  };
   const updateOverlap = (index: number, val: number) => {
     const updated = [...overlaps];
     updated[index] = val;
@@ -328,10 +339,14 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                             id={`overlap-${idx}`}
                             type="range"
                             min="0"
-                            max={Math.max(500, val + 200)}
+                            max={maxOverlapFor(idx)}
                             value={val}
                             onChange={(e) => updateOverlap(idx, parseInt(e.target.value))}
-                            className="w-full h-1 bg-dark-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
+                            onPointerUp={onOverlapCommit}
+                            onPointerCancel={onOverlapCommit}
+                            onKeyUp={onOverlapCommit}
+                            onBlur={onOverlapCommit}
+                            className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                           />
                         </div>
                       ))}
