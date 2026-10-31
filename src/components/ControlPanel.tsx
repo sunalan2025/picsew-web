@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Scissors, Type, Battery, ShieldAlert, Monitor, Download, FileText, Split, Undo, Redo, Trash2, Check, Layers, FolderOpen
+  Scissors, Type, Battery, ShieldAlert, Monitor, Download, Copy, FileText, Split, Undo, Redo, Trash2, Check, Layers, FolderOpen
 } from 'lucide-react';
 import type {
   AnnotationType,
@@ -51,6 +51,8 @@ interface ControlPanelProps {
   exportConfig: ExportConfig;
   setExportConfig: (config: ExportConfig) => void;
   onDownloadImage: () => void;
+  onCopyImage: () => void;
+  copyStatus: string;
   onDownloadPDF: () => void;
   onDownloadZip: () => void;
 
@@ -94,6 +96,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   exportConfig,
   setExportConfig,
   onDownloadImage,
+  onCopyImage,
+  copyStatus,
   onDownloadPDF,
   onDownloadZip,
   hasImages,
@@ -833,13 +837,24 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
                 {/* Main downloads */}
                 <div className="space-y-2.5 pt-4 border-t border-dark-700/60">
-                  <button
-                    onClick={onDownloadImage}
-                    className="w-full flex items-center justify-center gap-2 bg-linear-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 text-white font-medium py-2 px-4 rounded-xl shadow-lg transition duration-200 text-sm"
-                  >
-                    <Download className="w-4 h-4" />
-                    下载长截图图片
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={onDownloadImage}
+                      className="flex-1 flex items-center justify-center gap-2 bg-linear-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 text-white font-medium py-2 px-4 rounded-xl shadow-lg transition duration-200 text-sm"
+                    >
+                      <Download className="w-4 h-4" />
+                      下载图片
+                    </button>
+                    <button
+                      onClick={onCopyImage}
+                      aria-label="复制 PNG 图片"
+                      title="复制 PNG 图片"
+                      className="px-3.5 rounded-xl bg-dark-800 hover:bg-dark-700 border border-dark-700 text-gray-200 transition-colors"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {copyStatus && <p role="status" aria-live="polite" className="text-xs text-gray-400">{copyStatus}</p>}
 
                   <button
                     onClick={onDownloadPDF}
