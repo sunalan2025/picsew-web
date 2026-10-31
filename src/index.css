@@ -271,7 +271,8 @@ button:disabled { cursor: not-allowed; }
   .crop-editor-ui {padding:11px;gap:8px;}
   .crop-editor-ui h2 {font-size:15px;}
   .crop-editor-ui .crop-original-stage {padding:8px;}
-  .crop-editor-ui .crop-original-stage > div {height:min(27dvh,270px);width:auto!important;max-width:100%;}
+  .crop-editor-ui .crop-original-stage {min-height:245px; flex:none; overflow:hidden;}
+  .crop-editor-ui .crop-original-stage > div {max-height:none;flex-shrink:0;}
   .crop-result-heading {padding:8px 12px;}
   .crop-result-caption {padding:7px 12px;}
   .crop-result-canvas {padding:5px;}
@@ -288,3 +289,13 @@ button:disabled { cursor: not-allowed; }
 .crop-preview-action:hover {background:#e2edff;}
 @media(max-width:830px){.crop-preview-toolbar{padding:5px 8px;margin-bottom:4px;}
   .crop-preview-action{padding:4px 6px;}}
+
+/* Never sacrifice the primary image to extra parameters: scroll the inspector,
+   not the crop canvas. Original image coordinates remain aspect-correct. */
+.crop-studio-editor-pane {overflow-y:auto;overscroll-behavior:contain;}
+.crop-editor-ui {height:auto;min-height:100%;}
+.crop-editor-ui .crop-original-stage {flex:0 0 auto;min-height:280px;overflow:hidden;}
+.crop-editor-ui .crop-original-stage > div {flex-shrink:0;}
+@media(max-width:830px) {
+  .crop-editor-ui .crop-original-stage {min-height:245px;}
+}
