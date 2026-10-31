@@ -179,7 +179,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       <div
         role="tabpanel"
         id={`panel-${activeTab}`}
-        aria-labelledby={`tab-${activeTab}`}
+        aria-labelledby={hideTabNavigation ? undefined : `tab-${activeTab}`}
+        aria-label={hideTabNavigation ? '当前工具设置' : undefined}
         className="flex-1 overflow-y-auto p-4 space-y-5"
       >
         {!hasImages && activeTab !== 'upload' && (

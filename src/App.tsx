@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import {
   Smartphone, RefreshCw, Images, WandSparkles, PencilRuler,
-  Sparkles, Download, Plus, X, Undo2, Redo2, Check, ChevronRight
+  Sparkles, Download, Plus, X, Check, ChevronRight
 } from 'lucide-react';
 import type {
   StitchedImage,

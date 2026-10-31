@@ -992,7 +992,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
   return (
     <div className="flex flex-col w-full h-full overflow-hidden">
       {/* 1. Zoom View Controller Floating Bar */}
-      <div className="bg-dark-900/90 border border-dark-800/80 backdrop-blur-md px-4 py-2 rounded-xl flex items-center justify-between shadow-xl mb-4 shrink-0 mx-auto w-full max-w-[820px] gap-6 select-none z-20">
+      <div className="bg-dark-900/90 border border-dark-800/80 backdrop-blur-md px-4 py-2 rounded-2xl flex items-center justify-between shadow-sm mb-3 shrink-0 mx-auto w-auto max-w-full gap-2 select-none z-20">
         <div className="flex items-center gap-1">
           <button
             onClick={handleZoomOut}
@@ -1024,7 +1024,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
             title="铺满宽度"
           >
             <Maximize2 className="w-3.5 h-3.5 text-primary-400" />
-            铺满宽度
+            适宽
           </button>
 
           <button
@@ -1033,14 +1033,14 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
             title="完整高度"
           >
             <Minimize2 className="w-3.5 h-3.5 text-pink-400" />
-            完整高度
+            适高
           </button>
 
           <button
             onClick={handleResetZoom}
             className="px-2.5 py-1 bg-dark-850 hover:bg-dark-800 text-gray-400 hover:text-gray-200 rounded-lg text-xs font-semibold border border-dark-700/30 transition"
           >
-            1:1 原始
+            100%
           </button>
         </div>
 
@@ -1079,7 +1079,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
       {/* 2. Main Scrollable Viewport (CSS Centering Scroll cutoff Fix) */}
       <div
         ref={containerRef}
-        className="flex-1 w-full h-full flex overflow-auto p-6 bg-dark-900/40 rounded-2xl border border-dark-700/30"
+        className="flex-1 w-full h-full flex overflow-auto p-4 md:p-6 bg-white/60 rounded-2xl border border-slate-200/80"
       >
         {images.length === 0 ? (
           <div className="m-auto text-gray-500 text-sm flex flex-col items-center select-none">

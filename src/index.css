@@ -188,3 +188,12 @@ button:disabled { cursor: not-allowed; }
 @media (prefers-reduced-motion:reduce) {
   .workspace-sheet { animation:none; }
 }
+
+/* Keep the collapsed per-image crop controls unobtrusive. */
+.workspace-app details > summary { list-style: none; }
+.workspace-app details > summary::-webkit-details-marker { display:none; }
+.workspace-app details[open] > summary { color:#2563eb; }
+.workspace-app details[open] > summary span:last-child { display:none; }
+.workspace-app input.text-white { color:#20354f; }
+.workspace-app ::-webkit-scrollbar-thumb { background: rgba(91,125,166,.28); }
+.workspace-app ::-webkit-scrollbar-thumb:hover { background: rgba(91,125,166,.48); }
