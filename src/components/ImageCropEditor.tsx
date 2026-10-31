@@ -77,7 +77,7 @@ export function ImageCropEditor({images, onChange, onCommit, onReset}: Props) {
     <p className="truncate text-xs text-slate-500">第 {index+1} 张 · {image.name}</p>
     <div className="rounded-2xl bg-slate-100 p-4 border border-slate-200">
       <div ref={preview} className="relative mx-auto overflow-hidden bg-white shadow-md"
-        style={{width:'min(100%,220px)',aspectRatio:`${image.width}/${image.height}`,maxHeight:285}}>
+        style={{width:`${Math.min(220,285*image.width/image.height)}px`,maxWidth:'100%',aspectRatio:`${image.width}/${image.height}`}}>
         <img src={image.src} alt="当前图片四边裁剪预览"
           className="absolute inset-0 h-full w-full" draggable={false}/>
         <div className="pointer-events-none absolute border-2 border-blue-500"

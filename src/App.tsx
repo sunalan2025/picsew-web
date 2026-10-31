@@ -718,7 +718,7 @@ function App() {
             <button type="button" onClick={() => openTool('stitch')}
               className="inline-flex items-center gap-1 rounded-xl bg-amber-50 border border-amber-200 px-2.5 py-2 text-xs font-semibold text-amber-800"
               title="打开拼接面板，检查无法自动对齐的连接位置">
-              <AlertTriangle className="h-3.5 w-3.5" /> {uncertainSeams.length} 处待检查
+              <AlertTriangle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{uncertainSeams.length} 处待检查</span><span className="sm:hidden">{uncertainSeams.length}</span>
             </button>
           )}
           {images.length > 0 && (
