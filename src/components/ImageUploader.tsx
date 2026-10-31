@@ -311,7 +311,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             if (!isImporting) fileInputRef.current?.click();
           }
         }}
-        className={`border-2 border-dashed focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none rounded-2xl p-6 mb-4 flex flex-col items-center justify-center transition-all duration-200 glass-card text-center ${isDragging ? 'border-primary-500 bg-primary-500/20 scale-[1.01]' : 'border-dark-700 hover:border-primary-500'} ${isImporting ? 'cursor-wait opacity-70' : 'cursor-pointer'}`}
+        className={`border-2 border-dashed focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none rounded-2xl p-6 mb-4 flex flex-col items-center justify-center transition-all duration-200 glass-card text-center ${isDragging ? 'border-primary-500 bg-primary-500/20 scale-[1.01]' : 'border-slate-200 hover:border-primary-500'} ${isImporting ? 'cursor-wait opacity-70' : 'cursor-pointer'}`}
       >
         <input
           type="file"
@@ -322,13 +322,13 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           disabled={isImporting}
           className="hidden"
         />
-        <div className="p-3 bg-primary-500/10 rounded-full text-primary-300 mb-3">
+        <div className="p-3 bg-primary-500/10 rounded-full text-blue-600 mb-3">
           <Upload className="w-6 h-6" />
         </div>
-        <p className="text-sm font-medium text-gray-200">
+        <p className="text-sm font-medium text-slate-700">
           {isImporting ? '正在导入图片…' : isDragging ? '松开即可添加图片' : '点击或拖拽添加截图'}
         </p>
-        <p className="text-xs text-gray-400 mt-1">PNG / JPEG / WebP / GIF · 最多 50 张</p>
+        <p className="text-xs text-slate-600 mt-1">PNG / JPEG / WebP / GIF · 最多 50 张</p>
       </div>
       <input
         ref={videoInputRef}
@@ -343,7 +343,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           type="button"
           disabled={isImporting}
           onClick={() => videoInputRef.current?.click()}
-          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-dark-700 bg-white px-3 py-2.5 text-xs font-semibold text-gray-300 hover:bg-primary-50 disabled:opacity-50"
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-primary-50 disabled:opacity-50"
         >
           <Film className="h-4 w-4 text-primary-500" /> 从录屏提取
         </button>
@@ -356,7 +356,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       </div>
       {videoProgress && (
         <div className="mb-3" role="status" aria-live="polite">
-          <div className="mb-1 flex justify-between text-xs text-gray-400">
+          <div className="mb-1 flex justify-between text-xs text-slate-600">
             <span>正在提取录屏帧</span><span>{videoProgress.total ? Math.round(videoProgress.done / videoProgress.total * 100) : 0}%</span>
           </div>
           <progress className="h-2 w-full accent-primary-500" value={videoProgress.done} max={videoProgress.total || 1} />
@@ -392,7 +392,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       {/* Image list */}
       <div className="flex-1 overflow-y-auto space-y-3 pr-1">
         {images.length === 0 ? (
-          <div className="text-center py-10 text-gray-500 text-sm">
+          <div className="text-center py-10 text-slate-500 text-sm">
             暂无上传的图片
           </div>
         ) : (
@@ -411,7 +411,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                 e.preventDefault();
                 onSortDrop(img.id);
               }}
-              className={`p-3 rounded-xl relative group flex flex-col gap-2 transition-all ${dragTargetId === img.id && dragSourceId !== img.id ? 'bg-blue-50 border-2 border-blue-400' : 'bg-dark-800 border border-dark-700/50'} ${dragSourceId === img.id ? 'opacity-50' : ''}`}
+              className={`p-3 rounded-xl relative group flex flex-col gap-2 transition-all ${dragTargetId === img.id && dragSourceId !== img.id ? 'bg-blue-50 border-2 border-blue-400' : 'bg-slate-50 border border-slate-200'} ${dragSourceId === img.id ? 'opacity-50' : ''}`}
             >
               <div className="flex items-center gap-2">
                 <span className="shrink-0 text-xs font-bold text-blue-600" title="拼接顺序">{index + 1}</span>
@@ -434,12 +434,12 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                   }}
                   aria-label={`长按或拖动调整第 ${index + 1} 张图片顺序`}
                   title="拖动排序，触屏长按后拖动"
-                  className="cursor-grab rounded-lg p-1.5 text-gray-400 hover:bg-dark-700 active:cursor-grabbing"
+                  className="cursor-grab rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 active:cursor-grabbing"
                 >
                   <GripVertical className="h-4 w-4" />
                 </button>
                 {/* Thumbnail */}
-                <div className="w-12 h-16 rounded-md overflow-hidden bg-dark-900 border border-dark-700 flex-shrink-0 flex items-center justify-center">
+                <div className="w-12 h-16 rounded-md overflow-hidden bg-slate-50 border border-slate-200 flex-shrink-0 flex items-center justify-center">
                   <img
                     src={img.src}
                     alt={img.name}
@@ -449,10 +449,10 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-gray-300 truncate">
+                  <p className="text-xs font-semibold text-slate-700 truncate">
                     {img.name}
                   </p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">
+                  <p className="text-[10px] text-slate-500 mt-0.5">
                     {img.width} × {img.height}px
                   </p>
                 </div>
@@ -464,7 +464,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     onClick={() => moveImage(index, 'up')}
                     aria-label="上移图片"
                     title="上移图片"
-                    className="p-2 hover:bg-dark-700 text-gray-400 disabled:text-gray-600 disabled:hover:bg-transparent rounded-lg focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
+                    className="p-2 hover:bg-slate-100 text-slate-600 disabled:text-slate-400 disabled:hover:bg-transparent rounded-lg focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
                   >
                     <ChevronUp className="w-4 h-4" />
                   </button>
@@ -473,7 +473,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     onClick={() => moveImage(index, 'down')}
                     aria-label="下移图片"
                     title="下移图片"
-                    className="p-2 hover:bg-dark-700 text-gray-400 disabled:text-gray-600 disabled:hover:bg-transparent rounded-lg focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
+                    className="p-2 hover:bg-slate-100 text-slate-600 disabled:text-slate-400 disabled:hover:bg-transparent rounded-lg focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
                   >
                     <ChevronDown className="w-4 h-4" />
                   </button>

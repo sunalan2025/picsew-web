@@ -1087,22 +1087,22 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
           <span className="font-mono">{Math.round(zoom * 100)}%</span>
         </div>
       </div>}
-      {!compact && <div className="bg-dark-900/90 border border-dark-800/80 backdrop-blur-md px-4 py-2 rounded-2xl flex items-center justify-between shadow-sm mb-3 shrink-0 mx-auto w-auto max-w-full gap-2 select-none z-20">
+      {!compact && <div className="bg-slate-50 border border-slate-200 backdrop-blur-md px-4 py-2 rounded-2xl flex items-center justify-between shadow-sm mb-3 shrink-0 mx-auto w-auto max-w-full gap-2 select-none z-20">
         <div className="flex items-center gap-1">
           <button
             onClick={handleZoomOut}
-            className="p-1.5 hover:bg-dark-800 rounded-lg text-gray-400 hover:text-gray-200 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
+            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 hover:text-slate-700 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
             title="缩小"
             aria-label="缩小"
           >
             <ZoomOut className="w-4 h-4" />
           </button>
-          <span className="text-xs font-mono font-bold text-gray-300 w-12 text-center">
+          <span className="text-xs font-mono font-bold text-slate-700 w-12 text-center">
             {Math.round(zoom * 100)}%
           </span>
           <button
             onClick={handleZoomIn}
-            className="p-1.5 hover:bg-dark-800 rounded-lg text-gray-400 hover:text-gray-200 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
+            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 hover:text-slate-700 transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
             title="放大"
             aria-label="放大"
           >
@@ -1110,21 +1110,21 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
           </button>
         </div>
 
-        <div className="h-4 w-px bg-dark-700/50" />
+        <div className="h-4 w-px bg-slate-50" />
 
         <div className="flex items-center gap-2">
           <button
             onClick={handleFitWidth}
-            className="flex items-center gap-1 px-2.5 py-1 bg-dark-805 hover:bg-dark-800 text-gray-300 hover:text-white rounded-lg text-xs font-medium border border-dark-750 transition"
+            className="flex items-center gap-1 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-white rounded-lg text-xs font-medium border border-slate-200 transition"
             title="铺满宽度"
           >
-            <Maximize2 className="w-3.5 h-3.5 text-primary-400" />
+            <Maximize2 className="w-3.5 h-3.5 text-blue-600" />
             适宽
           </button>
 
           <button
             onClick={handleFitHeight}
-            className="flex items-center gap-1 px-2.5 py-1 bg-dark-805 hover:bg-dark-800 text-gray-300 hover:text-white rounded-lg text-xs font-medium border border-dark-750 transition"
+            className="flex items-center gap-1 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-white rounded-lg text-xs font-medium border border-slate-200 transition"
             title="完整高度"
           >
             <Minimize2 className="w-3.5 h-3.5 text-pink-400" />
@@ -1133,22 +1133,22 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
           <button
             onClick={handleResetZoom}
-            className="px-2.5 py-1 bg-dark-850 hover:bg-dark-800 text-gray-400 hover:text-gray-200 rounded-lg text-xs font-semibold border border-dark-700/30 transition"
+            className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-700 rounded-lg text-xs font-semibold border border-slate-200 transition"
           >
             100%
           </button>
         </div>
 
-        <div className="h-4 w-px bg-dark-700/50" />
+        <div className="h-4 w-px bg-slate-50" />
 
         <div className="flex items-center gap-1.5">
           <button
             onClick={onUndo}
             disabled={!canUndo}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-dark-805 hover:bg-dark-800 disabled:opacity-40 disabled:hover:bg-dark-805 text-gray-300 hover:text-white disabled:text-gray-500 rounded-lg text-xs font-semibold border border-dark-750 transition cursor-pointer disabled:cursor-not-allowed select-none"
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-slate-100 text-slate-700 hover:text-white disabled:text-slate-500 rounded-lg text-xs font-semibold border border-slate-200 transition cursor-pointer disabled:cursor-not-allowed select-none"
             title="撤回最近一步 (最多可撤回5步)"
           >
-            <Undo2 className="w-3.5 h-3.5 text-primary-400" />
+            <Undo2 className="w-3.5 h-3.5 text-blue-600" />
             <span>撤销</span>
           </button>
 
@@ -1164,11 +1164,11 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
       </div>}
 
       {/* Helper text display */}
-      {!compact && <div className="text-center text-[11px] text-gray-500 mb-2 font-medium">
-        {activeTab === 'stitch' && '💡 提示：按住鼠标左键并在图片上【上下拖动】，可以直接调节相邻截图的重叠对齐。'}
+      {!compact && <div className="text-center text-[11px] text-slate-500 mb-2 font-medium">
+        {activeTab === 'stitch' && '拖动画面即可调整接缝，或使用右侧精调。'}
         {activeTab === 'cut' && (selectedTool === 'cut-horizontal' || selectedTool === 'cut-vertical' 
-          ? '💡 提示：在图片需要切割的位置【点击一下】插入分割线。' 
-          : '💡 提示：在分割切片中【按住上下拖拽】，可以直接调节上下裁剪。')}
+          ? '点击画布以放置分割线。' 
+          : '拖动边缘调整裁剪范围。')}
       </div>}
 
       {/* 2. Main Scrollable Viewport (CSS Centering Scroll cutoff Fix) */}
@@ -1179,9 +1179,9 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
           : 'flex-1 w-full h-full flex overflow-auto p-4 md:p-6 bg-white/60 rounded-2xl border border-slate-200/80'}
       >
         {images.length === 0 ? (
-          <div className="m-auto text-gray-500 text-sm flex flex-col items-center select-none">
-            <p className="font-semibold text-gray-400 mb-1">画板预览区域</p>
-            <p className="text-xs text-gray-500">上传图片后，这里会实时显示拼接与编辑效果</p>
+          <div className="m-auto text-slate-500 text-sm flex flex-col items-center select-none">
+            <p className="font-semibold text-slate-600 mb-1">画板预览区域</p>
+            <p className="text-xs text-slate-500">上传图片后，这里会实时显示拼接与编辑效果</p>
           </div>
         ) : (
           <div className="m-auto relative shrink-0" data-focused-seam={focusedSeam?.index ?? ''}>
@@ -1224,7 +1224,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
             {/* Inline Text Input overlay */}
             {textInput && (
               <div
-                className="absolute bg-dark-800 border border-primary-500 rounded-lg p-2 shadow-2xl z-50 flex flex-col gap-1.5"
+                className="absolute bg-slate-50 border border-primary-500 rounded-lg p-2 shadow-2xl z-50 flex flex-col gap-1.5"
                 style={{
                   left: `${(textInput.x / (canvasRef.current?.width || 1)) * 100}%`,
                   top: `${(textInput.y / (canvasRef.current?.height || 1)) * 100}%`,
@@ -1242,13 +1242,13 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
                     if (e.key === 'Enter') saveTextInput();
                     if (e.key === 'Escape') setTextInput(null);
                   }}
-                  className="bg-dark-900 border border-dark-700 rounded px-2 py-1 text-xs text-white outline-hidden focus:border-primary-500 font-medium"
+                  className="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs text-white outline-hidden focus:border-primary-500 font-medium"
                   placeholder="输入标注内容..."
                 />
                 <div className="flex justify-end gap-1.5">
                   <button
                     onClick={() => setTextInput(null)}
-                    className="px-1.5 py-0.5 text-[10px] text-gray-400 hover:bg-dark-700 rounded"
+                    className="px-1.5 py-0.5 text-[10px] text-slate-600 hover:bg-slate-100 rounded"
                   >
                     取消
                   </button>
