@@ -103,7 +103,7 @@ export function ImageCropEditor({ images, selectedId, onSelect, onChange, onComm
         style={{ width: previewWidth + 'px',
           maxWidth: '100%', aspectRatio: image.width + ' / ' + image.height }}>
         <img src={image.src} alt={'正在裁剪的第 ' + (idx+1) + ' 张原图'}
-          draggable={false} className="absolute inset-0 h-full w-full select-none"/>
+          draggable={false} className="absolute inset-0 h-full w-full select-none" style={{objectFit:'fill'}}/>
         <div className="pointer-events-none absolute border-2 border-blue-500"
           style={{top: fraction.top + '%', bottom: fraction.bottom + '%',
             left: fraction.left + '%', right: fraction.right + '%',

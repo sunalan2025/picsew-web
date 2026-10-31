@@ -320,6 +320,7 @@ function App() {
   };
 
   const handleUndo = () => {
+    pendingCropRef.current = null;
     if (historyIndex > 0) {
       const prevIdx = historyIndex - 1;
       setHistoryIndex(prevIdx);
@@ -331,6 +332,7 @@ function App() {
   };
 
   const handleRedo = () => {
+    pendingCropRef.current = null;
     if (historyIndex < history.length - 1) {
       const nextIdx = historyIndex + 1;
       setHistoryIndex(nextIdx);
@@ -383,21 +385,25 @@ function App() {
     setOverlaps(safe);
   };
 
+  const pendingCropRef = useRef<{images: StitchedImage[]; overlaps: number[]} | null>(null);
   const handleAdjustCrop = (sliceIndex: number, field: 'cropTop' | 'cropBottom' | 'cropLeft' | 'cropRight', val: number) => {
-    // Cropping invalidates cached seam geometry and in-flight auto matching.
     imageChangeSequenceRef.current++;
     setIsStitching(false);
-    const next = images.map((img, idx) => idx === sliceIndex
+    const baseline = pendingCropRef.current?.images ?? images;
+    const next = baseline.map((img, idx) => idx === sliceIndex
       ? { ...img, [field]: clampCropValue(img, field, val) } : img);
+    const safeOverlaps = clampOverlapsToVisibleImages(next, pendingCropRef.current?.overlaps ?? overlaps, direction);
+    pendingCropRef.current = {images: next, overlaps: safeOverlaps};
     setImages(next);
-    setOverlaps(prev => clampOverlapsToVisibleImages(next, prev, direction));
+    setOverlaps(safeOverlaps);
     setUncertainSeams(prev => Array.from(new Set([
       ...prev, ...(sliceIndex > 0 ? [sliceIndex - 1] : []),
-      ...(sliceIndex < images.length - 1 ? [sliceIndex] : [])
+      ...(sliceIndex < next.length - 1 ? [sliceIndex] : [])
     ])).sort((a,b)=>a-b));
   };
 
   const handleResetOneCrop = (index: number) => {
+    pendingCropRef.current = null;
     imageChangeSequenceRef.current++;
     const next = images.map((img, i) => i === index
       ? { ...img, cropTop:0, cropBottom:0, cropLeft:0, cropRight:0 } : img);
@@ -410,7 +416,9 @@ function App() {
 
   // Drag End pushes state to History
   const handleDragEnd = () => {
-    commitState(images, overlaps, annotations);
+    const snapshot = pendingCropRef.current;
+    pendingCropRef.current = null;
+    commitState(snapshot?.images ?? images, snapshot?.overlaps ?? overlaps, annotations);
   };
 
   // --- Image Slice Split Callback (Cut Line) ---
