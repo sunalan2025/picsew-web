@@ -16,7 +16,7 @@ import { ImageUploader } from './components/ImageUploader';
 import { ControlPanel } from './components/ControlPanel';
 import { PreviewCanvas } from './components/PreviewCanvas';
 import { detectOverlapDetailed, loadImage } from './utils/stitching';
-import { restoreOriginalImages } from './utils/imageState';
+import { clampCropValue, restoreOriginalImages } from './utils/imageState';
 import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
 import { planPdfExport } from './utils/pdfExport';
@@ -366,13 +366,25 @@ function App() {
   };
 
   const handleAdjustCrop = (sliceIndex: number, field: 'cropTop' | 'cropBottom' | 'cropLeft' | 'cropRight', val: number) => {
-    // Modify crop state in real-time
-    setImages(prev => prev.map((img, idx) => {
-      if (idx === sliceIndex) {
-        return { ...img, [field]: val };
-      }
-      return img;
-    }));
+    // Crop geometry invalidates earlier alignment requests and adjacent seams.
+    imageChangeSequenceRef.current++;
+    setImages(prev => prev.map((img, idx) => idx === sliceIndex
+      ? { ...img, [field]: clampCropValue(img, field, val) } : img));
+    setUncertainSeams(prev => Array.from(new Set([
+      ...prev, ...(sliceIndex > 0 ? [sliceIndex - 1] : []),
+      ...(sliceIndex < images.length - 1 ? [sliceIndex] : [])
+    ])).sort((a,b)=>a-b));
+  };
+
+  const handleResetOneCrop = (index: number) => {
+    imageChangeSequenceRef.current++;
+    const next = images.map((img, i) => i === index
+      ? { ...img, cropTop:0, cropBottom:0, cropLeft:0, cropRight:0 } : img);
+    commitState(next, overlaps, annotations);
+    setUncertainSeams(prev => Array.from(new Set([
+      ...prev, ...(index > 0 ? [index - 1] : []),
+      ...(index < images.length - 1 ? [index] : [])
+    ])).sort((a,b)=>a-b));
   };
 
   // Drag End pushes state to History
@@ -666,7 +678,7 @@ function App() {
   const tools = [
     { id: 'upload', label: '素材', icon: Images },
     { id: 'stitch', label: '拼接', icon: WandSparkles },
-    { id: 'cut', label: '编辑', icon: PencilRuler },
+    { id: 'cut', label: '裁剪', icon: PencilRuler },
     { id: 'mockup', label: '美化', icon: Sparkles },
     { id: 'export', label: '导出', icon: Download }
   ];
@@ -878,6 +890,9 @@ function App() {
                   images={images}
                   onImagesChange={handleImagesChange}
                   onAutoStitchTrigger={handleAutoStitch}
+                  onCropPreview={handleAdjustCrop}
+                  onCropCommit={handleDragEnd}
+                  onResetOneCrop={handleResetOneCrop}
                 />
               </div>
               <div className="workspace-sheet-footer shrink-0 px-5 py-3 text-xs text-slate-400">
