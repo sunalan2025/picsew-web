@@ -103,7 +103,7 @@ try {
 
   // Every navigation group shares the exact same canvas/inspector geometry.
   for(const tab of ['拼接','素材','美化','导出','裁剪']){
-    await page.getByRole('button',{name:tab,exact:true}).click();
+    await page.getByRole('navigation',{name:'主要工具'}).getByRole('button',{name:tab,exact:true}).click();
     await layoutCheck(tab);
     assert.equal(await page.locator('.workspace-canvas canvas').count(),1,
       tab+': the single export canvas must remain mounted');
@@ -118,7 +118,7 @@ try {
 
   await page.setViewportSize({width:390,height:844});
   for(const tab of ['拼接','素材','美化','导出','裁剪']){
-    await page.getByRole('button',{name:tab,exact:true}).click();
+    await page.getByRole('navigation',{name:'主要工具'}).getByRole('button',{name:tab,exact:true}).click();
     await layoutCheck('mobile '+tab);
   }
   await page.locator('.crop-original-stage').scrollIntoViewIfNeeded();
