@@ -25,6 +25,14 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   const [dragSourceId, setDragSourceId] = useState<string | null>(null);
   const [dragTargetId, setDragTargetId] = useState<string | null>(null);
   const [videoProgress, setVideoProgress] = useState<{ done: number; total: number } | null>(null);
+  const touchSortRef = useRef<{
+    sourceId: string;
+    targetId: string;
+    active: boolean;
+    x: number;
+    y: number;
+    timer: ReturnType<typeof setTimeout> | null;
+  } | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -203,6 +211,62 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     if (e.dataTransfer.files.length) void addFiles(Array.from(e.dataTransfer.files));
   };
 
+  // Long-press the grab handle on touchscreens. All other areas keep native scrolling.
+  const onTouchSortStart = (event: React.PointerEvent<HTMLButtonElement>, sourceId: string) => {
+    if (event.pointerType === 'mouse' || images.length < 2) return;
+    const gesture = {
+      sourceId, targetId: sourceId, active: false,
+      x: event.clientX, y: event.clientY,
+      timer: null as ReturnType<typeof setTimeout> | null
+    };
+    touchSortRef.current = gesture;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    gesture.timer = setTimeout(() => {
+      if (touchSortRef.current !== gesture) return;
+      gesture.active = true;
+      setDragSourceId(sourceId);
+      setDragTargetId(sourceId);
+    }, 240);
+  };
+
+  const onTouchSortMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const gesture = touchSortRef.current;
+    if (!gesture) return;
+    if (!gesture.active) {
+      if (Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 12) {
+        if (gesture.timer) clearTimeout(gesture.timer);
+        touchSortRef.current = null;
+      }
+      return;
+    }
+    const target = document.elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLElement>('[data-picsew-image-id]');
+    const targetId = target?.dataset.picsewImageId;
+    if (targetId) {
+      gesture.targetId = targetId;
+      setDragTargetId(targetId);
+    }
+  };
+
+  const endTouchSort = () => {
+    const gesture = touchSortRef.current;
+    if (!gesture) return;
+    if (gesture.timer) clearTimeout(gesture.timer);
+    if (gesture.active && gesture.targetId !== gesture.sourceId) {
+      onImagesChange(reorderImages(images, gesture.sourceId, gesture.targetId));
+    }
+    touchSortRef.current = null;
+    setDragSourceId(null);
+    setDragTargetId(null);
+  };
+
+  const cancelTouchSort = () => {
+    if (touchSortRef.current?.timer) clearTimeout(touchSortRef.current.timer);
+    touchSortRef.current = null;
+    setDragSourceId(null);
+    setDragTargetId(null);
+  };
+
   const onSortDrop = (targetId: string) => {
     if (dragSourceId) {
       const changed = reorderImages(images, dragSourceId, targetId);
@@ -333,6 +397,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           images.map((img, index) => (
             <div
               key={img.id}
+              data-picsew-image-id={img.id}
               onDragOver={e => {
                 if (dragSourceId) {
                   e.preventDefault();
@@ -350,6 +415,11 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                 <button
                   type="button"
                   draggable
+                  onPointerDown={e => onTouchSortStart(e, img.id)}
+                  onPointerMove={onTouchSortMove}
+                  onPointerUp={endTouchSort}
+                  onPointerCancel={cancelTouchSort}
+                  style={{ touchAction: 'none' }}
                   onDragStart={e => {
                     setDragSourceId(img.id);
                     e.dataTransfer.effectAllowed = 'move';
@@ -359,8 +429,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     setDragSourceId(null);
                     setDragTargetId(null);
                   }}
-                  aria-label={`拖动调整第 ${index + 1} 张图片顺序`}
-                  title="拖动排序"
+                  aria-label={`长按或拖动调整第 ${index + 1} 张图片顺序`}
+                  title="拖动排序，触屏长按后拖动"
                   className="cursor-grab rounded-lg p-1.5 text-gray-400 hover:bg-dark-700 active:cursor-grabbing"
                 >
                   <GripVertical className="h-4 w-4" />
