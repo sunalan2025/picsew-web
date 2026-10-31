@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { restoreOriginalImages } from '../src/utils/imageState.ts';
+import { restoreOriginalImages, clampCropValue } from '../src/utils/imageState.ts';
 
 const original = id => ({
   id, name: id, src: 'data:image/png;base64,AAAA', width: 400, height: 1000,
@@ -28,4 +28,14 @@ test('empty list and unsplit image stay valid', () => {
   assert.deepEqual(restoreOriginalImages([]), []);
   assert.deepEqual(restored, input.map(item => ({ ...item, originalId: undefined })));
   assert.notEqual(restored[0], input[0]);
+});
+
+test('editing a crop edge only subtracts the opposite edge', () => {
+  const img = { ...original('sample'), cropTop: 400, cropBottom: 20, cropLeft: 10, cropRight: 50 };
+  assert.equal(clampCropValue(img, 'cropTop', 600), 600);
+  assert.equal(clampCropValue(img, 'cropBottom', 700), 590);
+  assert.equal(clampCropValue(img, 'cropLeft', 380), 340);
+  assert.equal(clampCropValue(img, 'cropRight', 390), 380);
+  assert.equal(clampCropValue(img, 'cropTop', -20), 0);
+  assert.equal(clampCropValue(img, 'cropLeft', Number.NaN), 0);
 });

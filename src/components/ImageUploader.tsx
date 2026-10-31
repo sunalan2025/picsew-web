@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Upload, X, ChevronUp, ChevronDown, Crop } from 'lucide-react';
 import type { StitchedImage } from '../types';
+import { clampCropValue } from '../utils/imageState';
 
 interface ImageUploaderProps {
   images: StitchedImage[];
@@ -157,14 +158,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     onImagesChange(
       images.map(img => {
         if (img.id === id) {
-          // Keep crops positive and smaller than image height/width
-          let cleanValue = Math.max(0, value);
-          if (field === 'cropTop' || field === 'cropBottom') {
-            cleanValue = Math.min(img.height - img.cropTop - img.cropBottom - 10, cleanValue);
-          } else {
-            cleanValue = Math.min(img.width - img.cropLeft - img.cropRight - 10, cleanValue);
-          }
-          return { ...img, [field]: cleanValue };
+          return { ...img, [field]: clampCropValue(img, field, value) };
         }
         return img;
       })
@@ -292,11 +286,11 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
               <div className="bg-dark-900/60 p-2 rounded-lg mt-1 border border-dark-700/30">
                 <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium mb-1.5">
                   <Crop className="w-3.5 h-3.5 text-primary-300" />
-                  <span>单图裁切边缘 (像素)</span>
+                  <span>边缘裁剪 · px</span>
                 </div>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
                   <div>
-                    <label htmlFor={`cropTop-${img.id}`} className="text-[10px] text-gray-500 font-medium">顶部 (Top)</label>
+                    <label htmlFor={`cropTop-${img.id}`} className="text-[10px] text-gray-500 font-medium">顶部</label>
                     <input
                       id={`cropTop-${img.id}`}
                       type="number"
@@ -306,7 +300,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     />
                   </div>
                   <div>
-                    <label htmlFor={`cropBottom-${img.id}`} className="text-[10px] text-gray-500 font-medium">底部 (Bottom)</label>
+                    <label htmlFor={`cropBottom-${img.id}`} className="text-[10px] text-gray-500 font-medium">底部</label>
                     <input
                       id={`cropBottom-${img.id}`}
                       type="number"
@@ -316,7 +310,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     />
                   </div>
                   <div>
-                    <label htmlFor={`cropLeft-${img.id}`} className="text-[10px] text-gray-500 font-medium">左侧 (Left)</label>
+                    <label htmlFor={`cropLeft-${img.id}`} className="text-[10px] text-gray-500 font-medium">左侧</label>
                     <input
                       id={`cropLeft-${img.id}`}
                       type="number"
@@ -326,7 +320,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     />
                   </div>
                   <div>
-                    <label htmlFor={`cropRight-${img.id}`} className="text-[10px] text-gray-500 font-medium">右侧 (Right)</label>
+                    <label htmlFor={`cropRight-${img.id}`} className="text-[10px] text-gray-500 font-medium">右侧</label>
                     <input
                       id={`cropRight-${img.id}`}
                       type="number"
