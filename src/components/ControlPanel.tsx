@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Scissors, Type, Battery, ShieldAlert, Monitor, Download, Copy, FileText, Split, Undo, Redo, Trash2, Check, Layers, FolderOpen
+  Scissors, Type, Battery, ShieldAlert, Monitor, Download, Copy, Share2, FileText, Split, Undo, Redo, Trash2, Check, Layers, FolderOpen
 } from 'lucide-react';
 import type {
   AnnotationType,
@@ -56,6 +56,7 @@ interface ControlPanelProps {
   setExportConfig: (config: ExportConfig) => void;
   onDownloadImage: () => void;
   onCopyImage: () => void;
+  onShareImage: () => void;
   copyStatus: string;
   onDownloadPDF: () => void;
   onDownloadZip: () => void;
@@ -104,6 +105,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   setExportConfig,
   onDownloadImage,
   onCopyImage,
+  onShareImage,
   copyStatus,
   onDownloadPDF,
   onDownloadZip,
@@ -924,6 +926,14 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                       className="px-3.5 rounded-xl bg-dark-800 hover:bg-dark-700 border border-dark-700 text-gray-200 transition-colors"
                     >
                       <Copy className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={onShareImage}
+                      aria-label="系统分享 PNG 图片"
+                      title="通过系统分享"
+                      className="px-3.5 rounded-xl bg-dark-800 hover:bg-dark-700 border border-dark-700 text-gray-200 transition-colors"
+                    >
+                      <Share2 className="w-4 h-4" />
                     </button>
                   </div>
                   {copyStatus && <p role="status" aria-live="polite" className="text-xs text-gray-400">{copyStatus}</p>}
