@@ -108,7 +108,17 @@ try {
     assert.equal(await page.locator('.workspace-canvas canvas').count(),1,
       tab+': the single export canvas must remain mounted');
   }
-  await page.getByRole('button',{name:'拼接',exact:true}).click();
+  // Probe less-traveled nested tools: not just the five dock labels.
+  const dock = page.getByRole('navigation',{name:'主要工具'});
+  await dock.getByRole('button',{name:'美化',exact:true}).click();
+  for (const item of ['状态栏','文字水印','设备套壳']) {
+    await page.getByRole('button',{name:item,exact:true}).click();
+    await layoutCheck(item);
+  }
+  await dock.getByRole('button',{name:'裁剪',exact:true}).click();
+  await page.getByRole('button',{name:'标注与打码',exact:true}).click();
+  await layoutCheck('标注与打码');
+  await dock.getByRole('button',{name:'拼接',exact:true}).click();
   await page.getByRole('button',{name:'在画布定位接缝 3'}).click();
   await page.locator('[data-seam-highlight="2"]').waitFor({state:'visible'});
   await page.waitForFunction(()=>document.querySelector('.workspace-canvas .overflow-auto')?.scrollTop>50);
