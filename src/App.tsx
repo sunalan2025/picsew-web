@@ -837,7 +837,7 @@ function App() {
                         <span className="crop-studio-eyebrow">OUTPUT / 完整结果</span>
                         <h3 className="text-sm font-bold text-slate-800">实时拼接预览</h3>
                       </div>
-                      <span className="crop-live-indicator"><span className="crop-live-dot"/> 同步中</span>
+                      <span className="crop-live-indicator"><span className="crop-live-dot"/> 实时更新</span>
                     </div>
                     <div className="crop-result-canvas">{previewCanvas}</div>
                     <div className="crop-result-caption">
