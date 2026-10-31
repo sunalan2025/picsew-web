@@ -64,8 +64,10 @@ try {
   await page.goto('http://127.0.0.1:4173/');
   const input = page.locator('input[accept="image/png,image/jpeg,image/webp,image/gif"]').first();
   await input.setInputFiles([
+    { name: '04_scroll.png', mimeType: 'image/png', buffer: generateScreenshot(840) },
     { name: '02_scroll.png', mimeType: 'image/png', buffer: generateScreenshot(280) },
-    { name: '01_scroll.png', mimeType: 'image/png', buffer: generateScreenshot(0) }
+    { name: '01_scroll.png', mimeType: 'image/png', buffer: generateScreenshot(0) },
+    { name: '03_scroll.png', mimeType: 'image/png', buffer: generateScreenshot(560) }
   ]);
   await page.getByRole('button', { name: '裁剪', exact: true }).waitFor({ state: 'visible', timeout: 30000 });
   await page.getByRole('button', { name: '裁剪', exact: true }).click();
@@ -97,7 +99,7 @@ try {
   }, originalWidth, { timeout: 20000 });
 
   await page.getByRole('button', { name: '下一张截图' }).click();
-  await page.getByText('第 2/2 张').waitFor();
+  await page.getByText('第 2/4 张').waitFor();
   await page.setViewportSize({ width: 390, height: 844 });
   const narrowEditor = await page.locator('.crop-studio-editor-pane').boundingBox();
   const narrowResult = await page.locator('.crop-studio-result-pane').boundingBox();
@@ -110,6 +112,26 @@ try {
   const bottomHandle = await page.getByRole('button',{name:'拖动裁剪底部'}).boundingBox();
   assert.ok(bottomHandle && bottomHandle.y + bottomHandle.height <= narrowEditor.y + narrowEditor.height + 2,
     'bottom crop handle must remain inside the visible mobile editor');
+  // Regression: the seam controls must navigate the stitched pixels, not
+  // merely scroll the corresponding input range into view.
+  await page.setViewportSize({ width: 1340, height: 900 });
+  await page.getByRole('button', { name: '完成裁剪' }).click();
+  await page.getByRole('button', { name: '拼接', exact: true }).click();
+  const inspect = page.getByRole('button', { name: '在画布定位接缝 3' });
+  await inspect.waitFor({ state: 'visible' });
+  await inspect.click();
+  await page.locator('[data-seam-highlight="2"]').waitFor({ state:'visible' });
+  await page.waitForFunction(() => {
+    const viewport = document.querySelector('.workspace-canvas .overflow-auto');
+    return viewport && viewport.scrollTop > 50;
+  }, { timeout: 8000 });
+  const seamLabel = page.getByRole('status', { name: '当前接缝 3' });
+  await seamLabel.waitFor({ state: 'visible' });
+  // Clicking the SAME seam twice should also work after manually scrolling away.
+  await page.locator('.workspace-canvas .overflow-auto').evaluate(el => el.scrollTop = 0);
+  await inspect.click();
+  await page.waitForFunction(() => document.querySelector('.workspace-canvas .overflow-auto')?.scrollTop > 50,
+    { timeout: 8000 });
   await page.screenshot({ path: 'browser-crop-success.png', fullPage: false });
   console.log('PASS: crop workspace source handles, WYSIWYG live canvas, selection and mobile layout');
 } catch (error) {

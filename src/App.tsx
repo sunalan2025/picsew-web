@@ -37,6 +37,8 @@ function App() {
   const [overlaps, setOverlaps] = useState<number[]>([]);
   // A low-confidence join must be highlighted for review, never silently trimmed.
   const [uncertainSeams, setUncertainSeams] = useState<number[]>([]);
+  const [focusedSeam, setFocusedSeam] = useState<{ index: number; token: number } | null>(null);
+  const seamNavigationSequence = useRef(0);
   
   // Stitching process states
   const [direction, setDirection] = useState<'vertical' | 'horizontal'>('vertical');
@@ -283,6 +285,14 @@ function App() {
     }
   };
 
+  const inspectSeam = (index: number) => {
+    if (index < 0 || index >= images.length - 1) return;
+    setPanelOpen(true);
+    setAdvancedCutOpen(false);
+    setSelectedTool('select');
+    setActiveTab('stitch');
+    setFocusedSeam({ index, token: ++seamNavigationSequence.current });
+  };
   const openTool = (tab: string) => {
     if (panelOpen && activeTab === tab) {
       setPanelOpen(false);
@@ -734,6 +744,7 @@ function App() {
                 activeTab={cropMode ? 'view' : panelOpen ? activeTab : 'view'}
       compact={cropMode}
       focusSliceIndex={cropMode ? Math.max(0, images.findIndex(img => img.id === cropSelectedId)) : undefined}
+      focusedSeam={!cropMode ? focusedSeam : null}
                 color={color}
                 strokeWidth={strokeWidth}
                 fontSize={fontSize}
@@ -764,7 +775,7 @@ function App() {
         </div>
         <div className="flex items-center gap-2">
           {uncertainSeams.length > 0 && (
-            <button type="button" onClick={() => openTool('stitch')}
+            <button type="button" onClick={() => inspectSeam(uncertainSeams[0])}
               className="inline-flex items-center gap-1 rounded-xl bg-amber-50 border border-amber-200 px-2.5 py-2 text-xs font-semibold text-amber-800"
               title="打开拼接面板，检查无法自动对齐的连接位置">
               <AlertTriangle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{uncertainSeams.length} 处待检查</span><span className="sm:hidden">{uncertainSeams.length}</span>
@@ -937,6 +948,8 @@ function App() {
                   overlaps={overlaps}
                   setOverlaps={handleManualOverlapsChange}
                   uncertainSeams={uncertainSeams}
+                  focusedSeamIndex={focusedSeam?.index ?? null}
+                  onInspectSeam={inspectSeam}
                   imageNames={images.map(img => img.name)}
                   selectedTool={selectedTool}
                   setSelectedTool={setSelectedTool}

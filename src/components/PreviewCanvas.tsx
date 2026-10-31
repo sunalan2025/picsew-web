@@ -44,6 +44,7 @@ interface PreviewCanvasProps {
   onResetAll: () => void;
   compact?: boolean;
   focusSliceIndex?: number;
+  focusedSeam?: { index: number; token: number } | null;
 }
 
 const drawArrow = (
@@ -193,7 +194,8 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
   canUndo,
   onResetAll,
   compact = false,
-  focusSliceIndex
+  focusSliceIndex,
+  focusedSeam = null
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -294,6 +296,39 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
     return () => window.clearTimeout(timer);
     // Only follow an explicit picture selection; don't fight crop handle drag.
   }, [focusSliceIndex, direction, images.length, canvasRef]);
+
+  // Navigate the actual stitched canvas, never a slider inside the inspector.
+  // The explicit token allows repeatedly selecting the same seam.
+  useEffect(() => {
+    if (!focusedSeam || focusedSeam.index < 0 || focusedSeam.index >= images.length - 1) return;
+    const timer = window.setTimeout(() => {
+      const view = containerRef.current;
+      const canvas = canvasRef.current;
+      if (!view || !canvas) return;
+      const { start, total } = getStitchedImageLocation(
+        images, overlaps, gap, direction, focusedSeam.index + 1);
+      const position = Math.max(0, Math.min(1, start / Math.max(1,total)));
+      const imageBox = canvas.getBoundingClientRect();
+      const viewBox = view.getBoundingClientRect();
+      const horizontal = direction === 'horizontal';
+      const canvasPosition = horizontal
+        ? imageBox.left - viewBox.left + view.scrollLeft + position * imageBox.width
+        : imageBox.top - viewBox.top + view.scrollTop + position * imageBox.height;
+      const extent = horizontal ? view.clientWidth : view.clientHeight;
+      const desired = Math.max(0, canvasPosition - extent * .48);
+      if (horizontal) view.scrollTo({left: desired, behavior: 'smooth'});
+      else view.scrollTo({top: desired, behavior: 'smooth'});
+    }, 180);
+    return () => window.clearTimeout(timer);
+    // Follow only an explicit navigation, not seam updates while dragging.
+  }, [focusedSeam?.token, direction, images.length, canvasRef]);
+
+  const focusedSeamFraction = focusedSeam && focusedSeam.index >= 0 &&
+      focusedSeam.index < images.length - 1
+    ? (() => { const {start,total}=getStitchedImageLocation(
+        images, overlaps, gap, direction, focusedSeam.index + 1);
+        return Math.max(0,Math.min(1,start/Math.max(1,total))); })()
+    : null;
 
   // Core Render Loop: Builds the stitched image + statusbar + crops
   const renderStitchedImage = useCallback((): HTMLCanvasElement => {
@@ -1149,7 +1184,20 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
             <p className="text-xs text-gray-500">上传图片后，这里会实时显示拼接与编辑效果</p>
           </div>
         ) : (
-          <div className="m-auto relative shrink-0">
+          <div className="m-auto relative shrink-0" data-focused-seam={focusedSeam?.index ?? ''}>
+            {/* Highlight is HTML, not painted into the export canvas. */}
+            {focusedSeamFraction !== null && (
+              <div data-seam-highlight={focusedSeam?.index}
+                role="status" aria-label={`当前接缝 ${(focusedSeam?.index ?? 0) + 1}`}
+                className={`pointer-events-none absolute z-10 border-blue-500 ${direction === 'vertical'
+                  ? 'left-0 right-0 border-t-[3px]' : 'top-0 bottom-0 border-l-[3px]'}`}
+                style={direction === 'vertical' ? {top:`${focusedSeamFraction*100}%`}
+                  : {left:`${focusedSeamFraction*100}%`}}>
+                <span className="absolute left-1 top-1 rounded-lg bg-blue-600 px-2 py-1 text-[11px] font-bold text-white shadow-lg">
+                  接缝 {(focusedSeam?.index ?? 0)+1}
+                </span>
+              </div>
+            )}
             {/* Main Canvas rendering everything */}
             <canvas
               ref={canvasRef}

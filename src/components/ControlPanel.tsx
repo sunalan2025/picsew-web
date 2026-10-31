@@ -25,6 +25,8 @@ interface ControlPanelProps {
   overlaps: number[];
   setOverlaps: (overlaps: number[]) => void;
   uncertainSeams?: number[];
+  focusedSeamIndex?: number | null;
+  onInspectSeam?: (index: number) => void;
   imageNames: string[];
 
   // Markup
@@ -83,6 +85,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   overlaps,
   setOverlaps,
   uncertainSeams = [],
+  focusedSeamIndex = null,
+  onInspectSeam,
   imageNames,
   selectedTool,
   setSelectedTool,
@@ -289,7 +293,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {uncertainSeams.map(idx => (
                         <button key={idx} type="button"
-                          onClick={() => document.getElementById(`overlap-${idx}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}
+                          onClick={() => onInspectSeam?.(idx)}
                           className="rounded-lg border border-amber-300 bg-white px-2 py-1 font-semibold">
                           接缝 {idx + 1}
                         </button>
@@ -304,17 +308,21 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     <label className="text-xs font-bold text-gray-400 block border-b border-dark-700/40 pb-1">
                       接缝重叠微调 (Overlap Fine-Tuning)
                     </label>
-                    <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-1">
+                    <div className="overlap-list space-y-3.5 max-h-[300px] overflow-y-auto pr-1">
                       {overlaps.map((val, idx) => (
-                        <div key={idx} className="space-y-1.5 bg-dark-850 p-2.5 rounded-lg border border-dark-700/35">
+                        <div key={idx} data-overlap-card={idx}
+                           className={`space-y-2 rounded-xl border p-3 transition-colors ${focusedSeamIndex === idx
+                             ? 'border-blue-400 bg-blue-50 shadow-sm' : 'border-slate-200 bg-white'}`}>
                           <div className="flex justify-between items-center text-[11px]">
                             <label htmlFor={`overlap-${idx}`} className="text-gray-400 font-medium truncate max-w-[170px] cursor-pointer">
                               连接点 {idx + 1}: {imageNames[idx]} {direction === 'vertical' ? '↓' : '→'} {imageNames[idx + 1]}
                             </label>
-                            <span className="flex items-center gap-1 text-primary-600 font-mono font-bold">
-                              {uncertainSeams.includes(idx) && <span className="text-amber-600">需检查</span>}
-                              {val} px
-                            </span>
+                            <button type="button" onClick={() => onInspectSeam?.(idx)}
+                              aria-label={`在画布定位接缝 ${idx + 1}`}
+                              className="flex items-center gap-1 rounded-lg bg-blue-50 px-2 py-1 font-semibold text-blue-700 hover:bg-blue-100">
+                              {uncertainSeams.includes(idx) && <span className="text-amber-600">需检查 ·</span>}
+                              定位 ↗ <span className="font-mono">{val} px</span>
+                            </button>
                           </div>
                           <input
                             id={`overlap-${idx}`}
