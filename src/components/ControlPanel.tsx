@@ -24,6 +24,7 @@ interface ControlPanelProps {
   setGap: (gap: number) => void;
   overlaps: number[];
   setOverlaps: (overlaps: number[]) => void;
+  uncertainSeams?: number[];
   imageNames: string[];
 
   // Markup
@@ -81,6 +82,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   setGap,
   overlaps,
   setOverlaps,
+  uncertainSeams = [],
   imageNames,
   selectedTool,
   setSelectedTool,
@@ -276,6 +278,23 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   </div>
                 )}
 
+                {/* Only surface seams where alignment confidence is insufficient. */}
+                {uncertainSeams.length > 0 && (
+                  <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
+                    <p className="font-bold">有 {uncertainSeams.length} 处接缝需要检查</p>
+                    <p className="mt-1 leading-5">这些图片的内容相似或无法找到可靠的重叠位置。请检查对应连接点并手动微调，其他接缝无需操作。</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {uncertainSeams.map(idx => (
+                        <button key={idx} type="button"
+                          onClick={() => document.getElementById(`overlap-${idx}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}
+                          className="rounded-lg border border-amber-300 bg-white px-2 py-1 font-semibold">
+                          接缝 {idx + 1}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Manual overlaps */}
                 {overlaps.length > 0 && (
                   <div className="space-y-3 pt-2">
@@ -289,13 +308,16 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                             <label htmlFor={`overlap-${idx}`} className="text-gray-400 font-medium truncate max-w-[170px] cursor-pointer">
                               连接点 {idx + 1}: {imageNames[idx]} {direction === 'vertical' ? '↓' : '→'} {imageNames[idx + 1]}
                             </label>
-                            <span className="text-primary-300 font-mono font-bold">{val} px</span>
+                            <span className="flex items-center gap-1 text-primary-600 font-mono font-bold">
+                              {uncertainSeams.includes(idx) && <span className="text-amber-600">需检查</span>}
+                              {val} px
+                            </span>
                           </div>
                           <input
                             id={`overlap-${idx}`}
                             type="range"
                             min="0"
-                            max="500"
+                            max={Math.max(500, val + 200)}
                             value={val}
                             onChange={(e) => updateOverlap(idx, parseInt(e.target.value))}
                             className="w-full h-1 bg-dark-700 rounded-lg appearance-none cursor-pointer accent-primary-500"

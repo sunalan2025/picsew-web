@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import {
-  Smartphone, RefreshCw, Images, WandSparkles, PencilRuler,
+  Smartphone, RefreshCw, Images, WandSparkles, PencilRuler, AlertTriangle,
   Sparkles, Download, Plus, X, Check, ChevronRight
 } from 'lucide-react';
 import type {
@@ -15,7 +15,7 @@ import type {
 import { ImageUploader } from './components/ImageUploader';
 import { ControlPanel } from './components/ControlPanel';
 import { PreviewCanvas } from './components/PreviewCanvas';
-import { detectOverlap, loadImage } from './utils/stitching';
+import { detectOverlapDetailed, loadImage } from './utils/stitching';
 import { restoreOriginalImages } from './utils/imageState';
 import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
@@ -32,6 +32,8 @@ function App() {
   const [images, setImages] = useState<StitchedImage[]>([]);
   // Overlaps between adjacent slices
   const [overlaps, setOverlaps] = useState<number[]>([]);
+  // A low-confidence join must be highlighted for review, never silently trimmed.
+  const [uncertainSeams, setUncertainSeams] = useState<number[]>([]);
   
   // Stitching process states
   const [direction, setDirection] = useState<'vertical' | 'horizontal'>('vertical');
@@ -143,6 +145,7 @@ function App() {
     if (window.confirm('确定要重置全部裁剪、分割、重合度和标注吗？')) {
       const resetImages = restoreOriginalImages(images);
       commitState(resetImages, Array(Math.max(0, resetImages.length - 1)).fill(0), []);
+      setUncertainSeams([]);
       setSelectedTool('select');
     }
   };
@@ -151,9 +154,12 @@ function App() {
   // Reorder/removal must not inherit an overlap from a different image pair.
   const handleImagesChange = async (newImgs: StitchedImage[]) => {
     const sequence = ++imageChangeSequenceRef.current;
-    const previousPairs = new Map<string, number>();
+    const previousPairs = new Map<string, { pixels: number; review: boolean }>();
     for (let i = 0; i < images.length - 1; i++) {
-      previousPairs.set(`${images[i].id}:${images[i + 1].id}`, overlaps[i] ?? 0);
+      previousPairs.set(`${images[i].id}:${images[i + 1].id}`, {
+        pixels: overlaps[i] ?? 0,
+        review: uncertainSeams.includes(i)
+      });
     }
 
     const decodedImages = new Map<string, HTMLImageElement>();
@@ -166,10 +172,13 @@ function App() {
     };
 
     const newOverlaps: number[] = [];
+    const newWarnings: number[] = [];
     for (let i = 0; i < newImgs.length - 1; i++) {
       const pair = `${newImgs[i].id}:${newImgs[i + 1].id}`;
       if (previousPairs.has(pair)) {
-        newOverlaps.push(previousPairs.get(pair)!);
+        const previous = previousPairs.get(pair)!;
+        newOverlaps.push(previous.pixels);
+        if (previous.review) newWarnings.push(i);
         continue;
       }
 
@@ -178,16 +187,20 @@ function App() {
           getDecoded(newImgs[i]),
           getDecoded(newImgs[i + 1])
         ]);
-        newOverlaps.push(detectOverlap(first, second, undefined, direction));
+        const match = detectOverlapDetailed(first, second, undefined, direction);
+        newOverlaps.push(match.overlap);
+        if (match.confidence !== 'high') newWarnings.push(i);
       } catch (error) {
         console.error('Error calculating overlap', error);
         newOverlaps.push(0);
+        newWarnings.push(i);
       }
       if (sequence !== imageChangeSequenceRef.current) return;
     }
 
     if (sequence !== imageChangeSequenceRef.current) return;
     commitState(newImgs, newOverlaps, annotations);
+    setUncertainSeams(newWarnings);
     // Importing a new batch immediately returns to the finished canvas.
     if (newImgs.length > images.length) {
       setActiveTab('stitch');
@@ -203,16 +216,20 @@ function App() {
     
     try {
       const newOverlaps: number[] = [];
+      const warnings: number[] = [];
       let previousImage: HTMLImageElement | null = null;
       for (let i = 0; i < images.length - 1; i++) {
         const imgA: HTMLImageElement = previousImage ?? await loadImage(images[i].src);
         const imgB = await loadImage(images[i + 1].src);
-        newOverlaps.push(detectOverlap(imgA, imgB, undefined, direction));
+        const match = detectOverlapDetailed(imgA, imgB, undefined, direction);
+        newOverlaps.push(match.overlap);
+        if (match.confidence !== 'high') warnings.push(i);
         previousImage = imgB;
       }
       
       // Automatic alignment must not unexpectedly erase manual cropping.
       commitState(images, newOverlaps, annotations);
+      setUncertainSeams(warnings);
       setActiveTab('stitch');
     } catch (err) {
       console.error('Error during auto stitching', err);
@@ -227,18 +244,23 @@ function App() {
     setDirection(nextDirection);
     // Old seam values belong to a different axis; never reuse them.
     setOverlaps(Array(Math.max(0, images.length - 1)).fill(0));
+    setUncertainSeams([]);
     if (images.length < 2) return;
     setIsStitching(true);
     try {
       const detected: number[] = [];
+      const warnings: number[] = [];
       let previous: HTMLImageElement | null = null;
       for (let i = 0; i < images.length - 1; i++) {
         const first: HTMLImageElement = previous ?? await loadImage(images[i].src);
         const second = await loadImage(images[i + 1].src);
-        detected.push(detectOverlap(first, second, undefined, nextDirection));
+        const match = detectOverlapDetailed(first, second, undefined, nextDirection);
+        detected.push(match.overlap);
+        if (match.confidence !== 'high') warnings.push(i);
         previous = second;
       }
       commitState(images, detected, annotations);
+      setUncertainSeams(warnings);
     } catch (error) {
       console.error('Cannot recalculate overlap after switching direction', error);
     } finally {
@@ -287,6 +309,7 @@ function App() {
       setImages(history[prevIdx].images);
       setOverlaps(history[prevIdx].overlaps);
       setAnnotations(history[prevIdx].annotations);
+      setUncertainSeams([]);
     }
   };
 
@@ -297,6 +320,7 @@ function App() {
       setImages(history[nextIdx].images);
       setOverlaps(history[nextIdx].overlaps);
       setAnnotations(history[nextIdx].annotations);
+      setUncertainSeams([]);
     }
   };
 
@@ -327,12 +351,18 @@ function App() {
 
   // --- Drag Adjustment Callbacks ---
   const handleAdjustOverlap = (idx: number, val: number) => {
+    setUncertainSeams(prev => prev.filter(index => index !== idx));
     // Modify state in real-time for rendering smoothness (don't push history yet)
     setOverlaps(prev => {
       const updated = [...prev];
       updated[idx] = Math.max(0, val);
       return updated;
     });
+  };
+
+  const handleManualOverlapsChange = (newVals: number[]) => {
+    setUncertainSeams(prev => prev.filter(idx => overlaps[idx] === newVals[idx]));
+    setOverlaps(newVals);
   };
 
   const handleAdjustCrop = (sliceIndex: number, field: 'cropTop' | 'cropBottom' | 'cropLeft' | 'cropRight', val: number) => {
@@ -416,6 +446,7 @@ function App() {
     updatedOverlaps.splice(sliceIndex, 0, 0); // Insert 0 overlap between the two splits
 
     commitState(updatedImages, updatedOverlaps, annotations);
+    setUncertainSeams([]);
     setSelectedTool('select'); // Set tool back to select so they can drag to crop
   };
 
@@ -424,6 +455,7 @@ function App() {
     if (!images.length) return;
     const resetImages = restoreOriginalImages(images);
     commitState(resetImages, Array(Math.max(0, resetImages.length - 1)).fill(0), annotations);
+    setUncertainSeams([]);
   };
 
   // --- Export / Download Actions ---
@@ -704,7 +736,9 @@ function App() {
           <>
             <div className="workspace-stage-meta pointer-events-none absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium text-slate-500">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              已准备好 · {images.length} 张 · {direction === 'vertical' ? '纵向' : '横向'}
+              {uncertainSeams.length > 0
+                ? `⚠ ${uncertainSeams.length} 处接缝待确认`
+                : '已准备好'} · {images.length} 张 · {direction === 'vertical' ? '纵向' : '横向'}
             </div>
             <section className="workspace-canvas min-h-0 flex-1 px-2 pb-25 pt-11 md:px-6 md:pb-25">
               <PreviewCanvas
@@ -732,6 +766,15 @@ function App() {
                 onResetAll={handleResetAll}
               />
             </section>
+            {uncertainSeams.length > 0 && !panelOpen && (
+              <button
+                type="button"
+                onClick={() => openTool('stitch')}
+                className="absolute left-1/2 top-12 z-20 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 shadow-sm"
+              >
+                <AlertTriangle className="h-4 w-4" /> {uncertainSeams.length} 处可能拼接错位 · 点击检查
+              </button>
+            )}
             {images.length > 1 && !panelOpen && (
               <button
                 type="button"
@@ -799,7 +842,8 @@ function App() {
                   gap={gap}
                   setGap={setGap}
                   overlaps={overlaps}
-                  setOverlaps={setOverlaps}
+                  setOverlaps={handleManualOverlapsChange}
+                  uncertainSeams={uncertainSeams}
                   imageNames={images.map(img => img.name)}
                   selectedTool={selectedTool}
                   setSelectedTool={setSelectedTool}
