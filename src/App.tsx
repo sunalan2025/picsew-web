@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import {
-  Smartphone, Grid, RefreshCw, Layers
+  Smartphone, RefreshCw, Images, WandSparkles, PencilRuler,
+  Sparkles, Download, Plus, X, Undo2, Redo2, Check, ChevronRight
 } from 'lucide-react';
 import type {
   StitchedImage,
@@ -47,7 +48,8 @@ function App() {
   }, []);
 
   // Active navigation tab
-  const [activeTab, setActiveTab] = useState<string>(window.innerWidth < 768 ? 'upload' : 'stitch');
+  const [activeTab, setActiveTab] = useState<string>('stitch');
+  const [panelOpen, setPanelOpen] = useState(false);
 
   // Annotation/Markup parameters
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
@@ -163,7 +165,7 @@ function App() {
           getDecoded(newImgs[i]),
           getDecoded(newImgs[i + 1])
         ]);
-        newOverlaps.push(detectOverlap(first, second));
+        newOverlaps.push(detectOverlap(first, second, undefined, direction));
       } catch (error) {
         console.error('Error calculating overlap', error);
         newOverlaps.push(0);
@@ -173,6 +175,12 @@ function App() {
 
     if (sequence !== imageChangeSequenceRef.current) return;
     commitState(newImgs, newOverlaps, annotations);
+    // Importing a new batch immediately returns to the finished canvas.
+    if (newImgs.length > images.length) {
+      setActiveTab('stitch');
+      setPanelOpen(false);
+      setSelectedTool('select');
+    }
   };
 
   // --- Auto Stitching Logic ---
@@ -186,21 +194,12 @@ function App() {
       for (let i = 0; i < images.length - 1; i++) {
         const imgA: HTMLImageElement = previousImage ?? await loadImage(images[i].src);
         const imgB = await loadImage(images[i + 1].src);
-        newOverlaps.push(detectOverlap(imgA, imgB));
+        newOverlaps.push(detectOverlap(imgA, imgB, undefined, direction));
         previousImage = imgB;
       }
       
-      // Reset crops of all images when smart-stitching
-      const resetImages = images.map(img => ({
-        ...img,
-        cropTop: 0,
-        cropBottom: 0,
-        cropLeft: 0,
-        cropRight: 0
-      }));
-
-      commitState(resetImages, newOverlaps, annotations);
-      setDirection('vertical');
+      // Automatic alignment must not unexpectedly erase manual cropping.
+      commitState(images, newOverlaps, annotations);
       setActiveTab('stitch');
     } catch (err) {
       console.error('Error during auto stitching', err);
@@ -209,6 +208,58 @@ function App() {
       setIsStitching(false);
     }
   };
+
+  const handleDirectionChange = async (nextDirection: 'vertical' | 'horizontal') => {
+    if (nextDirection === direction) return;
+    setDirection(nextDirection);
+    // Old seam values belong to a different axis; never reuse them.
+    setOverlaps(Array(Math.max(0, images.length - 1)).fill(0));
+    if (images.length < 2) return;
+    setIsStitching(true);
+    try {
+      const detected: number[] = [];
+      let previous: HTMLImageElement | null = null;
+      for (let i = 0; i < images.length - 1; i++) {
+        const first: HTMLImageElement = previous ?? await loadImage(images[i].src);
+        const second = await loadImage(images[i + 1].src);
+        detected.push(detectOverlap(first, second, undefined, nextDirection));
+        previous = second;
+      }
+      commitState(images, detected, annotations);
+    } catch (error) {
+      console.error('Cannot recalculate overlap after switching direction', error);
+    } finally {
+      setIsStitching(false);
+    }
+  };
+
+  const openTool = (tab: string) => {
+    if (panelOpen && activeTab === tab) {
+      setPanelOpen(false);
+      setActiveTab('stitch');
+      setSelectedTool('select');
+      return;
+    }
+    setActiveTab(tab);
+    setPanelOpen(true);
+    setSelectedTool(tab === 'markup' ? 'pen' : 'select');
+  };
+
+  const closePanel = () => {
+    setPanelOpen(false);
+    // Leaving annotation mode must not keep the pen active.
+    setActiveTab('stitch');
+    setSelectedTool('select');
+  };
+
+  useEffect(() => {
+    if (!panelOpen) return;
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closePanel();
+    };
+    window.addEventListener('keydown', onEscape);
+    return () => window.removeEventListener('keydown', onEscape);
+  }, [panelOpen]);
 
   // --- Drawing History / Undo-Redo Stack ---
   const handleAddAnnotation = (anno: Annotation) => {
@@ -539,140 +590,229 @@ function App() {
     triggerDownload(zipBlob, 'application/zip', `Picsew_slices_${getFormattedDateTime()}.zip`);
   };
 
+  const tools = [
+    { id: 'upload', label: '素材', icon: Images },
+    { id: 'stitch', label: '拼接', icon: WandSparkles },
+    { id: 'cut', label: '编辑', icon: PencilRuler },
+    { id: 'mockup', label: '美化', icon: Sparkles },
+    { id: 'export', label: '导出', icon: Download }
+  ];
+  const currentGroup = activeTab === 'cut' || activeTab === 'markup' ? 'cut'
+    : activeTab === 'statusbar' || activeTab === 'mockup' ? 'mockup' : activeTab;
+  const toolName = currentGroup === 'upload' ? '素材管理'
+    : currentGroup === 'stitch' ? '拼接与对齐'
+    : currentGroup === 'cut' ? '裁剪与标注'
+    : currentGroup === 'mockup' ? '外观美化' : '保存与分享';
+
   return (
-    <div className="flex flex-col h-dvh w-screen overflow-hidden bg-dark-950 text-gray-100 font-sans">
-      {/* Header Bar */}
-      <header className="shrink-0 bg-dark-900/80 border-b border-dark-800 backdrop-blur-md px-4 md:px-6 py-3 md:py-4 flex items-center justify-between z-10">
-        <div className="flex items-center gap-3">
-          <div className="bg-linear-to-tr from-primary-600 to-primary-400 p-1.5 md:p-2 rounded-xl text-white shadow-md shadow-primary-500/20">
-            <Smartphone className="w-4 md:w-5 h-4 md:h-5" />
+    <div className="workspace-app flex h-dvh w-screen flex-col overflow-hidden text-slate-800">
+      <header className="workspace-header relative z-20 flex shrink-0 items-center justify-between gap-3 px-4 py-3 md:px-7">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="workspace-brand flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white">
+            <Smartphone className="h-5 w-5" />
           </div>
-          <div>
-            <h1 className="text-sm md:text-base font-bold tracking-tight text-white m-0 leading-none">
-              Picsew Web
-            </h1>
-            {!isMobile && <p className="text-[10px] text-gray-400 mt-1">智能截图拼接、状态栏美化、高清扩展套壳与分段切片工具</p>}
+          <div className="min-w-0">
+            <h1 className="m-0 text-[16px] font-bold tracking-tight text-slate-900">Picsew Web</h1>
+            <p className="hidden text-[11px] text-slate-500 sm:block">轻松拼接每一张截图</p>
           </div>
         </div>
-
-        {/* Info badges */}
-        <div className="flex items-center gap-2 md:gap-4 text-[10px] md:text-xs text-gray-400 font-medium">
+        <div className="flex items-center gap-2">
+          {images.length > 0 && (
+            <span className="workspace-count hidden items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold sm:flex">
+              <Check className="h-3.5 w-3.5 text-emerald-600" />
+              {images.length} 张图片
+            </span>
+          )}
           <button
-            onClick={() => setDirection(d => d === 'vertical' ? 'horizontal' : 'vertical')}
-            className="flex items-center gap-1 px-2 md:px-3 py-1 md:py-1.5 bg-dark-800 hover:bg-dark-700 border border-dark-700/60 rounded-xl font-semibold text-gray-300 hover:text-white transition cursor-pointer select-none"
-            title="点击切换画布模式"
+            type="button"
+            onClick={() => openTool('upload')}
+            className="workspace-top-button flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium"
           >
-            <Grid className="w-3.5 h-3.5 text-primary-400" />
-            <span>画布: {direction === 'vertical' ? '纵向' : '横向'}</span>
+            <Plus className="h-4 w-4" /> <span className="hidden sm:inline">添加图片</span><span className="sm:hidden">添加</span>
           </button>
-          <span className="flex items-center gap-1 px-2 md:px-3 py-1 md:py-1.5 bg-dark-800/40 border border-dark-700/20 rounded-xl">
-            <Layers className="w-3.5 h-3.5 text-pink-400" />
-            <span>素材: {images.length} 张</span>
-          </span>
+          <button
+            type="button"
+            onClick={handleDownloadImage}
+            disabled={!images.length}
+            className="workspace-primary flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-semibold text-white disabled:opacity-40"
+          >
+            <Download className="h-4 w-4" /> 导出
+          </button>
         </div>
       </header>
 
-      {/* Main Workspace Layout */}
-      <main className={`flex-1 flex overflow-hidden min-h-0 bg-linear-to-b from-dark-950 to-dark-900 ${isMobile ? 'flex-col' : 'flex-row'}`}>
-        {/* Left Side: Images uploading & ordering (Desktop only) */}
-        {!isMobile && (
-          <section className="w-[300px] border-r border-dark-800 bg-dark-900/30 flex flex-col p-4 shrink-0 overflow-hidden">
-            <h2 className="text-xs font-bold text-gray-400 mb-3 tracking-wider uppercase shrink-0">素材与排序</h2>
-            <div className="flex-1 overflow-hidden">
+      <main className="workspace-main relative flex min-h-0 flex-1 flex-col">
+        {images.length === 0 ? (
+          <section className="workspace-welcome mx-auto flex w-full max-w-[680px] flex-1 flex-col items-center justify-center px-5 pb-25 text-center">
+            <div className="workspace-welcome-icon mb-5 flex h-17 w-17 items-center justify-center rounded-[24px]">
+              <Images className="h-8 w-8 text-blue-600" />
+            </div>
+            <p className="mb-2 text-xs font-bold tracking-[0.18em] text-blue-600">一步开始</p>
+            <h2 className="mb-3 text-2xl font-bold tracking-tight text-slate-900 md:text-4xl">多张截图，一张长图</h2>
+            <p className="mb-7 max-w-[380px] text-sm leading-6 text-slate-500">拖入截图即可自动对齐。裁剪、打码、设备外框与高清导出都在这里完成。</p>
+            <div className="workspace-import-card w-full max-w-[450px] rounded-[26px] p-4 text-left">
               <ImageUploader
                 images={images}
                 onImagesChange={handleImagesChange}
                 onAutoStitchTrigger={handleAutoStitch}
               />
             </div>
+            <p className="mt-5 text-xs text-slate-400">图片仅在当前设备处理，不会上传到服务器</p>
           </section>
+        ) : (
+          <>
+            <div className="workspace-stage-meta pointer-events-none absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium text-slate-500">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              已准备好 · {images.length} 张 · {direction === 'vertical' ? '纵向' : '横向'}
+            </div>
+            <section className="workspace-canvas min-h-0 flex-1 px-2 pb-25 pt-11 md:px-6 md:pb-25">
+              <PreviewCanvas
+                images={images}
+                direction={direction}
+                gap={gap}
+                overlaps={overlaps}
+                statusBar={statusBar}
+                mockup={mockup}
+                annotations={annotations}
+                onAddAnnotation={handleAddAnnotation}
+                selectedTool={selectedTool}
+                activeTab={activeTab}
+                color={color}
+                strokeWidth={strokeWidth}
+                fontSize={fontSize}
+                canvasRef={canvasRef}
+                onAdjustOverlap={handleAdjustOverlap}
+                onAdjustCrop={handleAdjustCrop}
+                onSplitImage={handleSplitImage}
+                onDragEnd={handleDragEnd}
+                onUndo={handleUndo}
+                canUndo={historyIndex > 0}
+                onResetAll={handleResetAll}
+              />
+            </section>
+            {images.length > 1 && !panelOpen && (
+              <button
+                type="button"
+                onClick={handleAutoStitch}
+                className="workspace-auto absolute bottom-26 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold text-blue-700 shadow-md md:bottom-27"
+              >
+                <WandSparkles className="h-4 w-4" /> 重新智能对齐
+              </button>
+            )}
+          </>
         )}
 
-        {/* Center: Canvas Live-Preview Area */}
-        <section className="flex-1 flex flex-col items-center justify-center p-3 md:p-4 relative overflow-hidden bg-dark-950/80 min-h-0">
-          {isStitching && (
-            <div className="absolute inset-0 bg-dark-950/80 backdrop-blur-xs flex flex-col items-center justify-center z-50 animate-fade-in">
-              <RefreshCw className="w-10 h-10 text-primary-400 animate-spin mb-4" />
-              <p className="text-sm font-semibold text-gray-200">正在分析图像像素特征，智能重合对齐中...</p>
-              <p className="text-xs text-gray-500 mt-1">这通常只需几秒钟</p>
-            </div>
-          )}
-          
-          <div className="w-full h-full flex items-center justify-center relative">
-            <PreviewCanvas
-              images={images}
-              direction={direction}
-              gap={gap}
-              overlaps={overlaps}
-              statusBar={statusBar}
-              mockup={mockup}
-              annotations={annotations}
-              onAddAnnotation={handleAddAnnotation}
-              selectedTool={selectedTool}
-              activeTab={activeTab}
-              color={color}
-              strokeWidth={strokeWidth}
-              fontSize={fontSize}
-              canvasRef={canvasRef}
-              onAdjustOverlap={handleAdjustOverlap}
-              onAdjustCrop={handleAdjustCrop}
-              onSplitImage={handleSplitImage}
-              onDragEnd={handleDragEnd}
-              onUndo={handleUndo}
-              canUndo={historyIndex > 0}
-              onResetAll={handleResetAll}
-            />
+        {isStitching && (
+          <div className="workspace-processing absolute inset-0 z-60 flex flex-col items-center justify-center gap-3">
+            <RefreshCw className="h-8 w-8 animate-spin text-blue-600" />
+            <p className="text-sm font-semibold text-slate-700">正在智能对齐截图…</p>
           </div>
-        </section>
+        )}
 
-        {/* Right/Bottom Side: Options Controls Panels */}
-        <section className={`${isMobile ? 'w-full h-[45vh] border-t' : 'w-[340px] border-l'} border-dark-800 bg-dark-900/30 flex flex-col shrink-0 overflow-hidden`}>
-          {!isMobile && <h2 className="text-xs font-bold text-gray-400 p-4 pb-0 tracking-wider uppercase shrink-0">控制面板</h2>}
-          <div className="flex-1 overflow-hidden">
-            <ControlPanel
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              direction={direction}
-              setDirection={setDirection}
-              gap={gap}
-              setGap={setGap}
-              overlaps={overlaps}
-              setOverlaps={setOverlaps}
-              imageNames={images.map(img => img.name)}
-              selectedTool={selectedTool}
-              setSelectedTool={setSelectedTool}
-              color={color}
-              setColor={setColor}
-              strokeWidth={strokeWidth}
-              setStrokeWidth={setStrokeWidth}
-              fontSize={fontSize}
-              setFontSize={setFontSize}
-              onUndo={handleUndo}
-              onRedo={handleRedo}
-              onClearAnnotations={handleClearAnnotations}
-              canUndo={historyIndex > 0}
-              canRedo={historyIndex < history.length - 1}
-              statusBar={statusBar}
-              setStatusBar={setStatusBar}
-              mockup={mockup}
-              setMockup={setMockup}
-              exportConfig={exportConfig}
-              setExportConfig={setExportConfig}
-              onDownloadImage={handleDownloadImage}
-              onCopyImage={handleCopyImage}
-              copyStatus={copyStatus}
-              onDownloadPDF={handleDownloadPDF}
-              onDownloadZip={handleDownloadZip}
-              hasImages={images.length > 0}
-              onResetCropsAndSplits={handleResetCropsAndSplits}
-              
-              isMobile={isMobile}
-              images={images}
-              onImagesChange={handleImagesChange}
-              onAutoStitchTrigger={handleAutoStitch}
+        {panelOpen && (
+          <>
+            <button
+              type="button"
+              aria-label="关闭工具面板"
+              onClick={closePanel}
+              className="workspace-backdrop absolute inset-0 z-30"
             />
-          </div>
-        </section>
+            <aside className="workspace-sheet absolute z-40 flex flex-col overflow-hidden" aria-label={toolName}>
+              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200/60 px-5 py-4">
+                <div>
+                  <h2 className="text-[17px] font-bold text-slate-900">{toolName}</h2>
+                  <p className="mt-1 text-[11px] text-slate-500">按需调整，完成后点击空白处返回画布</p>
+                </div>
+                <button type="button" aria-label="关闭面板" onClick={closePanel} className="workspace-icon-button rounded-xl p-2">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              {(currentGroup === 'cut' || currentGroup === 'mockup') && (
+                <div className="workspace-subtabs mx-4 mt-4 flex shrink-0 gap-1 rounded-xl p-1">
+                  {(currentGroup === 'cut'
+                    ? [{ id: 'cut', label: '裁剪' }, { id: 'markup', label: '标注与打码' }]
+                    : [{ id: 'mockup', label: '设备套壳' }, { id: 'statusbar', label: '状态栏' }]
+                  ).map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveTab(item.id);
+                        setSelectedTool(item.id === 'markup' ? 'pen' : 'select');
+                      }}
+                      className={activeTab === item.id ? 'workspace-subtab active' : 'workspace-subtab'}
+                    >{item.label}</button>
+                  ))}
+                </div>
+              )}
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <ControlPanel
+                  hideTabNavigation
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  direction={direction}
+                  setDirection={handleDirectionChange}
+                  gap={gap}
+                  setGap={setGap}
+                  overlaps={overlaps}
+                  setOverlaps={setOverlaps}
+                  imageNames={images.map(img => img.name)}
+                  selectedTool={selectedTool}
+                  setSelectedTool={setSelectedTool}
+                  color={color}
+                  setColor={setColor}
+                  strokeWidth={strokeWidth}
+                  setStrokeWidth={setStrokeWidth}
+                  fontSize={fontSize}
+                  setFontSize={setFontSize}
+                  onUndo={handleUndo}
+                  onRedo={handleRedo}
+                  onClearAnnotations={handleClearAnnotations}
+                  canUndo={historyIndex > 0}
+                  canRedo={historyIndex < history.length - 1}
+                  statusBar={statusBar}
+                  setStatusBar={setStatusBar}
+                  mockup={mockup}
+                  setMockup={setMockup}
+                  exportConfig={exportConfig}
+                  setExportConfig={setExportConfig}
+                  onDownloadImage={handleDownloadImage}
+                  onCopyImage={handleCopyImage}
+                  copyStatus={copyStatus}
+                  onDownloadPDF={handleDownloadPDF}
+                  onDownloadZip={handleDownloadZip}
+                  hasImages={images.length > 0}
+                  onResetCropsAndSplits={handleResetCropsAndSplits}
+                  isMobile={isMobile}
+                  images={images}
+                  onImagesChange={handleImagesChange}
+                  onAutoStitchTrigger={handleAutoStitch}
+                />
+              </div>
+              <div className="workspace-sheet-footer shrink-0 px-5 py-3 text-xs text-slate-400">
+                <ChevronRight className="mr-1 inline h-3 w-3" /> 所有调整实时显示在画布中
+              </div>
+            </aside>
+          </>
+        )}
+
+        <nav className="workspace-dock absolute bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-[22px] p-1.5" aria-label="主要工具">
+          {tools.map(tool => {
+            const Icon = tool.icon;
+            return (
+              <button
+                key={tool.id}
+                type="button"
+                onClick={() => openTool(tool.id)}
+                aria-pressed={panelOpen && currentGroup === tool.id}
+                className={panelOpen && currentGroup === tool.id ? 'workspace-dock-item active' : 'workspace-dock-item'}
+              >
+                <Icon className="h-[19px] w-[19px]" />
+                <span>{tool.label}</span>
+              </button>
+            );
+          })}
+        </nav>
       </main>
     </div>
   );
