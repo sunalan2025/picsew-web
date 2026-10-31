@@ -60,7 +60,10 @@ export function analyzeOverlapSamples(
       textureCount++;
     }
   }
-  if (!textureCount || texture / (textureCount * 3) < 3.4) return empty;
+  // Sparse document screenshots contain broad white regions separated by thin
+  // text strokes. A threshold of 3.4 rejected actual 8-image fixtures even
+  // when the correct overlap had pixel-perfect zero error.
+  if (!textureCount || texture / (textureCount * 3) < 1.2) return empty;
 
   const minimum = Math.max(5, Math.ceil(40 / scale));
   if (maxOverlap < minimum) return empty;
@@ -112,7 +115,18 @@ export function analyzeOverlapSamples(
   // similarly scored offsets and must NOT trigger destructive auto-cropping.
   const runner = candidates.find(x => Math.abs(x.v - best.v) >= 3);
   const marginScore = runner ? runner.error - best.error : 255;
-  const high = best.error <= 10 && marginScore >= 4;
+  // A very short blank portion often looks like another "perfect" match.
+  // Compare a pixel-exact long seam with competitors that span at least 55%
+  // of its content. A repeated wallpaper has several such long ties and is
+  // still rejected. For the real eight PNG test, the right seams have error 0
+  // but the global runner gaps range from 0.005 to ~3.8 because of white space.
+  const meaningfulRunner = candidates.find(x =>
+    Math.abs(x.v - best.v) >= 3 && x.v >= Math.floor(best.v * 0.55));
+  const exactLongMatch = scale === 1 &&
+    best.error <= 0.15 &&
+    best.v >= Math.max(minimum, Math.floor(maxOverlap * 0.20)) &&
+    (!meaningfulRunner || meaningfulRunner.error - best.error >= 2.0);
+  const high = exactLongMatch || (best.error <= 10 && marginScore >= 4);
   const medium = best.error <= 22 && marginScore >= 2.2;
   if (!high && !medium) return { ...empty, error: best.error };
 
