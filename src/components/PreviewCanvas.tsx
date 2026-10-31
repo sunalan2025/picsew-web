@@ -299,7 +299,9 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
     // Normalize all images to the visible width of the first image
     const firstVisibleW = images[0].width - images[0].cropLeft - images[0].cropRight;
-    const baseW = Math.max(50, firstVisibleW);
+    const baseW = Math.max(50, direction === 'vertical'
+      ? firstVisibleW
+      : images[0].height - images[0].cropTop - images[0].cropBottom);
 
     // Calculate dimensions
     let totalW = baseW;
@@ -462,7 +464,9 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
         baseCtx.setLineDash([6, 3]);
 
         const firstVisibleW = images[0].width - images[0].cropLeft - images[0].cropRight;
-        const baseW = Math.max(50, firstVisibleW);
+        const baseW = Math.max(50, direction === 'vertical'
+      ? firstVisibleW
+      : images[0].height - images[0].cropTop - images[0].cropBottom);
         let currentY = 0;
         let currentX = 0;
 
@@ -613,7 +617,9 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
   const findSliceAtCoords = (coords: { x: number; y: number }) => {
     if (images.length === 0) return null;
     const firstVisibleW = images[0].width - images[0].cropLeft - images[0].cropRight;
-    const baseW = Math.max(50, firstVisibleW);
+    const baseW = Math.max(50, direction === 'vertical'
+      ? firstVisibleW
+      : images[0].height - images[0].cropTop - images[0].cropBottom);
 
     if (direction === 'vertical') {
       let currentY = 0;
@@ -812,7 +818,9 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
       const sliceVisibleW = slice.width - slice.cropLeft - slice.cropRight;
       const sliceVisibleH = slice.height - slice.cropTop - slice.cropBottom;
       const firstVisibleW = images[0].width - images[0].cropLeft - images[0].cropRight;
-      const baseW = Math.max(50, firstVisibleW);
+      const baseW = Math.max(50, direction === 'vertical'
+      ? firstVisibleW
+      : images[0].height - images[0].cropTop - images[0].cropBottom);
       
       if (draggedField === 'cropTop' || draggedField === 'cropBottom') {
         const scale = direction === 'vertical' 
