@@ -68,3 +68,47 @@ export function clampOverlapsToVisibleImages(
       Math.max(0,Math.floor(Math.min(nextLimit,prevLimit))));
   });
 }
+
+/** Canonical original-pixel crop used by the editor AND Canvas drawImage.
+ * Keeping one rectangle model avoids a visually different editor preview. */
+export function getCropRect(image: StitchedImage): { left:number; top:number; width:number; height:number } {
+  return {
+    left: image.cropLeft,
+    top: image.cropTop,
+    width: Math.max(0, image.width - image.cropLeft - image.cropRight),
+    height: Math.max(0, image.height - image.cropTop - image.cropBottom)
+  };
+}
+
+/** The shade on the editor and source rectangle for Canvas drawImage are identical. */
+export function getCropFractions(image: StitchedImage) {
+  const rect = getCropRect(image);
+  return { top: rect.top / image.height, bottom: image.cropBottom / image.height,
+    left: rect.left / image.width, right: image.cropRight / image.width };
+}
+
+/** Locate a source screenshot within the normalized stitched output.
+ * Uses the same per-image scale/overlap/gap convention as PreviewCanvas.
+ * Helpful for keeping the edited image visible in the live long screenshot. */
+export function getStitchedImageLocation(
+  images: StitchedImage[], overlaps: number[], gap: number,
+  axis: 'vertical' | 'horizontal', targetIndex: number
+): { start:number; total:number } {
+  if (!images.length) return { start:0, total:0 };
+  const vertical = axis === 'vertical';
+  const cross = (img:StitchedImage) => vertical
+    ? Math.max(10,img.width-img.cropLeft-img.cropRight)
+    : Math.max(10,img.height-img.cropTop-img.cropBottom);
+  const along = (img:StitchedImage) => vertical
+    ? Math.max(10,img.height-img.cropTop-img.cropBottom)
+    : Math.max(10,img.width-img.cropLeft-img.cropRight);
+  const firstCross = Math.max(50,cross(images[0]));
+  let end = 0, start = 0, targetStart=0;
+  for(let i=0;i<images.length;i++) {
+    const scale = firstCross / cross(images[i]);
+    start = i===0 ? 0 : end-(overlaps[i-1]??0)*scale+gap;
+    if(i===targetIndex) targetStart=start;
+    end = start+along(images[i])*scale;
+  }
+  return {start:targetStart,total:Math.max(1,end)};
+}

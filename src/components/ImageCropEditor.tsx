@@ -1,139 +1,150 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
+import { ChevronLeft, ChevronRight, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import type { StitchedImage } from '../types';
-import { clampCropValue } from '../utils/imageState';
+import { clampCropValue, getCropRect, getCropFractions } from '../utils/imageState';
 
 type Edge = 'cropTop' | 'cropBottom' | 'cropLeft' | 'cropRight';
-const edges: {key: Edge; label: string}[] = [
-  {key:'cropTop',label:'上边'}, {key:'cropBottom',label:'下边'},
-  {key:'cropLeft',label:'左边'}, {key:'cropRight',label:'右边'}
+const fields: { edge: Edge; title: string; short: string }[] = [
+  { edge: 'cropTop', title: '顶部', short: '上' },
+  { edge: 'cropBottom', title: '底部', short: '下' },
+  { edge: 'cropLeft', title: '左侧', short: '左' },
+  { edge: 'cropRight', title: '右侧', short: '右' }
 ];
+
 interface Props {
   images: StitchedImage[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
   onChange: (index: number, edge: Edge, value: number) => void;
   onCommit: () => void;
   onReset: (index: number) => void;
 }
 
-/** Independent image cropping with draggable borders and exact numeric controls. */
-export function ImageCropEditor({images, onChange, onCommit, onReset}: Props) {
-  const [selected, setSelected] = useState<string | null>(null);
-  const index = Math.max(0, images.findIndex(image => image.id === selected));
-  const image = images[index];
-  const preview = useRef<HTMLDivElement>(null);
-  const gesture = useRef<{id:number; index:number; edge:Edge; start:number; value:number; ratio:number} | null>(null);
-  if (!image) return <p className="text-sm text-slate-500">先导入图片，再进行裁剪。</p>;
+/** Source image is never changed; the mask represents the same source rectangle
+ * consumed by the stitched Canvas's drawImage(source, sx, sy, sw, sh, ...). */
+export function ImageCropEditor({ images, selectedId, onSelect, onChange, onCommit, onReset }: Props) {
+  const idx = Math.max(0, images.findIndex(img => img.id === selectedId));
+  const image = images[idx];
+  const box = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ pointer: number; edge: Edge; index: number;
+    start: number; initial: number; sourcePerCssPx: number } | null>(null);
+  if (!image) return <div className="p-6 text-sm text-slate-500">还没有可裁剪的截图。</div>;
 
-  const pct = {
-    top: image.cropTop / image.height * 100,
-    bottom: image.cropBottom / image.height * 100,
-    left: image.cropLeft / image.width * 100,
-    right: image.cropRight / image.width * 100
+  const rect = getCropRect(image);
+  const units = getCropFractions(image);
+  const fraction = { top: units.top * 100, bottom: units.bottom * 100,
+    left: units.left * 100, right: units.right * 100 };
+
+  const begin = (event: React.PointerEvent<HTMLButtonElement>, edge: Edge) => {
+    const dimensions = box.current?.getBoundingClientRect();
+    if (!dimensions) return;
+    event.stopPropagation(); event.preventDefault();
+    const alongX = edge === 'cropLeft' || edge === 'cropRight';
+    drag.current = { pointer: event.pointerId, edge, index: idx,
+      start: alongX ? event.clientX : event.clientY, initial: image[edge],
+      sourcePerCssPx: alongX ? image.width / dimensions.width : image.height / dimensions.height };
+    event.currentTarget.setPointerCapture(event.pointerId);
   };
-  const begin = (e: React.PointerEvent<HTMLButtonElement>, edge:Edge) => {
-    const box=preview.current?.getBoundingClientRect();
-    if (!box) return;
-    e.preventDefault();
-    e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    const x=edge==='cropLeft'||edge==='cropRight';
-    gesture.current={id:e.pointerId,index,edge,start:x?e.clientX:e.clientY,
-      value:image[edge],ratio:x?image.width/box.width:image.height/box.height};
+  const move = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const state = drag.current;
+    if (!state || state.pointer !== event.pointerId) return;
+    const position = state.edge === 'cropLeft' || state.edge === 'cropRight'
+      ? event.clientX : event.clientY;
+    const sign = state.edge === 'cropRight' || state.edge === 'cropBottom' ? -1 : 1;
+    onChange(state.index, state.edge,
+      Math.round(state.initial + (position - state.start) * state.sourcePerCssPx * sign));
   };
-  const move = (e: React.PointerEvent<HTMLButtonElement>) => {
-    const g=gesture.current;
-    if (!g || g.id!==e.pointerId) return;
-    const pos=g.edge==='cropLeft'||g.edge==='cropRight'?e.clientX:e.clientY;
-    const sign=g.edge==='cropRight'||g.edge==='cropBottom'?-1:1;
-    onChange(g.index,g.edge,Math.round(g.value+(pos-g.start)*g.ratio*sign));
-  };
-  const end = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (gesture.current?.id!==e.pointerId) return;
-    gesture.current=null;
+  const end = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!drag.current || drag.current.pointer !== event.pointerId) return;
+    drag.current = null;
     onCommit();
   };
 
-  return <section className="space-y-3" aria-label="四边自由裁剪">
-    <div className="flex items-center justify-between gap-2">
-      <div>
-        <h3 className="text-sm font-bold text-slate-900">四边自由裁剪</h3>
-        <p className="mt-1 text-xs leading-5 text-slate-500">选一张图片，拖动蓝色控制点裁剪任意一边。</p>
+  const prev = () => onSelect(images[(idx - 1 + images.length) % images.length].id);
+  const next = () => onSelect(images[(idx + 1) % images.length].id);
+
+  return <div className="crop-editor-ui flex min-h-0 flex-col gap-3 p-4 md:p-5">
+    <div className="flex items-start justify-between gap-2">
+      <div className="min-w-0">
+        <span className="crop-studio-eyebrow">SOURCE / 裁剪原图</span>
+        <h2 className="mt-1 text-lg font-bold tracking-tight text-slate-900">选择保留的画面</h2>
+        <p className="mt-1 text-xs text-slate-500">蓝框内将被保留，拖动四边手柄即刻生效。</p>
       </div>
-      <button type="button" onClick={()=>onReset(index)}
-        className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-blue-600">
-        重置本张
+      <button type="button" title="将当前图片还原为未裁剪" onClick={() => onReset(idx)}
+        className="crop-soft-btn shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-semibold">
+        <RotateCcw className="h-3.5 w-3.5"/> 重置
       </button>
     </div>
 
-    <div className="flex gap-2 overflow-x-auto pb-2" aria-label="选择图片">
-      {images.map((item,n)=><button key={item.id} type="button"
-        onClick={()=>setSelected(item.id)} aria-pressed={index===n}
-        className={`shrink-0 w-16 rounded-xl border-2 p-1.5 text-center
-          ${n===index?'border-blue-600 bg-blue-50':'border-slate-200 bg-white'}`}>
-        <img src={item.src} alt="" className="mx-auto h-14 w-11 object-contain"/>
-        <span className="block text-xs font-semibold text-slate-700">{n+1}</span>
-      </button>)}
+    <div className="crop-thumbnails flex items-center gap-1.5">
+      <button type="button" onClick={prev} aria-label="上一张截图"
+        className="crop-small-step"><ChevronLeft className="h-4 w-4"/></button>
+      <div className="min-w-0 flex flex-1 gap-2 overflow-x-auto py-1" aria-label="选择需要裁剪的截图">
+        {images.map((item,n)=><button type="button" key={item.id}
+          onClick={() => onSelect(item.id)} aria-pressed={idx === n}
+          title={item.name}
+          className={'crop-thumb shrink-0 ' + (idx === n ? 'active' : '')}>
+          <img src={item.src} alt="" className="h-10 w-9 rounded object-contain"/>
+          <span className="text-[11px] font-bold">{n+1}</span>
+        </button>)}
+      </div>
+      <button type="button" onClick={next} aria-label="下一张截图"
+        className="crop-small-step"><ChevronRight className="h-4 w-4"/></button>
     </div>
 
-    <p className="truncate text-xs text-slate-500">第 {index+1} 张 · {image.name}</p>
-    <div className="rounded-2xl bg-slate-100 p-4 border border-slate-200">
-      <div ref={preview} className="relative mx-auto overflow-hidden bg-white shadow-md"
-        style={{width:`${Math.min(220,285*image.width/image.height)}px`,maxWidth:'100%',aspectRatio:`${image.width}/${image.height}`}}>
-        <img src={image.src} alt="当前图片四边裁剪预览"
-          className="absolute inset-0 h-full w-full" draggable={false}/>
+    <div className="crop-original-stage flex min-h-0 flex-1 items-center justify-center overflow-auto rounded-2xl p-3 md:p-5">
+      <div className="relative shrink-0" ref={box}
+        style={{ width: Math.min(520, 520 * image.width / image.height) + 'px',
+          maxWidth: '100%', aspectRatio: image.width + ' / ' + image.height }}>
+        <img src={image.src} alt={'正在裁剪的第 ' + (idx+1) + ' 张原图'}
+          draggable={false} className="absolute inset-0 h-full w-full select-none"/>
         <div className="pointer-events-none absolute border-2 border-blue-500"
-          style={{top:`${pct.top}%`,bottom:`${pct.bottom}%`,
-            left:`${pct.left}%`,right:`${pct.right}%`,
-            boxShadow:'0 0 0 1000px rgba(15,23,42,.48)'}}/>
-        {edges.map(({key,label})=>{
-          const lr=key==='cropLeft'||key==='cropRight';
-          const style:React.CSSProperties=lr?{
-            left:`${key==='cropLeft'?pct.left:100-pct.right}%`,
-            top:`${(pct.top+100-pct.bottom)/2}%`
-          }:{
-            left:`${(pct.left+100-pct.right)/2}%`,
-            top:`${key==='cropTop'?pct.top:100-pct.bottom}%`
-          };
-          return <button key={key} type="button" aria-label={`拖动${label}裁剪线`}
-            onPointerDown={e=>begin(e,key)} onPointerMove={move}
+          style={{top: fraction.top + '%', bottom: fraction.bottom + '%',
+            left: fraction.left + '%', right: fraction.right + '%',
+            boxShadow:'0 0 0 1500px rgba(12,24,44,.53)'}}>
+          <div className="absolute inset-0 crop-thirds-grid"/>
+        </div>
+        {fields.map(({edge,title}) => {
+          const verticalEdge = edge === 'cropLeft' || edge === 'cropRight';
+          const style: React.CSSProperties = verticalEdge
+            ? {left: (edge === 'cropLeft' ? fraction.left : 100-fraction.right) + '%',
+                top: (fraction.top+(100-fraction.top-fraction.bottom)/2) + '%'}
+            : {top: (edge === 'cropTop' ? fraction.top : 100-fraction.bottom) + '%',
+                left: (fraction.left+(100-fraction.left-fraction.right)/2) + '%'};
+          return <button type="button" key={edge} title={'拖动裁剪' + title} aria-label={'拖动裁剪' + title}
+            onPointerDown={e => begin(e,edge)} onPointerMove={move}
             onPointerUp={end} onPointerCancel={end}
-            style={{...style,transform:'translate(-50%,-50%)',touchAction:'none'}}
-            className={`absolute z-10 cursor-grab rounded-full border-[3px] border-white bg-blue-500
-              shadow-md active:cursor-grabbing ${lr?'h-10 w-5':'w-10 h-5'}`}/>;
+            style={{...style, transform:'translate(-50%,-50%)',touchAction:'none'}}
+            className={'crop-drag-handle ' + (verticalEdge ? 'vertical' : 'horizontal')}/>;
         })}
       </div>
-      <p className="mt-3 text-center text-xs text-slate-600">
-        保留区域 <strong className="text-blue-700">
-          {image.width-image.cropLeft-image.cropRight} × {image.height-image.cropTop-image.cropBottom} px
-        </strong>
-      </p>
     </div>
 
-    <div className="space-y-2">
-      {edges.map(({key,label})=>{
-        const horizontal=key==='cropLeft'||key==='cropRight';
-        const other=key==='cropLeft'?image.cropRight:key==='cropRight'?image.cropLeft:
-          key==='cropTop'?image.cropBottom:image.cropTop;
-        const max=Math.max(0,(horizontal?image.width:image.height)-other-10);
-        return <div key={key} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <label htmlFor={`crop-slider-${key}`} className="text-xs font-semibold text-slate-700">
-              {label}
-            </label>
-            <span className="flex items-center gap-1 text-xs text-slate-500">
-              <input type="number" min={0} max={max} step={1} value={image[key]}
-                aria-label={`${label}裁剪像素`}
-                onChange={e=>onChange(index,key,clampCropValue(image,key,Number(e.target.value)))}
-                onBlur={onCommit}
-                className="w-20 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-right font-mono text-blue-700"/>
-              px
-            </span>
-          </div>
-          <input id={`crop-slider-${key}`} type="range" min={0} max={max}
-            value={image[key]} onChange={e=>onChange(index,key,Number(e.target.value))}
-            onPointerUp={onCommit} onKeyUp={onCommit} className="w-full accent-blue-600"/>
-        </div>;
-      })}
+    <div className="flex items-center justify-between gap-2 text-xs">
+      <span className="truncate text-slate-500" title={image.name}>第 {idx+1}/{images.length} 张 · {image.name}</span>
+      <span className="crop-dimension shrink-0">{rect.width} × {rect.height} px</span>
     </div>
-    <p className="text-xs leading-5 text-slate-500">每张图都能独立裁上下左右四边；调整后可点击“重新智能对齐”。</p>
-  </section>;
+
+    <details className="crop-numeric-details rounded-xl border border-slate-200 bg-white" >
+      <summary className="flex cursor-pointer items-center justify-between gap-2 px-3 py-2.5 text-xs font-semibold text-slate-600">
+        <span className="flex items-center gap-2"><SlidersHorizontal className="h-3.5 w-3.5"/> 精确裁剪</span>
+        <span className="text-[11px] font-normal text-slate-400">四边独立 · px</span>
+      </summary>
+      <div className="grid grid-cols-2 gap-2 border-t border-slate-100 p-3">
+        {fields.map(({edge,short})=>{
+          const max = Math.max(0, (edge==='cropTop'||edge==='cropBottom'?image.height:image.width)
+            - (edge==='cropTop'?image.cropBottom:edge==='cropBottom'?image.cropTop:
+                edge==='cropLeft'?image.cropRight:image.cropLeft) - 10);
+          return <label key={edge} className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 p-2 text-xs">
+            <span className="text-slate-500">{short}</span>
+            <input type="number" min={0} max={max} step={1} value={image[edge]}
+              aria-label={short + '侧裁剪像素'}
+              onChange={e => onChange(idx,edge,clampCropValue(image,edge,Number(e.target.value)))}
+              onBlur={onCommit}
+              className="w-[75px] min-w-0 rounded-md border border-slate-200 bg-white px-2 py-1 text-right font-mono font-semibold text-slate-700"/>
+          </label>;
+        })}
+      </div>
+    </details>
+  </div>;
 }

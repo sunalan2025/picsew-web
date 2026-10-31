@@ -14,6 +14,7 @@ import type {
 import { drawStatusBar } from '../utils/statusBar';
 import { drawMockup } from '../utils/mockup';
 import { canInteractWithCanvas } from '../utils/canvasInteraction';
+import { getStitchedImageLocation } from '../utils/imageState';
 
 interface PreviewCanvasProps {
   images: StitchedImage[];
@@ -41,6 +42,8 @@ interface PreviewCanvasProps {
   onUndo: () => void;
   canUndo: boolean;
   onResetAll: () => void;
+  compact?: boolean;
+  focusSliceIndex?: number;
 }
 
 const drawArrow = (
@@ -188,7 +191,9 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
   onDragEnd,
   onUndo,
   canUndo,
-  onResetAll
+  onResetAll,
+  compact = false,
+  focusSliceIndex
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -268,6 +273,27 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
       return () => clearTimeout(timer);
     }
   }, [images.length, direction, handleFitWidth, handleFitHeight]);
+
+  // When the editor switches source pictures, automatically reveal that
+  // section of the *real* composite without changing the user's zoom.
+  useEffect(() => {
+    if (focusSliceIndex === undefined || focusSliceIndex < 0 || !images.length) return;
+    const timer = window.setTimeout(() => {
+      const view = containerRef.current;
+      const canvas = canvasRef.current;
+      if (!view || !canvas) return;
+      const { start, total } = getStitchedImageLocation(images, overlaps, gap, direction, focusSliceIndex);
+      const fraction = Math.min(1, Math.max(0,start / Math.max(1,total)));
+      const extent = (direction === 'vertical' ? canvas.height : canvas.width) * zoom;
+      const widthAxis = direction === 'horizontal';
+      const viewExtent = widthAxis ? view.clientWidth : view.clientHeight;
+      const target = Math.max(0, fraction * extent - viewExtent * 0.23);
+      if (widthAxis) view.scrollTo({left:target,behavior:'smooth'});
+      else view.scrollTo({top:target,behavior:'smooth'});
+    }, 280);
+    return () => window.clearTimeout(timer);
+    // Only follow an explicit picture selection; don't fight crop handle drag.
+  }, [focusSliceIndex, direction, images.length, canvasRef]);
 
   // Core Render Loop: Builds the stitched image + statusbar + crops
   const renderStitchedImage = useCallback((): HTMLCanvasElement => {
@@ -1013,8 +1039,18 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
   return (
     <div className="flex flex-col w-full h-full overflow-hidden">
-      {/* 1. Zoom View Controller Floating Bar */}
-      <div className="bg-dark-900/90 border border-dark-800/80 backdrop-blur-md px-4 py-2 rounded-2xl flex items-center justify-between shadow-sm mb-3 shrink-0 mx-auto w-auto max-w-full gap-2 select-none z-20">
+      {/* Compact output preview: only the zoom operations needed during cropping. */}
+      {compact && <div className="crop-preview-toolbar">
+        <span className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+          <span className="h-2 w-2 rounded-full bg-emerald-500"/> 实时画布
+        </span>
+        <div className="flex items-center gap-2 text-xs text-slate-600">
+          <button type="button" onClick={handleFitWidth} className="crop-preview-action">适宽</button>
+          <button type="button" onClick={handleFitHeight} className="crop-preview-action">全览</button>
+          <span className="font-mono">{Math.round(zoom * 100)}%</span>
+        </div>
+      </div>}
+      {!compact && <div className="bg-dark-900/90 border border-dark-800/80 backdrop-blur-md px-4 py-2 rounded-2xl flex items-center justify-between shadow-sm mb-3 shrink-0 mx-auto w-auto max-w-full gap-2 select-none z-20">
         <div className="flex items-center gap-1">
           <button
             onClick={handleZoomOut}
@@ -1088,20 +1124,22 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
             <span>重置清空</span>
           </button>
         </div>
-      </div>
+      </div>}
 
       {/* Helper text display */}
-      <div className="text-center text-[11px] text-gray-500 mb-2 font-medium">
+      {!compact && <div className="text-center text-[11px] text-gray-500 mb-2 font-medium">
         {activeTab === 'stitch' && '💡 提示：按住鼠标左键并在图片上【上下拖动】，可以直接调节相邻截图的重叠对齐。'}
         {activeTab === 'cut' && (selectedTool === 'cut-horizontal' || selectedTool === 'cut-vertical' 
           ? '💡 提示：在图片需要切割的位置【点击一下】插入分割线。' 
           : '💡 提示：在分割切片中【按住上下拖拽】，可以直接调节上下裁剪。')}
-      </div>
+      </div>}
 
       {/* 2. Main Scrollable Viewport (CSS Centering Scroll cutoff Fix) */}
       <div
         ref={containerRef}
-        className="flex-1 w-full h-full flex overflow-auto p-4 md:p-6 bg-white/60 rounded-2xl border border-slate-200/80"
+        className={compact
+          ? 'flex-1 min-h-0 w-full flex overflow-auto p-2 bg-white/70 rounded-xl border border-slate-200/80'
+          : 'flex-1 w-full h-full flex overflow-auto p-4 md:p-6 bg-white/60 rounded-2xl border border-slate-200/80'}
       >
         {images.length === 0 ? (
           <div className="m-auto text-gray-500 text-sm flex flex-col items-center select-none">

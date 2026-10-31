@@ -197,3 +197,94 @@ button:disabled { cursor: not-allowed; }
 .workspace-app input.text-white { color:#20354f; }
 .workspace-app ::-webkit-scrollbar-thumb { background: rgba(91,125,166,.28); }
 .workspace-app ::-webkit-scrollbar-thumb:hover { background: rgba(91,125,166,.48); }
+
+/* Crop Studio: one workspace, two always-visible perspectives.
+   Inspired by direct-manipulation crop UI (Figma / Lightroom), not a modal. */
+.crop-studio-shell {
+  flex:1; min-height:0; display:flex; flex-direction:column;
+  padding:14px 20px 100px; gap:12px;
+  background:radial-gradient(ellipse at 20% 0%,#f3f7ff 0%,#f7f9fc 60%,#f6f8fb 100%);
+}
+.crop-studio-heading {
+  flex:0 0 auto; display:flex; align-items:center; justify-content:space-between;
+  gap:16px; padding:2px 5px 0;
+}
+.crop-studio-eyebrow {font-size:9px;line-height:1.5;font-weight:800;letter-spacing:.15em;color:#6d89b8;}
+.crop-studio-grid {flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:14px;}
+.crop-studio-panel {min-width:0;min-height:0; overflow:hidden; background:#fff;
+  border:1px solid #dfe7f3; border-radius:24px;
+  box-shadow:0 9px 35px rgba(55,83,128,.075),0 1px 4px rgba(55,83,128,.035);}
+.crop-studio-editor-pane {overflow-y:auto;scrollbar-gutter:stable;}
+.crop-soft-btn {border:1px solid #dae4f0; border-radius:12px; background:#fff;color:#64748b; transition:.16s ease;}
+.crop-soft-btn:hover {background:#eff5ff;color:#275cbe;border-color:#bfdbfe;}
+.crop-done-btn {display:inline-flex;align-items:center;gap:6px;border-radius:12px;
+  background:linear-gradient(130deg,#397bf2,#2362df);color:white;
+  box-shadow:0 6px 16px rgba(37,99,235,.17);transition:transform .16s ease;}
+.crop-done-btn:hover {transform:translateY(-1px);}
+.crop-result-heading {display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:17px 19px 14px;border-bottom:1px solid #ecf0f6;}
+.crop-live-indicator {display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
+  color:#18805c;background:#eafaf2;padding:6px 9px;border-radius:999px;}
+.crop-live-dot {width:6px;height:6px;border-radius:50%;background:#19b47a;}
+.crop-studio-result-pane {display:flex;flex-direction:column;}
+.crop-result-canvas {flex:1; min-height:0;padding:12px; overflow:hidden; background:#f6f8fc;}
+.crop-result-caption {display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:11px 18px;font-size:11px;color:#8290a5;border-top:1px solid #e9eef5;background:white;}
+.crop-editor-ui {height:100%; min-height:0;}
+.crop-original-stage {background-color:#e8edf5;
+  background-image:linear-gradient(45deg,rgba(181,194,213,.14) 25%,transparent 25%),
+   linear-gradient(-45deg,rgba(181,194,213,.14) 25%,transparent 25%);
+  background-size:24px 24px;}
+.crop-original-stage > div {box-shadow:0 12px 34px rgba(15,31,60,.16);}
+.crop-thirds-grid {width:100%;height:100%;opacity:.72;
+  background-image:linear-gradient(to right,transparent calc(33.333% - .5px),
+    rgba(255,255,255,.68) 33.333%,transparent calc(33.333% + .5px)),
+    linear-gradient(to right,transparent calc(66.666% - .5px),
+    rgba(255,255,255,.68) 66.666%,transparent calc(66.666% + .5px)),
+    linear-gradient(to bottom,transparent calc(33.333% - .5px),
+    rgba(255,255,255,.68) 33.333%,transparent calc(33.333% + .5px)),
+    linear-gradient(to bottom,transparent calc(66.666% - .5px),
+    rgba(255,255,255,.68) 66.666%,transparent calc(66.666% + .5px));}
+.crop-drag-handle {position:absolute;z-index:4;border:3px solid white;border-radius:999px;
+  background:#2976f6;box-shadow:0 2px 9px rgba(22,73,139,.36);
+  cursor:grab;transition:box-shadow .12s ease;}
+.crop-drag-handle:active {cursor:grabbing;box-shadow:0 2px 0 4px rgba(59,130,246,.22);}
+.crop-drag-handle.vertical {width:18px;height:44px;}
+.crop-drag-handle.horizontal {width:44px;height:18px;}
+.crop-thumbnails {min-width:0;}
+.crop-thumb {display:flex;flex-direction:column;align-items:center;gap:3px;min-width:49px;
+  border-radius:12px;border:1.5px solid #e1e8f1;background:#f8fafc;padding:5px;color:#74849d;}
+.crop-thumb.active {border-color:#2976f6;background:#edf4ff;box-shadow:0 0 0 2px rgba(41,118,246,.06);color:#1d5fb9;}
+.crop-small-step {display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  width:27px;height:48px;border-radius:10px;border:1px solid #e1e8f1;color:#7790af;background:white;}
+.crop-small-step:hover {background:#eef5ff;color:#2563eb;}
+.crop-dimension {padding:6px 10px;border-radius:8px;background:#ebf3ff;color:#2866c2;font-weight:750;
+  font-variant-numeric:tabular-nums;}
+.crop-numeric-details summary::-webkit-details-marker {display:none;}
+.crop-studio-shell .workspace-canvas > .flex {min-height:0;}
+/* A real layout, not a side drawer painted over the photograph. */
+@media (max-width: 830px) {
+  .crop-studio-shell {padding:8px 8px 88px;gap:8px;}
+  .crop-studio-heading {padding:2px 8px;}
+  .crop-studio-grid {grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(275px,1.5fr) minmax(160px,1fr);gap:8px;}
+  .crop-studio-panel {border-radius:17px;}
+  .crop-editor-ui {padding:11px;gap:8px;}
+  .crop-editor-ui h2 {font-size:15px;}
+  .crop-editor-ui .crop-original-stage {padding:8px;}
+  .crop-editor-ui .crop-original-stage > div {height:min(27dvh,270px);width:auto!important;max-width:100%;}
+  .crop-result-heading {padding:8px 12px;}
+  .crop-result-caption {padding:7px 12px;}
+  .crop-result-canvas {padding:5px;}
+}
+@media (max-height:680px) and (min-width:831px) {
+  .crop-editor-ui .crop-original-stage > div {max-height:39dvh;}
+}
+
+.crop-preview-toolbar {display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;
+  gap:6px;padding:9px 12px;margin-bottom:6px;border:1px solid #e0e8f5;border-radius:12px;
+  background:#fff;box-shadow:0 2px 7px rgba(30,68,120,.035);}
+.crop-preview-action {padding:5px 8px;border-radius:7px;background:#f0f5ff;
+  color:#3066c7;font-size:11px;font-weight:750;}
+.crop-preview-action:hover {background:#e2edff;}
+@media(max-width:830px){.crop-preview-toolbar{padding:5px 8px;margin-bottom:4px;}
+  .crop-preview-action{padding:4px 6px;}}
