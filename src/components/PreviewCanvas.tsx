@@ -2,12 +2,14 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   ZoomIn, ZoomOut, Maximize2, Minimize2, Undo2, RotateCcw
 } from 'lucide-react';
+import { drawWatermark } from '../utils/watermark';
 import type {
   StitchedImage,
   Annotation,
   AnnotationType,
   StatusBarConfig,
-  MockupConfig
+  MockupConfig,
+  WatermarkConfig
 } from '../types';
 import { drawStatusBar } from '../utils/statusBar';
 import { drawMockup } from '../utils/mockup';
@@ -19,6 +21,7 @@ interface PreviewCanvasProps {
   overlaps: number[];
   statusBar: StatusBarConfig;
   mockup: MockupConfig;
+  watermark: WatermarkConfig;
   annotations: Annotation[];
   onAddAnnotation: (anno: Annotation) => void;
   selectedTool: AnnotationType | 'select' | 'cut-horizontal' | 'cut-vertical';
@@ -169,6 +172,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
   overlaps,
   statusBar,
   mockup,
+  watermark,
   annotations,
   onAddAnnotation,
   selectedTool,
@@ -586,8 +590,11 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
         ctx.drawImage(baseStitchedCanvas, 0, 0);
       }
     }
+    // Place watermarks above the final screenshot or mockup, not into the
+    // cached stitching bitmap. This keeps previews and exported output equal.
+    drawWatermark(canvasRef.current, watermark);
   }, [
-    images, direction, gap, overlaps, mockup, annotations,
+    images, direction, gap, overlaps, mockup, watermark, annotations,
     isDrawing, startPoint, currentPoint, selectedTool, dragMode, color, strokeWidth, penPoints,
     activeTab, hoverY, hoverX, canvasRef, renderStitchedImage
   ]);
