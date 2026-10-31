@@ -164,7 +164,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       if (controller.signal.aborted) return;
       if (result.images.length > 0) await onImagesChange([...images, ...result.images]);
       setUploadMessage(
-        `录屏已提取 ${result.images.length} 张不同画面（分析 ${result.considered} 帧）。请检查接缝；快滚动建议使用较短录屏。`
+        `录屏已分析 ${result.considered} 帧，提取 ${result.images.length} 张滚动画面。` +
+        (result.uncertainTransitions ? ` 有 ${result.uncertainTransitions} 处变化尚无法可靠对齐，请检查拼接接缝。` : '') +
+        (result.truncated ? ' 已达到截图张数上限，部分尾部内容尚未导入；请拆分录屏。' : '')
       );
     } catch (error) {
       if (!controller.signal.aborted) {
