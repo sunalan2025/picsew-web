@@ -90,6 +90,8 @@ function App() {
 
   // Canvas Reference to fetch rendered bitmap
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Ignore the results of an older asynchronous image list change.
+  const imageChangeSequenceRef = useRef(0);
 
   // Helper to commit state change and record history
   const commitState = (newImgs: StitchedImage[], newOverlaps: number[], newAnnos: Annotation[]) => {
@@ -128,36 +130,47 @@ function App() {
     }
   };
 
-  // Synchronize overlaps size when uploading images manually
+  // Keep manually adjusted overlaps only while the same two images remain adjacent.
+  // Reorder/removal must not inherit an overlap from a different image pair.
   const handleImagesChange = async (newImgs: StitchedImage[]) => {
-    let newOverlaps = [...overlaps];
-    if (newImgs.length <= 1) {
-      newOverlaps = [];
-      commitState(newImgs, newOverlaps, annotations);
-    } else {
-      // Automatically detect overlap for new additions
-      const oldLen = images.length;
-      const newLen = newImgs.length;
-
-      for (let i = oldLen > 1 ? oldLen - 1 : 0; i < newLen - 1; i++) {
-        try {
-          const imgA = await loadImage(newImgs[i].src);
-          const imgB = await loadImage(newImgs[i + 1].src);
-          const detected = detectOverlap(imgA, imgB);
-
-          if (newOverlaps.length <= i) {
-             newOverlaps.push(detected);
-          } else {
-             newOverlaps[i] = detected;
-          }
-        } catch (e) {
-          console.error("Error pre-calculating overlap", e);
-          if (newOverlaps.length <= i) newOverlaps.push(0);
-        }
-      }
-      newOverlaps = newOverlaps.slice(0, newLen - 1);
-      commitState(newImgs, newOverlaps, annotations);
+    const sequence = ++imageChangeSequenceRef.current;
+    const previousPairs = new Map<string, number>();
+    for (let i = 0; i < images.length - 1; i++) {
+      previousPairs.set(`${images[i].id}:${images[i + 1].id}`, overlaps[i] ?? 0);
     }
+
+    const decodedImages = new Map<string, HTMLImageElement>();
+    const getDecoded = async (img: StitchedImage): Promise<HTMLImageElement> => {
+      const cached = decodedImages.get(img.id);
+      if (cached) return cached;
+      const element = await loadImage(img.src);
+      decodedImages.set(img.id, element);
+      return element;
+    };
+
+    const newOverlaps: number[] = [];
+    for (let i = 0; i < newImgs.length - 1; i++) {
+      const pair = `${newImgs[i].id}:${newImgs[i + 1].id}`;
+      if (previousPairs.has(pair)) {
+        newOverlaps.push(previousPairs.get(pair)!);
+        continue;
+      }
+
+      try {
+        const [first, second] = await Promise.all([
+          getDecoded(newImgs[i]),
+          getDecoded(newImgs[i + 1])
+        ]);
+        newOverlaps.push(detectOverlap(first, second));
+      } catch (error) {
+        console.error('Error calculating overlap', error);
+        newOverlaps.push(0);
+      }
+      if (sequence !== imageChangeSequenceRef.current) return;
+    }
+
+    if (sequence !== imageChangeSequenceRef.current) return;
+    commitState(newImgs, newOverlaps, annotations);
   };
 
   // --- Auto Stitching Logic ---
@@ -167,11 +180,12 @@ function App() {
     
     try {
       const newOverlaps: number[] = [];
+      let previousImage: HTMLImageElement | null = null;
       for (let i = 0; i < images.length - 1; i++) {
-        const imgA = await loadImage(images[i].src);
+        const imgA: HTMLImageElement = previousImage ?? await loadImage(images[i].src);
         const imgB = await loadImage(images[i + 1].src);
-        const detected = detectOverlap(imgA, imgB);
-        newOverlaps.push(detected);
+        newOverlaps.push(detectOverlap(imgA, imgB));
+        previousImage = imgB;
       }
       
       // Reset crops of all images when smart-stitching
@@ -351,8 +365,11 @@ function App() {
     if (content instanceof Blob) {
       if (isAndroidApp) {
         const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64 = (reader.result as string).split(',')[1];
+        reader.onerror = () => console.error("无法读取要保存的文件");
+        reader.onload = () => {
+          if (typeof reader.result !== 'string') return;
+          const base64 = reader.result.split(',')[1];
+          if (!base64) return;
           try {
             (window as any).AndroidApp.saveBase64File(base64, mimeType, filename);
           } catch (e) {
@@ -442,7 +459,7 @@ function App() {
 
   const handleDownloadZip = async () => {
     const canvas = canvasRef.current;
-    const sliceH = exportConfig.scale;
+    const sliceH = Math.floor(exportConfig.scale);
     if (!canvas || sliceH <= 0) return;
 
     const zip = new JSZip();
@@ -488,7 +505,7 @@ function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-dark-950 text-gray-100 font-sans">
+    <div className="flex flex-col h-dvh w-screen overflow-hidden bg-dark-950 text-gray-100 font-sans">
       {/* Header Bar */}
       <header className="shrink-0 bg-dark-900/80 border-b border-dark-800 backdrop-blur-md px-4 md:px-6 py-3 md:py-4 flex items-center justify-between z-10">
         <div className="flex items-center gap-3">

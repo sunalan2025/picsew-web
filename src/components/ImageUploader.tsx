@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Upload, X, ChevronUp, ChevronDown, Crop } from 'lucide-react';
 import type { StitchedImage } from '../types';
 
@@ -14,98 +14,128 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   onAutoStitchTrigger
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importingRef = useRef(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState('');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      addFiles(Array.from(e.target.files));
-    }
+    const files = Array.from(e.target.files ?? []);
+    // Allow choosing the same screenshot again after removing it.
+    e.target.value = '';
+    if (files.length) void addFiles(files);
   };
 
-  const addFiles = (files: File[]) => {
-    // SECURITY: Limit number of files to prevent DoS
-    let filesToProcess = files;
-    if (images.length + filesToProcess.length > 50) {
-      alert('最多只能添加 50 张图片 (Maximum 50 images allowed)');
-      filesToProcess = filesToProcess.slice(0, Math.max(0, 50 - images.length));
+  const addFiles = async (files: File[]) => {
+    if (importingRef.current) {
+      setUploadMessage('图片正在导入，请完成后再添加。');
+      return;
     }
+    importingRef.current = true;
+    setIsImporting(true);
+    setUploadMessage('');
 
-    // SECURITY: Limit file size to prevent memory exhaustion (50MB)
+    const skipped = { limit: 0, format: 0, size: 0, pixels: 0, failed: 0 };
     const MAX_FILE_SIZE = 50 * 1024 * 1024;
-    const validFiles = filesToProcess.filter(f => {
-      if (!f.type.startsWith('image/')) return false;
+    const MAX_PIXELS = 25_000_000;
+    const supportedTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+    const available = Math.max(0, 50 - images.length);
+    const filesToProcess = files.slice(0, available);
+    skipped.limit = files.length - filesToProcess.length;
+    const loaded: StitchedImage[] = [];
 
-      // SECURITY: Block SVGs to prevent potential XSS/XXE vectors when rendered
-      if (f.type.includes('svg') || f.name.toLowerCase().endsWith('.svg')) {
-        alert(`不支持 SVG 格式图片以防止安全风险 (SVG images are blocked for security)`);
-        return false;
-      }
+    try {
+      // Decode sequentially instead of allocating dozens of large images at once.
+      for (const file of filesToProcess) {
+        if (!supportedTypes.has(file.type) || file.name.toLowerCase().endsWith('.svg')) {
+          skipped.format++;
+          continue;
+        }
+        if (file.size > MAX_FILE_SIZE) {
+          skipped.size++;
+          continue;
+        }
 
-      if (f.size > MAX_FILE_SIZE) {
-        alert(`图片 ${f.name} 过大，最大允许 50MB (Image too large, max 50MB)`);
-        return false;
-      }
-      return true;
-    });
-    
-    const loadPromises = validFiles.map(file => {
-      return new Promise<StitchedImage | null>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const img = new Image();
-          img.onload = () => {
-            // SECURITY: Validate uncompressed pixel footprint to prevent Image Bomb / Pixel Flood OOM DoS
-            // A 10000x10000 image takes ~400MB uncompressed memory. Limit to ~25 Megapixels (e.g. 5000x5000)
-            const MAX_PIXELS = 25000000;
-            if (img.naturalWidth * img.naturalHeight > MAX_PIXELS) {
-              console.error(`Image ${file.name} dimensions too large, preventing memory exhaustion.`);
-              alert(`图片 ${file.name} 尺寸过大 (超过2500万像素)，已阻止加载以防止内存耗尽 (Image dimensions too large)`);
-              resolve(null);
-              return;
+        try {
+          const image = await new Promise<StitchedImage>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onerror = () => reject(new Error('read'));
+            reader.onabort = () => reject(new Error('read'));
+            reader.onload = () => {
+              const src = reader.result;
+              if (typeof src !== 'string' || !src.startsWith('data:image/')) {
+                reject(new Error('read'));
+                return;
+              }
+              const img = new Image();
+              img.onerror = () => reject(new Error('decode'));
+              img.onload = () => {
+                if (!img.naturalWidth || !img.naturalHeight ||
+                    img.naturalWidth * img.naturalHeight > MAX_PIXELS) {
+                  reject(new Error('pixels'));
+                  return;
+                }
+                resolve({
+                  id: crypto.randomUUID(),
+                  name: file.name,
+                  src,
+                  width: img.naturalWidth,
+                  height: img.naturalHeight,
+                  cropTop: 0,
+                  cropBottom: 0,
+                  cropLeft: 0,
+                  cropRight: 0
+                });
+              };
+              img.src = src;
+            };
+            try {
+              reader.readAsDataURL(file);
+            } catch {
+              reject(new Error('read'));
             }
-
-            resolve({
-              id: crypto.randomUUID(),
-              name: file.name,
-              src: event.target?.result as string,
-              width: img.naturalWidth,
-              height: img.naturalHeight,
-              cropTop: 0,
-              cropBottom: 0,
-              cropLeft: 0,
-              cropRight: 0
-            });
-          };
-          img.onerror = () => {
-            console.error(`Failed to load image: ${file.name}`);
-            resolve(null);
-          };
-          img.src = event.target?.result as string;
-        };
-        reader.onerror = () => {
-          console.error(`Failed to read file: ${file.name}`);
-          resolve(null);
-        };
-        reader.readAsDataURL(file);
-      });
-    });
-
-    Promise.all(loadPromises).then(results => {
-      const newImages = results.filter((img): img is StitchedImage => img !== null);
-      if (newImages.length > 0) {
-        onImagesChange([...images, ...newImages]);
+          });
+          loaded.push(image);
+        } catch (error) {
+          if (error instanceof Error && error.message === 'pixels') skipped.pixels++;
+          else skipped.failed++;
+        }
       }
-    });
+
+      if (loaded.length) await onImagesChange([...images, ...loaded]);
+      const warnings = [
+        skipped.limit && `超过 50 张上限 ${skipped.limit} 张`,
+        skipped.format && `格式不支持 ${skipped.format} 张`,
+        skipped.size && `超过 50 MB ${skipped.size} 张`,
+        skipped.pixels && `超过 2500 万像素 ${skipped.pixels} 张`,
+        skipped.failed && `读取失败 ${skipped.failed} 张`
+      ].filter(Boolean);
+      if (warnings.length) {
+        setUploadMessage(`已导入 ${loaded.length} 张；跳过：${warnings.join('、')}。`);
+      }
+    } catch (error) {
+      console.error('Image import failed', error);
+      setUploadMessage('图片导入失败，请重试。');
+    } finally {
+      importingRef.current = false;
+      setIsImporting(false);
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    if (!isImporting) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setIsDragging(false);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    if (e.dataTransfer.files) {
-      addFiles(Array.from(e.dataTransfer.files));
-    }
+    setIsDragging(false);
+    if (e.dataTransfer.files.length) void addFiles(Array.from(e.dataTransfer.files));
   };
 
   const removeImage = (id: string) => {
@@ -148,35 +178,46 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         role="button"
         tabIndex={0}
         onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
+        aria-disabled={isImporting}
+        onClick={() => { if (!isImporting) fileInputRef.current?.click(); }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            fileInputRef.current?.click();
+            if (!isImporting) fileInputRef.current?.click();
           }
         }}
-        className="border-2 border-dashed border-dark-700 hover:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none rounded-2xl p-6 mb-4 flex flex-col items-center justify-center cursor-pointer transition-colors duration-200 glass-card text-center"
+        className={`border-2 border-dashed focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none rounded-2xl p-6 mb-4 flex flex-col items-center justify-center transition-all duration-200 glass-card text-center ${isDragging ? 'border-primary-500 bg-primary-500/20 scale-[1.01]' : 'border-dark-700 hover:border-primary-500'} ${isImporting ? 'cursor-wait opacity-70' : 'cursor-pointer'}`}
       >
         <input
           type="file"
           ref={fileInputRef}
           onChange={handleFileChange}
           multiple
-          accept="image/png, image/jpeg, image/webp"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          disabled={isImporting}
           className="hidden"
         />
         <div className="p-3 bg-primary-500/10 rounded-full text-primary-300 mb-3">
           <Upload className="w-6 h-6" />
         </div>
-        <p className="text-sm font-medium text-gray-200">点击或将图片拖拽至此</p>
-        <p className="text-xs text-gray-400 mt-1">支持所有图片格式</p>
+        <p className="text-sm font-medium text-gray-200">
+          {isImporting ? '正在导入图片…' : isDragging ? '松开即可添加图片' : '点击或拖拽添加截图'}
+        </p>
+        <p className="text-xs text-gray-400 mt-1">PNG / JPEG / WebP / GIF · 最多 50 张</p>
       </div>
+      {uploadMessage && (
+        <p role="status" aria-live="polite" className="text-xs text-amber-300 mb-3 rounded-lg bg-amber-500/10 px-3 py-2">
+          {uploadMessage}
+        </p>
+      )}
 
       {/* Action panel */}
       {images.length > 1 && (
         <button
           onClick={onAutoStitchTrigger}
+          disabled={isImporting}
           className="w-full bg-linear-to-r from-primary-600 to-primary-400 hover:from-primary-700 hover:to-primary-500 text-white font-medium py-2.5 px-4 rounded-xl shadow-lg transition-all duration-200 mb-4 text-sm"
         >
           🚀 智能一键拼接
