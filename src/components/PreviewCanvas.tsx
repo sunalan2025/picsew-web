@@ -41,6 +41,7 @@ interface PreviewCanvasProps {
   onUndo: () => void;
   canUndo: boolean;
   onResetAll: () => void;
+  compact?: boolean;
 }
 
 const drawArrow = (
@@ -188,7 +189,8 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
   onDragEnd,
   onUndo,
   canUndo,
-  onResetAll
+  onResetAll,
+  compact = false
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -1013,8 +1015,18 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
 
   return (
     <div className="flex flex-col w-full h-full overflow-hidden">
-      {/* 1. Zoom View Controller Floating Bar */}
-      <div className="bg-dark-900/90 border border-dark-800/80 backdrop-blur-md px-4 py-2 rounded-2xl flex items-center justify-between shadow-sm mb-3 shrink-0 mx-auto w-auto max-w-full gap-2 select-none z-20">
+      {/* Compact output preview: only the zoom operations needed during cropping. */}
+      {compact && <div className="crop-preview-toolbar">
+        <span className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+          <span className="h-2 w-2 rounded-full bg-emerald-500"/> 实时画布
+        </span>
+        <div className="flex items-center gap-2 text-xs text-slate-600">
+          <button type="button" onClick={handleFitWidth} className="crop-preview-action">适宽</button>
+          <button type="button" onClick={handleFitHeight} className="crop-preview-action">全览</button>
+          <span className="font-mono">{Math.round(zoom * 100)}%</span>
+        </div>
+      </div>}
+      {!compact && <div className="bg-dark-900/90 border border-dark-800/80 backdrop-blur-md px-4 py-2 rounded-2xl flex items-center justify-between shadow-sm mb-3 shrink-0 mx-auto w-auto max-w-full gap-2 select-none z-20">
         <div className="flex items-center gap-1">
           <button
             onClick={handleZoomOut}
@@ -1088,15 +1100,15 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
             <span>重置清空</span>
           </button>
         </div>
-      </div>
+      </div>}
 
       {/* Helper text display */}
-      <div className="text-center text-[11px] text-gray-500 mb-2 font-medium">
+      {!compact && <div className="text-center text-[11px] text-gray-500 mb-2 font-medium">
         {activeTab === 'stitch' && '💡 提示：按住鼠标左键并在图片上【上下拖动】，可以直接调节相邻截图的重叠对齐。'}
         {activeTab === 'cut' && (selectedTool === 'cut-horizontal' || selectedTool === 'cut-vertical' 
           ? '💡 提示：在图片需要切割的位置【点击一下】插入分割线。' 
           : '💡 提示：在分割切片中【按住上下拖拽】，可以直接调节上下裁剪。')}
-      </div>
+      </div>}
 
       {/* 2. Main Scrollable Viewport (CSS Centering Scroll cutoff Fix) */}
       <div

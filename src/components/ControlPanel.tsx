@@ -336,9 +336,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             {/* 2. Cut Tab */}
             {activeTab === 'cut' && (
               <div className="space-y-4">
-                <details className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <summary className="cursor-pointer text-xs font-semibold text-slate-600">
-                    高级：分割图片（可选）
+                <details open className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <summary className="cursor-pointer text-xs font-semibold text-slate-600">图片分割操作
                   </summary>
                   <div className="mt-3 space-y-4">
                 <div className="bg-primary-500/10 border border-primary-500/20 p-3 rounded-xl text-xs text-primary-200 space-y-2">

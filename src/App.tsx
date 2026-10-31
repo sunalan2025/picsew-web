@@ -32,6 +32,7 @@ function App() {
   // Images/Slices list
   const [images, setImages] = useState<StitchedImage[]>([]);
   const [cropSelectedId, setCropSelectedId] = useState<string | null>(null);
+  const [advancedCutOpen, setAdvancedCutOpen] = useState(false);
   // Overlaps between adjacent slices
   const [overlaps, setOverlaps] = useState<number[]>([]);
   // A low-confidence join must be highlighted for review, never silently trimmed.
@@ -290,12 +291,14 @@ function App() {
       return;
     }
     setActiveTab(tab);
+    setAdvancedCutOpen(false);
     setPanelOpen(true);
     setSelectedTool(tab === 'markup' ? 'pen' : 'select');
   };
 
   const closePanel = () => {
     setPanelOpen(false);
+    setAdvancedCutOpen(false);
     // Leaving annotation mode must not keep the pen active.
     setActiveTab('stitch');
     setSelectedTool('select');
@@ -707,7 +710,7 @@ function App() {
     : currentGroup === 'cut' ? '裁剪与标注'
     : currentGroup === 'mockup' ? '外观美化' : '保存与分享';
 
-  const cropMode = panelOpen && activeTab === 'cut';
+  const cropMode = panelOpen && activeTab === 'cut' && !advancedCutOpen;
   const previewCanvas = (
     <PreviewCanvas
                 images={images}
@@ -721,6 +724,7 @@ function App() {
                 onAddAnnotation={handleAddAnnotation}
                 selectedTool={selectedTool}
                 activeTab={cropMode ? 'view' : panelOpen ? activeTab : 'view'}
+      compact={cropMode}
                 color={color}
                 strokeWidth={strokeWidth}
                 fontSize={fontSize}
@@ -812,6 +816,8 @@ function App() {
                       className="crop-soft-btn px-3 py-2 text-xs font-semibold disabled:opacity-40">
                       撤销
                     </button>
+                    <button type="button" onClick={() => setAdvancedCutOpen(true)}
+                      className="crop-soft-btn px-3 py-2 text-xs font-semibold">高级分割</button>
                     <button type="button" onClick={closePanel}
                       className="crop-done-btn px-4 py-2.5 text-xs font-bold">
                       <Check className="h-4 w-4"/> 完成裁剪
@@ -880,8 +886,11 @@ function App() {
             <aside className="workspace-sheet absolute z-40 flex flex-col overflow-hidden" aria-label={toolName}>
               <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200/60 px-5 py-4">
                 <div>
-                  <h2 className="text-[17px] font-bold text-slate-900">{toolName}</h2>
-                  <p className="mt-1 text-[11px] text-slate-500">按需调整，完成后点击空白处返回画布</p>
+                  <h2 className="text-[17px] font-bold text-slate-900">{advancedCutOpen ? '高级图片分割' : toolName}</h2>
+                  {advancedCutOpen
+                    ? <button type="button" onClick={() => setAdvancedCutOpen(false)}
+                        className="mt-1 text-xs font-semibold text-blue-600">← 返回四边裁剪</button>
+                    : <p className="mt-1 text-[11px] text-slate-500">按需调整，完成后点击空白处返回画布</p>}
                 </div>
                 <button type="button" aria-label="关闭面板" onClick={closePanel} className="workspace-icon-button rounded-xl p-2">
                   <X className="h-4 w-4" />
