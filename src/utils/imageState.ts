@@ -35,3 +35,14 @@ export function clampCropValue(
   const maximum = Math.max(0, dimension - opposite - 10);
   return Math.min(maximum, Math.max(0, Number.isFinite(requested) ? Math.floor(requested) : 0));
 }
+
+/** Reorder safely by stable IDs instead of thumbnail array indices. */
+export function reorderImages(images: StitchedImage[], sourceId: string, targetId: string): StitchedImage[] {
+  const from = images.findIndex(image => image.id === sourceId);
+  const to = images.findIndex(image => image.id === targetId);
+  if (from < 0 || to < 0 || from === to) return images;
+  const changed = [...images];
+  const [item] = changed.splice(from, 1);
+  changed.splice(to, 0, item);
+  return changed;
+}

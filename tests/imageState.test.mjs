@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { restoreOriginalImages, clampCropValue } from '../src/utils/imageState.ts';
+import { restoreOriginalImages, clampCropValue, reorderImages } from '../src/utils/imageState.ts';
 
 const original = id => ({
   id, name: id, src: 'data:image/png;base64,AAAA', width: 400, height: 1000,
@@ -38,4 +38,14 @@ test('editing a crop edge only subtracts the opposite edge', () => {
   assert.equal(clampCropValue(img, 'cropRight', 390), 380);
   assert.equal(clampCropValue(img, 'cropTop', -20), 0);
   assert.equal(clampCropValue(img, 'cropLeft', Number.NaN), 0);
+});
+
+test('thumbnail drag reorder uses IDs and preserves source objects', () => {
+  const items = [original('a'), original('b'), original('c'), original('d')];
+  const changed = reorderImages(items, 'a', 'c');
+  assert.deepEqual(changed.map(x => x.id), ['b', 'c', 'a', 'd']);
+  assert.deepEqual(items.map(x => x.id), ['a', 'b', 'c', 'd']);
+  assert.equal(changed[2], items[0]);
+  assert.equal(reorderImages(items, 'missing', 'a'), items);
+  assert.equal(reorderImages(items, 'a', 'a'), items);
 });
