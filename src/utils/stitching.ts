@@ -98,21 +98,19 @@ export function analyzeOverlapSamples(
     return total / keep;
   };
 
+  // The source is already downsampled to at most 340 axis pixels.
+  // Search EVERY possible displacement: a coarse stride can completely miss
+  // the one correct offset in text-rich or JPEG-compressed screenshots,
+  // especially with fixed navigation bars. 340 candidates remain inexpensive.
   const candidates: SampleCandidate[] = [];
-  const stride = Math.max(1, Math.floor(maxOverlap / 95));
-  for (let v = minimum; v <= maxOverlap; v += stride) {
+  for (let v = minimum; v <= maxOverlap; v++) {
     candidates.push({ v, error: evaluate(v) });
   }
-  const bestCoarse = candidates.reduce((best, cur) => cur.error < best.error ? cur : best);
-  const refined: SampleCandidate[] = [...candidates];
-  for (let v = Math.max(minimum, bestCoarse.v - stride); v <= Math.min(maxOverlap, bestCoarse.v + stride); v++) {
-    if (v % stride !== minimum % stride) refined.push({ v, error: evaluate(v) });
-  }
-  refined.sort((x, y) => x.error - y.error);
-  const best = refined[0];
-  // Compare with non-neighbouring alternatives to catch repeated wallpaper,
-  // lists of identical rows, and "same screen" frames.
-  const runner = refined.find(x => Math.abs(x.v - best.v) >= 3);
+  candidates.sort((x, y) => x.error - y.error);
+  const best = candidates[0];
+  // Compare non-neighbouring alternatives; repeated wallpapers produce many
+  // similarly scored offsets and must NOT trigger destructive auto-cropping.
+  const runner = candidates.find(x => Math.abs(x.v - best.v) >= 3);
   const marginScore = runner ? runner.error - best.error : 255;
   const high = best.error <= 10 && marginScore >= 4;
   const medium = best.error <= 22 && marginScore >= 2.2;
