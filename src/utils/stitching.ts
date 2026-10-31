@@ -1,6 +1,9 @@
 /**
- * Seam detection for both vertical screenshots and horizontal photo strips.
- * Sources are decoded once by the caller; this function only samples a thin band.
+ * Image seam matcher (vertical or horizontal).
+ *
+ * Match downsampled edge bands; reject ambiguous low-texture content rather than
+ * silently deleting incorrect rows. Samples are centred on the cross axis so
+ * UI bars/side gutters have less influence than the scrolling article itself.
  */
 export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -13,125 +16,194 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 export type StitchAxis = 'vertical' | 'horizontal';
+export type MatchConfidence = 'high' | 'medium' | 'low';
+
+export interface OverlapMatch {
+  overlap: number;
+  confidence: MatchConfidence;
+  error: number;
+  /** Indicates a repeated pattern, a blank background, or a poor match. */
+  uncertain: boolean;
+}
 
 let cachedCanvasA: HTMLCanvasElement | null = null;
 let cachedCanvasB: HTMLCanvasElement | null = null;
 
-/** Pure pixel matcher, independently testable without the browser Canvas API. */
-export function findBestOverlapFromSamples(
-  a: Uint8ClampedArray,
-  b: Uint8ClampedArray,
-  sampleSpan: number,
-  maxOverlap: number,
-  axis: StitchAxis
-): number {
-  const minOverlap = 40;
-  if (maxOverlap < minOverlap || sampleSpan <= 0) return 0;
-  let bestOverlap = 0;
-  let bestScore = Infinity;
+interface SampleCandidate { v: number; error: number }
 
-  // For vertical: rows on the bottom of A match rows at the top of B.
-  // For horizontal: columns at the right of A match columns at the left of B.
-  for (let v = minOverlap; v <= maxOverlap; v += 2) {
-    let difference = 0;
-    let comparisons = 0;
-    if (axis === 'vertical') {
-      for (let row = 0; row < v; row += 2) {
-        const aOffset = (maxOverlap - v + row) * sampleSpan * 4;
-        const bOffset = row * sampleSpan * 4;
-        for (let x = 0; x < sampleSpan; x += 3) {
-          const ia = aOffset + x * 4;
-          const ib = bOffset + x * 4;
-          difference += Math.abs(a[ia] - b[ib])
-            + Math.abs(a[ia + 1] - b[ib + 1])
-            + Math.abs(a[ia + 2] - b[ib + 2]);
-          comparisons++;
-        }
-      }
-    } else {
-      for (let row = 0; row < sampleSpan; row += 3) {
-        const rowOffset = row * maxOverlap * 4;
-        for (let x = 0; x < v; x += 2) {
-          const ia = rowOffset + (maxOverlap - v + x) * 4;
-          const ib = rowOffset + x * 4;
-          difference += Math.abs(a[ia] - b[ib])
-            + Math.abs(a[ia + 1] - b[ib + 1])
-            + Math.abs(a[ia + 2] - b[ib + 2]);
-          comparisons++;
-        }
-      }
-    }
-    if (!comparisons) continue;
-    // Discourage tiny incidental matches.
-    const score = difference / comparisons + 50 / v;
-    if (score < bestScore) {
-      bestScore = score;
-      bestOverlap = v;
+/** Pure pixel matcher. Both buffers contain the final/initial edge band of size maxOverlap. */
+export function analyzeOverlapSamples(
+  a: Uint8ClampedArray, b: Uint8ClampedArray,
+  sampleSpan: number, maxOverlap: number, axis: StitchAxis,
+  scale = 1
+): OverlapMatch {
+  const empty: OverlapMatch = { overlap: 0, confidence: 'low', error: 255, uncertain: true };
+  const width = axis === 'vertical' ? sampleSpan : maxOverlap;
+  const height = axis === 'vertical' ? maxOverlap : sampleSpan;
+  if (!Number.isFinite(scale) || scale <= 0 ||
+      !Number.isInteger(width) || !Number.isInteger(height) ||
+      width < 8 || height < 8 || a.length !== width * height * 4 || b.length !== a.length) {
+    return empty;
+  }
+
+  // Texture is crucial: a solid/monochrome screenshot has infinitely many
+  // mathematically identical seams, so it should never be cropped automatically.
+  let texture = 0;
+  let textureCount = 0;
+  for (let row = 2; row < height - 1; row += 4) {
+    for (let col = 2; col < width - 1; col += 4) {
+      const p = (row * width + col) * 4;
+      const neighbor = axis === 'vertical' ? p - width * 4 : p - 4;
+      texture += Math.abs(a[p] - a[neighbor]) +
+        Math.abs(a[p + 1] - a[neighbor + 1]) +
+        Math.abs(a[p + 2] - a[neighbor + 2]);
+      textureCount++;
     }
   }
-  return bestScore <= 40 ? bestOverlap : 0;
+  if (!textureCount || texture / (textureCount * 3) < 3.4) return empty;
+
+  const minimum = Math.max(5, Math.ceil(40 / scale));
+  if (maxOverlap < minimum) return empty;
+
+  const evaluate = (v: number): number => {
+    const margin = Math.floor(v * 0.075);
+    const from = margin;
+    const to = v - margin;
+    const stepAxis = Math.max(1, Math.floor((to - from) / 62));
+    const rowErrors: number[] = [];
+    for (let k = from; k < to; k += stepAxis) {
+      let sum = 0;
+      let count = 0;
+      for (let orth = 2; orth < sampleSpan - 2; orth += 2) {
+        const ia = axis === 'vertical'
+          ? ((maxOverlap - v + k) * sampleSpan + orth) * 4
+          : (orth * maxOverlap + (maxOverlap - v + k)) * 4;
+        const ib = axis === 'vertical'
+          ? (k * sampleSpan + orth) * 4
+          : (orth * maxOverlap + k) * 4;
+        sum += Math.abs(a[ia] - b[ib]) +
+          Math.abs(a[ia + 1] - b[ib + 1]) +
+          Math.abs(a[ia + 2] - b[ib + 2]);
+        count++;
+      }
+      if (count) rowErrors.push(sum / (3 * count));
+    }
+    if (!rowErrors.length) return 255;
+    // Ignore the worst 12% of rows. Screen-recording clocks, sticky
+    // headers, and dynamic footers often disagree while body text matches.
+    rowErrors.sort((x, y) => x - y);
+    const keep = Math.max(1, Math.ceil(rowErrors.length * 0.88));
+    let total = 0;
+    for (let i = 0; i < keep; i++) total += rowErrors[i];
+    return total / keep;
+  };
+
+  const candidates: SampleCandidate[] = [];
+  const stride = Math.max(1, Math.floor(maxOverlap / 95));
+  for (let v = minimum; v <= maxOverlap; v += stride) {
+    candidates.push({ v, error: evaluate(v) });
+  }
+  const bestCoarse = candidates.reduce((best, cur) => cur.error < best.error ? cur : best);
+  const refined: SampleCandidate[] = [...candidates];
+  for (let v = Math.max(minimum, bestCoarse.v - stride); v <= Math.min(maxOverlap, bestCoarse.v + stride); v++) {
+    if (v % stride !== minimum % stride) refined.push({ v, error: evaluate(v) });
+  }
+  refined.sort((x, y) => x.error - y.error);
+  const best = refined[0];
+  // Compare with non-neighbouring alternatives to catch repeated wallpaper,
+  // lists of identical rows, and "same screen" frames.
+  const runner = refined.find(x => Math.abs(x.v - best.v) >= 3);
+  const marginScore = runner ? runner.error - best.error : 255;
+  const high = best.error <= 10 && marginScore >= 4;
+  const medium = best.error <= 22 && marginScore >= 2.2;
+  if (!high && !medium) return { ...empty, error: best.error };
+
+  return {
+    overlap: Math.round(best.v * scale),
+    confidence: high ? 'high' : 'medium',
+    error: best.error,
+    uncertain: false
+  };
 }
 
-export function detectOverlap(
-  img1: HTMLImageElement | CanvasImageSource,
-  img2: HTMLImageElement | CanvasImageSource,
+/** Compatibility API used by the pre-existing UI and unit tests. */
+export function findBestOverlapFromSamples(
+  a: Uint8ClampedArray, b: Uint8ClampedArray,
+  sampleSpan: number, maxOverlap: number, axis: StitchAxis
+): number {
+  return analyzeOverlapSamples(a, b, sampleSpan, maxOverlap, axis).overlap;
+}
+
+export function detectOverlapDetailed(
+  img1: CanvasImageSource,
+  img2: CanvasImageSource,
   maxOverlapRatio = 1,
   axis: StitchAxis = 'vertical'
-): number {
-  const dimensions = (img: HTMLImageElement | CanvasImageSource) => {
-    const el = img as HTMLImageElement;
-    return {
-      width: el.naturalWidth || (img as HTMLCanvasElement).width || 0,
-      height: el.naturalHeight || (img as HTMLCanvasElement).height || 0
-    };
+): OverlapMatch {
+  const empty: OverlapMatch = { overlap: 0, confidence: 'low', error: 255, uncertain: true };
+  const dimensions = (source: CanvasImageSource) => {
+    const image = source as HTMLImageElement;
+    const canvas = source as HTMLCanvasElement;
+    return { width: image.naturalWidth || canvas.width || 0, height: image.naturalHeight || canvas.height || 0 };
   };
   const first = dimensions(img1);
   const second = dimensions(img2);
   const isVertical = axis === 'vertical';
-  const axis1 = isVertical ? first.height : first.width;
-  const axis2 = isVertical ? second.height : second.width;
-  const orthogonal1 = isVertical ? first.width : first.height;
-  const orthogonal2 = isVertical ? second.width : second.height;
-  if (!axis1 || !axis2 || !orthogonal1 || !orthogonal2) return 0;
-
-  const maxOverlap = Math.min(
-    axis1, axis2, 600,
-    Math.floor(axis1 * maxOverlapRatio), Math.floor(axis2 * maxOverlapRatio)
-  );
-  const sampleSpan = Math.min(120, orthogonal1, orthogonal2);
-  if (maxOverlap < 40 || sampleSpan < 1) return 0;
-
+  const alongA = isVertical ? first.height : first.width;
+  const alongB = isVertical ? second.height : second.width;
+  const acrossA = isVertical ? first.width : first.height;
+  const acrossB = isVertical ? second.width : second.height;
+  if (!alongA || !alongB || acrossA < 8 || acrossB < 8) return empty;
+  // Previous implementation capped this at 600 pixels. Typical 2K-tall
+  // screen recordings may have >1500 pixels of genuine overlap.
+  const maxOverlap = Math.min(3600, Math.floor(alongA * 0.97),
+    Math.floor(alongB * 0.97), Math.floor(Math.min(alongA, alongB) * maxOverlapRatio));
+  if (maxOverlap < 40) return empty;
+  const axisPixels = Math.min(340, maxOverlap);
+  const sampleSpan = Math.min(96, acrossA, acrossB);
+  const scale = maxOverlap / axisPixels;
   if (!cachedCanvasA) cachedCanvasA = document.createElement('canvas');
   if (!cachedCanvasB) cachedCanvasB = document.createElement('canvas');
-  const canvasA = cachedCanvasA;
-  const canvasB = cachedCanvasB;
-  const w = isVertical ? sampleSpan : maxOverlap;
-  const h = isVertical ? maxOverlap : sampleSpan;
-  for (const canvas of [canvasA, canvasB]) {
-    if (canvas.width !== w) canvas.width = w;
-    if (canvas.height !== h) canvas.height = h;
+  const a = cachedCanvasA;
+  const b = cachedCanvasB;
+  const width = isVertical ? sampleSpan : axisPixels;
+  const height = isVertical ? axisPixels : sampleSpan;
+  for (const canvas of [a, b]) {
+    if (canvas.width !== width) canvas.width = width;
+    if (canvas.height !== height) canvas.height = height;
   }
-  const contextA = canvasA.getContext('2d', { willReadFrequently: true });
-  const contextB = canvasB.getContext('2d', { willReadFrequently: true });
-  if (!contextA || !contextB) return 0;
-  contextA.clearRect(0, 0, w, h);
-  contextB.clearRect(0, 0, w, h);
-
+  const ctxA = a.getContext('2d', { willReadFrequently: true });
+  const ctxB = b.getContext('2d', { willReadFrequently: true });
+  if (!ctxA || !ctxB) return empty;
+  ctxA.clearRect(0, 0, width, height);
+  ctxB.clearRect(0, 0, width, height);
+  // Both samples have the SAME dimension, regardless of original image size.
+  // Sample the central 80% of the orthogonal axis to avoid navigation rails.
+  const crossA = Math.max(1, Math.floor(acrossA * 0.8));
+  const crossB = Math.max(1, Math.floor(acrossB * 0.8));
   if (isVertical) {
-    const sourceXA = Math.floor((first.width - sampleSpan) / 2);
-    const sourceXB = Math.floor((second.width - sampleSpan) / 2);
-    contextA.drawImage(img1, sourceXA, first.height - maxOverlap, sampleSpan, maxOverlap, 0, 0, w, h);
-    contextB.drawImage(img2, sourceXB, 0, sampleSpan, maxOverlap, 0, 0, w, h);
+    ctxA.drawImage(img1, (acrossA - crossA) / 2, alongA - maxOverlap,
+      crossA, maxOverlap, 0, 0, width, height);
+    ctxB.drawImage(img2, (acrossB - crossB) / 2, 0,
+      crossB, maxOverlap, 0, 0, width, height);
   } else {
-    const sourceYA = Math.floor((first.height - sampleSpan) / 2);
-    const sourceYB = Math.floor((second.height - sampleSpan) / 2);
-    contextA.drawImage(img1, first.width - maxOverlap, sourceYA, maxOverlap, sampleSpan, 0, 0, w, h);
-    contextB.drawImage(img2, 0, sourceYB, maxOverlap, sampleSpan, 0, 0, w, h);
+    ctxA.drawImage(img1, alongA - maxOverlap, (acrossA - crossA) / 2,
+      maxOverlap, crossA, 0, 0, width, height);
+    ctxB.drawImage(img2, 0, (acrossB - crossB) / 2,
+      maxOverlap, crossB, 0, 0, width, height);
   }
-
-  return findBestOverlapFromSamples(
-    contextA.getImageData(0, 0, w, h).data,
-    contextB.getImageData(0, 0, w, h).data,
-    sampleSpan, maxOverlap, axis
+  return analyzeOverlapSamples(
+    ctxA.getImageData(0, 0, width, height).data,
+    ctxB.getImageData(0, 0, width, height).data,
+    sampleSpan, axisPixels, axis, scale
   );
+}
+
+export function detectOverlap(
+  img1: CanvasImageSource,
+  img2: CanvasImageSource,
+  maxOverlapRatio = 1,
+  axis: StitchAxis = 'vertical'
+): number {
+  return detectOverlapDetailed(img1, img2, maxOverlapRatio, axis).overlap;
 }
