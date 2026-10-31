@@ -288,3 +288,29 @@ button:disabled { cursor: not-allowed; }
 .crop-preview-action:hover {background:#e2edff;}
 @media(max-width:830px){.crop-preview-toolbar{padding:5px 8px;margin-bottom:4px;}
   .crop-preview-action{padding:4px 6px;}}
+
+/* Crop Studio refinement: uncluttered professional editor with a persistent
+   result instead of a modal obscuring the drawing. All surfaces stay scrollable. */
+.crop-studio-shell {background:#f4f6fa; padding:12px 16px 88px;}
+.crop-studio-heading {padding:4px 5px 2px;}
+.crop-studio-grid {grid-template-columns:minmax(340px,.95fr) minmax(0,1.25fr);gap:12px;}
+.crop-studio-panel {border-radius:18px;border-color:#e2e8f0;box-shadow:0 3px 18px rgba(15,23,42,.055);}
+.crop-studio-editor-pane {scrollbar-gutter:auto;}
+.crop-original-stage {overflow:auto;min-height:250px;}
+.crop-result-canvas {overflow:auto;background:repeating-conic-gradient(#f1f4f9 0% 25%,#e8edf5 0% 50%) 50% / 20px 20px;}
+.crop-live-indicator {background:#e8f8ef;color:#16734f;}
+.crop-drag-handle {transition:background .14s ease,box-shadow .14s ease;}
+.crop-drag-handle:hover,.crop-drag-handle:focus-visible {background:#145fe5;box-shadow:0 0 0 5px rgba(37,99,235,.14);}
+@media(max-width:900px) {
+  .crop-studio-grid {grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(310px,1.3fr) minmax(210px,.8fr);}
+  .crop-studio-shell {padding:8px 8px 86px;}
+  .crop-studio-heading {gap:6px;}
+  .crop-studio-editor-pane .crop-original-stage {min-height:165px;}
+}
+@media(max-width:520px) {
+  .crop-studio-heading .crop-studio-eyebrow,.crop-studio-heading p {display:none;}
+  .crop-studio-heading h2 {font-size:16px;}
+  .crop-studio-heading .crop-soft-btn {display:none;}
+  .crop-studio-heading .crop-done-btn {padding:9px 12px;}
+  .crop-studio-grid {grid-template-rows:minmax(280px,1.35fr) minmax(180px,.8fr);}
+}

@@ -94,10 +94,10 @@ export function ImageCropEditor({ images, selectedId, onSelect, onChange, onComm
 
     <div className="crop-original-stage flex min-h-0 flex-1 items-center justify-center overflow-auto rounded-2xl p-3 md:p-5">
       <div className="relative shrink-0" ref={box}
-        style={{ width: Math.min(520, 520 * image.width / image.height) + 'px',
-          maxWidth: '100%', aspectRatio: image.width + ' / ' + image.height }}>
+        style={{ width: 'min(100%, 380px)', maxHeight: 'min(52dvh, 540px)',
+          aspectRatio: image.width + ' / ' + image.height }}>
         <img src={image.src} alt={'正在裁剪的第 ' + (idx+1) + ' 张原图'}
-          draggable={false} className="absolute inset-0 h-full w-full select-none"/>
+          draggable={false} className="absolute inset-0 h-full w-full select-none" style={{objectFit:'fill'}}/>
         <div className="pointer-events-none absolute border-2 border-blue-500"
           style={{top: fraction.top + '%', bottom: fraction.bottom + '%',
             left: fraction.left + '%', right: fraction.right + '%',
