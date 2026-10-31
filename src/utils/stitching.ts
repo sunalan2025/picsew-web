@@ -206,3 +206,22 @@ export function detectOverlap(
 ): number {
   return detectOverlapDetailed(img1, img2, maxOverlapRatio, axis).overlap;
 }
+
+/** Return just the user's visible crop. Automatic stitching must match the
+ * same pixels that the preview/export renders, not the uncropped originals. */
+export function visibleImageSource(
+  source: HTMLImageElement,
+  crop: {cropTop:number;cropBottom:number;cropLeft:number;cropRight:number}
+): CanvasImageSource {
+  const width = source.naturalWidth - crop.cropLeft - crop.cropRight;
+  const height = source.naturalHeight - crop.cropTop - crop.cropBottom;
+  if (!crop.cropTop && !crop.cropBottom && !crop.cropLeft && !crop.cropRight) return source;
+  if (width < 10 || height < 10) throw new Error('裁剪区域太小，无法自动对齐');
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('无法创建裁剪预览');
+  context.drawImage(source, crop.cropLeft, crop.cropTop, width, height, 0, 0, width, height);
+  return canvas;
+}

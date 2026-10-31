@@ -15,7 +15,7 @@ import type {
 import { ImageUploader } from './components/ImageUploader';
 import { ControlPanel } from './components/ControlPanel';
 import { PreviewCanvas } from './components/PreviewCanvas';
-import { detectOverlapDetailed, loadImage } from './utils/stitching';
+import { detectOverlapDetailed, loadImage, visibleImageSource } from './utils/stitching';
 import { clampCropValue, restoreOriginalImages } from './utils/imageState';
 import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
@@ -187,7 +187,9 @@ function App() {
           getDecoded(newImgs[i]),
           getDecoded(newImgs[i + 1])
         ]);
-        const match = detectOverlapDetailed(first, second, undefined, direction);
+        const match = detectOverlapDetailed(
+          visibleImageSource(first, newImgs[i]),
+          visibleImageSource(second, newImgs[i+1]), undefined, direction);
         newOverlaps.push(match.overlap);
         if (match.confidence !== 'high') newWarnings.push(i);
       } catch (error) {
@@ -212,6 +214,7 @@ function App() {
   // --- Auto Stitching Logic ---
   const handleAutoStitch = async () => {
     if (images.length < 2) return;
+    const sequence = ++imageChangeSequenceRef.current;
     setIsStitching(true);
     
     try {
@@ -221,12 +224,16 @@ function App() {
       for (let i = 0; i < images.length - 1; i++) {
         const imgA: HTMLImageElement = previousImage ?? await loadImage(images[i].src);
         const imgB = await loadImage(images[i + 1].src);
-        const match = detectOverlapDetailed(imgA, imgB, undefined, direction);
+        const match = detectOverlapDetailed(
+          visibleImageSource(imgA, images[i]),
+          visibleImageSource(imgB, images[i + 1]), undefined, direction);
+        if (imageChangeSequenceRef.current !== sequence) return;
         newOverlaps.push(match.overlap);
         if (match.confidence !== 'high') warnings.push(i);
         previousImage = imgB;
       }
       
+      if (imageChangeSequenceRef.current !== sequence) return;
       // Automatic alignment must not unexpectedly erase manual cropping.
       commitState(images, newOverlaps, annotations);
       setUncertainSeams(warnings);
@@ -235,12 +242,13 @@ function App() {
       console.error('Error during auto stitching', err);
       alert('自动拼接算法出错，请尝试拖动手动微调！');
     } finally {
-      setIsStitching(false);
+      if (imageChangeSequenceRef.current === sequence) setIsStitching(false);
     }
   };
 
   const handleDirectionChange = async (nextDirection: 'vertical' | 'horizontal') => {
     if (nextDirection === direction) return;
+    const sequence = ++imageChangeSequenceRef.current;
     setDirection(nextDirection);
     // Old seam values belong to a different axis; never reuse them.
     setOverlaps(Array(Math.max(0, images.length - 1)).fill(0));
@@ -254,17 +262,21 @@ function App() {
       for (let i = 0; i < images.length - 1; i++) {
         const first: HTMLImageElement = previous ?? await loadImage(images[i].src);
         const second = await loadImage(images[i + 1].src);
-        const match = detectOverlapDetailed(first, second, undefined, nextDirection);
+        const match = detectOverlapDetailed(
+          visibleImageSource(first, images[i]),
+          visibleImageSource(second, images[i + 1]), undefined, nextDirection);
+        if (imageChangeSequenceRef.current !== sequence) return;
         detected.push(match.overlap);
         if (match.confidence !== 'high') warnings.push(i);
         previous = second;
       }
+      if (imageChangeSequenceRef.current !== sequence) return;
       commitState(images, detected, annotations);
       setUncertainSeams(warnings);
     } catch (error) {
       console.error('Cannot recalculate overlap after switching direction', error);
     } finally {
-      setIsStitching(false);
+      if (imageChangeSequenceRef.current === sequence) setIsStitching(false);
     }
   };
 
@@ -702,6 +714,13 @@ function App() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {uncertainSeams.length > 0 && (
+            <button type="button" onClick={() => openTool('stitch')}
+              className="inline-flex items-center gap-1 rounded-xl bg-amber-50 border border-amber-200 px-2.5 py-2 text-xs font-semibold text-amber-800"
+              title="打开拼接面板，检查无法自动对齐的连接位置">
+              <AlertTriangle className="h-3.5 w-3.5" /> {uncertainSeams.length} 处待检查
+            </button>
+          )}
           {images.length > 0 && (
             <span className="workspace-count hidden items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold sm:flex">
               <Check className="h-3.5 w-3.5 text-emerald-600" />
@@ -746,13 +765,7 @@ function App() {
           </section>
         ) : (
           <>
-            <div className="workspace-stage-meta pointer-events-none absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium text-slate-500">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              {uncertainSeams.length > 0
-                ? `⚠ ${uncertainSeams.length} 处接缝待确认`
-                : '已准备好'} · {images.length} 张 · {direction === 'vertical' ? '纵向' : '横向'}
-            </div>
-            <section className="workspace-canvas min-h-0 flex-1 px-2 pb-25 pt-11 md:px-6 md:pb-25">
+            <section className="workspace-canvas min-h-0 flex-1 px-2 pb-25 pt-2 md:px-6 md:pb-25">
               <PreviewCanvas
                 images={images}
                 direction={direction}
@@ -778,15 +791,6 @@ function App() {
                 onResetAll={handleResetAll}
               />
             </section>
-            {uncertainSeams.length > 0 && !panelOpen && (
-              <button
-                type="button"
-                onClick={() => openTool('stitch')}
-                className="absolute left-1/2 top-12 z-20 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 shadow-sm"
-              >
-                <AlertTriangle className="h-4 w-4" /> {uncertainSeams.length} 处可能拼接错位 · 点击检查
-              </button>
-            )}
             {images.length > 1 && !panelOpen && (
               <button
                 type="button"

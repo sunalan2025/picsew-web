@@ -287,7 +287,10 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
                 {/* Only surface seams where alignment confidence is insufficient. */}
                 {uncertainSeams.length > 0 && (
-                  <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
+                  <details className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                    <summary className="cursor-pointer font-semibold">
+                      {uncertainSeams.length} 处匹配不确定 · 展开查看
+                    </summary>
                     <p className="font-bold">有 {uncertainSeams.length} 处接缝需要检查</p>
                     <p className="mt-1 leading-5">这些图片的内容相似或无法找到可靠的重叠位置。请检查对应连接点并手动微调，其他接缝无需操作。</p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -299,7 +302,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                         </button>
                       ))}
                     </div>
-                  </div>
+                  </details>
                 )}
 
                 {/* Manual overlaps */}
