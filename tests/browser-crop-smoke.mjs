@@ -104,6 +104,12 @@ try {
   assert.ok(narrowEditor && narrowResult, 'mobile crop and result should both exist');
   assert.ok(narrowEditor.y + narrowEditor.height <= narrowResult.y + 2,
     'mobile panels must stack without covering each other');
+  const cropStage = await page.locator('.crop-original-stage').boundingBox();
+  assert.ok(cropStage && cropStage.height >= 200,
+    'mobile source image must not collapse when the advanced numeric controls are expanded');
+  const bottomHandle = await page.getByRole('button',{name:'拖动裁剪底部'}).boundingBox();
+  assert.ok(bottomHandle && bottomHandle.y + bottomHandle.height <= narrowEditor.y + narrowEditor.height + 2,
+    'bottom crop handle must remain inside the visible mobile editor');
   await page.screenshot({ path: 'browser-crop-success.png', fullPage: false });
   console.log('PASS: crop workspace source handles, WYSIWYG live canvas, selection and mobile layout');
 } catch (error) {

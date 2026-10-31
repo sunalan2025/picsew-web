@@ -31,6 +31,12 @@ export function ImageCropEditor({ images, selectedId, onSelect, onChange, onComm
   if (!image) return <div className="p-6 text-sm text-slate-500">还没有可裁剪的截图。</div>;
 
   const rect = getCropRect(image);
+  // A tall phone screenshot must stay tall when additional controls expand.
+  // Compute a width from the height budget, retaining the original aspect.
+  const previewHeightBudget = window.innerWidth <= 830
+    ? Math.max(175, Math.min(220, Math.round(window.innerHeight * 0.24)))
+    : 520;
+  const previewWidth = Math.min(520, previewHeightBudget * image.width / image.height);
   const units = getCropFractions(image);
   const fraction = { top: units.top * 100, bottom: units.bottom * 100,
     left: units.left * 100, right: units.right * 100 };
@@ -94,7 +100,7 @@ export function ImageCropEditor({ images, selectedId, onSelect, onChange, onComm
 
     <div className="crop-original-stage flex min-h-0 flex-1 items-center justify-center overflow-auto rounded-2xl p-3 md:p-5">
       <div className="relative shrink-0" ref={box}
-        style={{ width: Math.min(520, 520 * image.width / image.height) + 'px',
+        style={{ width: previewWidth + 'px',
           maxWidth: '100%', aspectRatio: image.width + ' / ' + image.height }}>
         <img src={image.src} alt={'正在裁剪的第 ' + (idx+1) + ' 张原图'}
           draggable={false} className="absolute inset-0 h-full w-full select-none"/>
