@@ -116,6 +116,25 @@ try {
   await page.getByRole('button',{name:'在画布定位接缝 3'}).click();
   await page.waitForFunction(()=>document.querySelector('.workspace-canvas .overflow-auto')?.scrollTop>50);
 
+  // Regression: manual seam changes must be undoable, with a fixed slider limit.
+  const overlapControl = page.locator('#overlap-2');
+  const maxBefore = await overlapControl.getAttribute('max');
+  const originalOverlap = Number(await overlapControl.inputValue());
+  await overlapControl.focus();
+  await overlapControl.press('ArrowLeft');
+  await page.waitForFunction(value => Number(document.querySelector('#overlap-2')?.value) < value,
+    originalOverlap);
+  const updatedOverlap = Number(await overlapControl.inputValue());
+  assert.equal(await overlapControl.getAttribute('max'), maxBefore,
+    'overlap slider maximum should stay stable while adjusting');
+  await overlapControl.press('Tab');
+  await page.keyboard.press('Control+z');
+  await page.waitForFunction(value => Number(document.querySelector('#overlap-2')?.value) === value,
+    originalOverlap);
+  await page.keyboard.press('Control+Shift+z');
+  await page.waitForFunction(value => Number(document.querySelector('#overlap-2')?.value) === value,
+    updatedOverlap);
+
   await page.setViewportSize({width:390,height:844});
   // Start with a *different* tool: selecting the already active tool is an
   // intentional shortcut to close the inspector.
