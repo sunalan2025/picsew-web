@@ -687,7 +687,7 @@ function App() {
                 annotations={annotations}
                 onAddAnnotation={handleAddAnnotation}
                 selectedTool={selectedTool}
-                activeTab={activeTab}
+                activeTab={panelOpen ? activeTab : 'view'}
                 color={color}
                 strokeWidth={strokeWidth}
                 fontSize={fontSize}
