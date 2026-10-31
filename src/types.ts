@@ -90,3 +90,15 @@ export interface ExportConfig {
   scale: number; // Slice height in pixels; 0 disables ZIP slicing.
   pdfPageMode: 'single' | 'multi'; // single long page or split pages
 }
+
+
+/** Text watermark applied as the final image overlay. */
+export interface WatermarkConfig {
+  enabled: boolean;
+  text: string;
+  opacity: number;
+  angle: number;
+  size: number;
+  repeat: boolean;
+  color: string;
+}

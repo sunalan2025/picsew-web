@@ -6,6 +6,7 @@ import type {
   AnnotationType,
   StatusBarConfig,
   MockupConfig,
+  WatermarkConfig,
   ExportConfig,
   StitchedImage
 } from '../types';
@@ -47,6 +48,8 @@ interface ControlPanelProps {
   // Mockups
   mockup: MockupConfig;
   setMockup: (config: MockupConfig) => void;
+  watermark: WatermarkConfig;
+  setWatermark: (config: WatermarkConfig) => void;
 
   // Export
   exportConfig: ExportConfig;
@@ -95,6 +98,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   setStatusBar,
   mockup,
   setMockup,
+  watermark,
+  setWatermark,
   exportConfig,
   setExportConfig,
   onDownloadImage,
@@ -116,6 +121,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     { id: 'markup', label: '标注', icon: Type },
     { id: 'statusbar', label: '状态栏', icon: Battery },
     { id: 'mockup', label: '套壳', icon: Monitor },
+    { id: 'watermark', label: '水印', icon: Type },
     { id: 'export', label: '导出', icon: Download },
   ];
 
@@ -739,6 +745,69 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                       />
                     </div>
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* Watermark: advanced option inside the Beautify group. */}
+            {activeTab === 'watermark' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between rounded-xl border border-dark-700 bg-dark-800/40 p-3">
+                  <label htmlFor="watermark-enabled" className="text-sm font-semibold text-gray-300">添加文字水印</label>
+                  <input id="watermark-enabled" type="checkbox" checked={watermark.enabled}
+                    onChange={e => setWatermark({ ...watermark, enabled: e.target.checked })}
+                    className="h-4 w-4 accent-primary-500" />
+                </div>
+                {watermark.enabled && (
+                  <>
+                    <div className="space-y-2">
+                      <label htmlFor="watermark-text" className="text-xs font-semibold text-gray-400">水印内容</label>
+                      <input id="watermark-text" value={watermark.text} maxLength={100}
+                        onChange={e => setWatermark({ ...watermark, text: e.target.value })}
+                        className="w-full rounded-xl border border-dark-700 bg-dark-800 px-3 py-2.5 text-sm text-gray-200 outline-none focus:border-primary-500"
+                        placeholder="输入自己的水印文字" />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs font-semibold text-gray-400">
+                        <label htmlFor="watermark-opacity">透明度</label>
+                        <span>{Math.round(watermark.opacity * 100)}%</span>
+                      </div>
+                      <input id="watermark-opacity" type="range" min="0.05" max="0.8" step="0.05"
+                        value={watermark.opacity}
+                        onChange={e => setWatermark({ ...watermark, opacity: Number(e.target.value) })}
+                        className="w-full accent-primary-500" />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs font-semibold text-gray-400">
+                        <label htmlFor="watermark-size">文字大小</label><span>{watermark.size} px</span>
+                      </div>
+                      <input id="watermark-size" type="range" min="12" max="100" step="2"
+                        value={watermark.size}
+                        onChange={e => setWatermark({ ...watermark, size: Number(e.target.value) })}
+                        className="w-full accent-primary-500" />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs font-semibold text-gray-400">
+                        <label htmlFor="watermark-angle">倾斜角度</label><span>{watermark.angle}°</span>
+                      </div>
+                      <input id="watermark-angle" type="range" min="-60" max="60" step="5"
+                        value={watermark.angle}
+                        onChange={e => setWatermark({ ...watermark, angle: Number(e.target.value) })}
+                        className="w-full accent-primary-500" />
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl border border-dark-700 bg-dark-800/40 p-3">
+                      <label htmlFor="watermark-repeat" className="text-xs font-semibold text-gray-300">重复铺满画面</label>
+                      <input id="watermark-repeat" type="checkbox" checked={watermark.repeat}
+                        onChange={e => setWatermark({ ...watermark, repeat: e.target.checked })}
+                        className="h-4 w-4 accent-primary-500" />
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl border border-dark-700 bg-dark-800/40 p-3">
+                      <label htmlFor="watermark-color" className="text-xs font-semibold text-gray-300">文字颜色</label>
+                      <input id="watermark-color" type="color" value={watermark.color}
+                        onChange={e => setWatermark({ ...watermark, color: e.target.value })}
+                        className="h-8 w-12 cursor-pointer rounded-lg border border-dark-700" />
+                    </div>
+                  </>
                 )}
               </div>
             )}

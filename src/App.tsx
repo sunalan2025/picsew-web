@@ -9,7 +9,8 @@ import type {
   AnnotationType,
   StatusBarConfig,
   MockupConfig,
-  ExportConfig
+  ExportConfig,
+  WatermarkConfig
 } from './types';
 import { ImageUploader } from './components/ImageUploader';
 import { ControlPanel } from './components/ControlPanel';
@@ -62,6 +63,15 @@ function App() {
   const [history, setHistory] = useState<HistoryState[]>([{ images: [], overlaps: [], annotations: [] }]);
   const [historyIndex, setHistoryIndex] = useState<number>(0);
   const [copyStatus, setCopyStatus] = useState('');
+  const [watermark, setWatermark] = useState<WatermarkConfig>({
+    enabled: false,
+    text: 'Picsew Web',
+    opacity: 0.18,
+    angle: -25,
+    size: 36,
+    repeat: true,
+    color: '#1e3a8a'
+  });
 
   // Status Bar Overlays config
   const [statusBar, setStatusBar] = useState<StatusBarConfig>({
@@ -598,7 +608,7 @@ function App() {
     { id: 'export', label: '导出', icon: Download }
   ];
   const currentGroup = activeTab === 'cut' || activeTab === 'markup' ? 'cut'
-    : activeTab === 'statusbar' || activeTab === 'mockup' ? 'mockup' : activeTab;
+    : activeTab === 'statusbar' || activeTab === 'mockup' || activeTab === 'watermark' ? 'mockup' : activeTab;
   const toolName = currentGroup === 'upload' ? '素材管理'
     : currentGroup === 'stitch' ? '拼接与对齐'
     : currentGroup === 'cut' ? '裁剪与标注'
@@ -673,6 +683,7 @@ function App() {
                 overlaps={overlaps}
                 statusBar={statusBar}
                 mockup={mockup}
+                watermark={watermark}
                 annotations={annotations}
                 onAddAnnotation={handleAddAnnotation}
                 selectedTool={selectedTool}
@@ -731,7 +742,7 @@ function App() {
                 <div className="workspace-subtabs mx-4 mt-4 flex shrink-0 gap-1 rounded-xl p-1">
                   {(currentGroup === 'cut'
                     ? [{ id: 'cut', label: '裁剪' }, { id: 'markup', label: '标注与打码' }]
-                    : [{ id: 'mockup', label: '设备套壳' }, { id: 'statusbar', label: '状态栏' }]
+                    : [{ id: 'mockup', label: '设备套壳' }, { id: 'statusbar', label: '状态栏' }, { id: 'watermark', label: '文字水印' }]
                   ).map(item => (
                     <button
                       key={item.id}
@@ -774,6 +785,8 @@ function App() {
                   setStatusBar={setStatusBar}
                   mockup={mockup}
                   setMockup={setMockup}
+                  watermark={watermark}
+                  setWatermark={setWatermark}
                   exportConfig={exportConfig}
                   setExportConfig={setExportConfig}
                   onDownloadImage={handleDownloadImage}

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Upload, X, ChevronUp, ChevronDown, Crop } from 'lucide-react';
 import type { StitchedImage } from '../types';
 import { clampCropValue } from '../utils/imageState';
@@ -122,6 +122,23 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       setIsImporting(false);
     }
   };
+
+  // Paste screenshots directly from the clipboard while the import view is open.
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      const target = event.target;
+      if (target instanceof HTMLElement &&
+          target.closest('input, textarea, [contenteditable="true"]')) return;
+      const pasted = Array.from(event.clipboardData?.files ?? [])
+        .filter(file => file.type.startsWith('image/'));
+      if (pasted.length) {
+        event.preventDefault();
+        void addFiles(pasted);
+      }
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  });
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
