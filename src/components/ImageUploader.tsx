@@ -283,12 +283,13 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
               </div>
 
               {/* Crop Fine-Tuning (4 Borders) */}
-              <div className="bg-dark-900/60 p-2 rounded-lg mt-1 border border-dark-700/30">
-                <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium mb-1.5">
-                  <Crop className="w-3.5 h-3.5 text-primary-300" />
-                  <span>边缘裁剪 · px</span>
-                </div>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+              <details className="bg-dark-900/60 p-2 rounded-lg mt-1 border border-dark-700/30">
+                <summary className="flex cursor-pointer items-center gap-1.5 text-xs text-gray-400 font-medium">
+                  <Crop className="w-3.5 h-3.5 text-primary-400" />
+                  <span>微调裁剪</span>
+                  <span className="ml-auto text-[10px] opacity-60">展开</span>
+                </summary>
+                <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
                   <div>
                     <label htmlFor={`cropTop-${img.id}`} className="text-[10px] text-gray-500 font-medium">顶部</label>
                     <input
@@ -330,7 +331,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     />
                   </div>
                 </div>
-              </div>
+              </details>
             </div>
           ))
         )}

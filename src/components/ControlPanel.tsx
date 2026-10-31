@@ -12,6 +12,7 @@ import type {
 import { ImageUploader } from './ImageUploader';
 
 interface ControlPanelProps {
+  hideTabNavigation?: boolean;
   activeTab: string;
   setActiveTab: (tab: string) => void;
   
@@ -67,6 +68,7 @@ interface ControlPanelProps {
 }
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({
+  hideTabNavigation = false,
   activeTab,
   setActiveTab,
   direction,
@@ -135,8 +137,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Navigation tabs */}
-      <div
+      {/* Navigation tabs: hidden in the streamlined workspace; dock controls them. */}
+      {!hideTabNavigation && <div
         role="tablist"
         aria-label="控制面板标签"
         className="flex border-b border-dark-700/80 p-1 bg-dark-900/60 shrink-0 overflow-x-auto"
@@ -171,24 +173,25 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             </button>
           );
         })}
-      </div>
+      </div>}
 
       {/* Tab Panels */}
       <div
         role="tabpanel"
         id={`panel-${activeTab}`}
-        aria-labelledby={`tab-${activeTab}`}
+        aria-labelledby={hideTabNavigation ? undefined : `tab-${activeTab}`}
+        aria-label={hideTabNavigation ? '当前工具设置' : undefined}
         className="flex-1 overflow-y-auto p-4 space-y-5"
       >
         {!hasImages && activeTab !== 'upload' && (
           <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 text-xs py-10">
             <ShieldAlert className="w-8 h-8 text-gray-600 mb-2" />
-            <p>{isMobile ? '请先切换到“素材”卡片上传截图' : '请先在左侧上传截图以开始编辑'}</p>
+            <p>{isMobile ? '请先切换到“素材”卡片上传截图' : '请先在素材页添加截图'}</p>
           </div>
         )}
 
         {/* 0. Upload Tab (Mobile Only) */}
-        {isMobile && activeTab === 'upload' && images && onImagesChange && (
+        {activeTab === 'upload' && images && onImagesChange && (
           <div className="h-full flex flex-col min-h-0">
             <ImageUploader
               images={images}
@@ -239,7 +242,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 {/* Gap */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-xs font-bold text-gray-400">
-                    <label htmlFor="stitch-gap" className="cursor-pointer">接缝间距 (Gap)</label>
+                    <label htmlFor="stitch-gap" className="cursor-pointer">接缝间距</label>
                     <span className="text-primary-300 font-mono">{gap} px</span>
                   </div>
                   <input
@@ -260,13 +263,13 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                       onClick={onAutoStitchTrigger}
                       className="w-full bg-linear-to-r from-primary-600 to-primary-400 hover:from-primary-700 hover:to-primary-500 text-white font-medium py-2 px-3 rounded-lg shadow-sm transition-all duration-200 text-xs flex items-center justify-center gap-1"
                     >
-                      ✨ 智能自动对齐 (Auto Align)
+                      ✨ 重新智能对齐
                     </button>
                   </div>
                 )}
 
                 {/* Manual overlaps */}
-                {overlaps.length > 0 && direction === 'vertical' && (
+                {overlaps.length > 0 && (
                   <div className="space-y-3 pt-2">
                     <label className="text-xs font-bold text-gray-400 block border-b border-dark-700/40 pb-1">
                       接缝重叠微调 (Overlap Fine-Tuning)
@@ -276,7 +279,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                         <div key={idx} className="space-y-1.5 bg-dark-850 p-2.5 rounded-lg border border-dark-700/35">
                           <div className="flex justify-between items-center text-[11px]">
                             <label htmlFor={`overlap-${idx}`} className="text-gray-400 font-medium truncate max-w-[170px] cursor-pointer">
-                              连接点 {idx + 1}: {imageNames[idx]} ⬇️ {imageNames[idx + 1]}
+                              连接点 {idx + 1}: {imageNames[idx]} {direction === 'vertical' ? '↓' : '→'} {imageNames[idx + 1]}
                             </label>
                             <span className="text-primary-300 font-mono font-bold">{val} px</span>
                           </div>

@@ -2,25 +2,28 @@
 
 /* Custom theme enhancements */
 @theme {
-  --color-primary-50: #f5f3ff;
-  --color-primary-100: #ede9fe;
-  --color-primary-200: #ddd6fe;
-  --color-primary-300: #c084fc;
-  --color-primary-400: #a855f7;
-  --color-primary-500: #8b5cf6;
-  --color-primary-600: #7c3aed;
-  --color-primary-700: #6d28d9;
-  --color-primary-800: #5b21b6;
-  --color-primary-900: #4c1d95;
-  --color-dark-950: #0a0a0c;
-  --color-dark-900: #121216;
-  --color-dark-800: #1c1c24;
-  --color-dark-700: #2d2d3d;
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #60a5fa;
+  --color-primary-400: #3b82f6;
+  --color-primary-500: #2563eb;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+  --color-dark-950: #f5f8fd;
+  --color-dark-900: #ffffff;
+  --color-dark-850: #f8fafd;
+  --color-dark-805: #f1f5fa;
+  --color-dark-800: #edf2f9;
+  --color-dark-750: #dae3ef;
+  --color-dark-700: #d7e0ec;
 }
 
 body {
-  background-color: var(--color-dark-950);
-  color: #f3f4f6;
+  background-color: #f4f8fd;
+  color: #263245;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   overflow: hidden;
   margin: 0;
@@ -31,17 +34,17 @@ body {
 
 /* Glassmorphism utility */
 .glass-panel {
-  background: rgba(28, 28, 36, 0.7);
+  background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(192, 208, 230, 0.65);
 }
 
 .glass-card {
-  background: rgba(45, 45, 61, 0.4);
+  background: rgba(247, 250, 255, 0.86);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(204, 217, 235, 0.85);
 }
 
 /* Custom Scrollbar */
@@ -70,7 +73,7 @@ body {
 }
 
 /* Reliable keyboard navigation, mobile viewport and motion preferences. */
-:root { color-scheme: dark; }
+:root { color-scheme: light; }
 button:focus-visible, input:focus-visible, [role="button"]:focus-visible {
   outline: 2px solid var(--color-primary-400);
   outline-offset: 2px;
@@ -83,3 +86,114 @@ button:disabled { cursor: not-allowed; }
     scroll-behavior: auto !important;
   }
 }
+
+/* Single-canvas workspace: the tool dock and panel overlay never shrink the preview. */
+.workspace-app {
+  color: #29394e;
+  background: linear-gradient(155deg, #f9fcff 2%, #f1f6ff 55%, #eaf1fa 100%);
+}
+.workspace-header {
+  background: rgba(255,255,255,.78);
+  border-bottom: 1px solid rgba(181,199,223,.48);
+  backdrop-filter: blur(22px) saturate(1.4);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+}
+.workspace-brand {
+  background: linear-gradient(135deg, #60a5fa, #2563eb 60%, #1d4ed8);
+  box-shadow: 0 8px 20px rgba(37,99,235,.18);
+}
+.workspace-count { background: #f0f6ff; border: 1px solid #dce7f7; }
+.workspace-top-button, .workspace-icon-button {
+  color: #354b68; background: rgba(255,255,255,.9); border: 1px solid #dbe5f2;
+  transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+.workspace-top-button:hover, .workspace-icon-button:hover { background: #f0f6ff; }
+.workspace-primary {
+  background: linear-gradient(135deg,#3b82f6,#2563eb);
+  box-shadow: 0 6px 16px rgba(37,99,235,.22);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.workspace-primary:not(:disabled):hover { transform: translateY(-1px); box-shadow: 0 9px 22px rgba(37,99,235,.28); }
+.workspace-main {
+  background: radial-gradient(ellipse at 15% 10%, rgba(154,194,255,.23), transparent 48%),
+  radial-gradient(ellipse at 90% 92%, rgba(186,221,255,.21),transparent 42%);
+}
+.workspace-welcome-icon {
+  background: linear-gradient(145deg, #fff, #dcecff);
+  border: 1px solid rgba(120,168,231,.25);
+  box-shadow: 0 16px 45px rgba(68,116,186,.13);
+}
+.workspace-import-card, .workspace-sheet {
+  background: rgba(255,255,255,.91);
+  border: 1px solid rgba(195,210,232,.78);
+  box-shadow: 0 22px 65px rgba(56,82,121,.13), 0 2px 8px rgba(56,82,121,.04);
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+}
+.workspace-import-card .flex-1.overflow-y-auto { display:none; }
+.workspace-import-card .border-dashed { margin-bottom:0; }
+.workspace-stage-meta { background:rgba(255,255,255,.9); border:1px solid #e3eaf4; }
+.workspace-auto { background:rgba(255,255,255,.94); border:1px solid #dbe7f8; }
+.workspace-auto:hover { background:#eaf3ff; }
+.workspace-processing { background: rgba(247,250,255,.78); backdrop-filter:blur(10px); }
+.workspace-backdrop { background:rgba(92,122,157,.08); cursor:default; }
+.workspace-sheet {
+  top: 12px; right: 16px; bottom: 102px; width: min(380px, calc(100% - 32px));
+  border-radius:24px;
+  animation: sheet-in .24s cubic-bezier(.2,.8,.2,1);
+}
+.workspace-sheet-footer { border-top:1px solid rgba(201,216,235,.5); }
+.workspace-dock {
+  background:rgba(255,255,255,.90);
+  border:1px solid rgba(194,212,234,.87);
+  box-shadow:0 12px 32px rgba(53,83,131,.17), 0 2px 6px rgba(53,83,131,.05);
+  backdrop-filter: blur(26px) saturate(1.5);
+  -webkit-backdrop-filter: blur(26px) saturate(1.5);
+}
+.workspace-dock-item {
+  min-width:68px; min-height:58px; padding:8px 13px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+  color:#687991; border-radius:16px; font-size:11px; font-weight:600;
+  transition:color .18s ease, background .18s ease, transform .18s ease;
+}
+.workspace-dock-item:hover { background:#f1f6fd; color:#315c96; }
+.workspace-dock-item.active { background:#e8f1ff; color:#2563eb; }
+.workspace-subtabs { background:#eef3f9; }
+.workspace-subtab { flex:1; border-radius:9px; padding:9px 10px; font-size:12px; font-weight:600; color:#63738a; }
+.workspace-subtab.active { color:#1f5abd; background:white; box-shadow:0 2px 8px rgba(84,112,152,.1); }
+.workspace-app .text-gray-200 { color:#34435a; }
+.workspace-app .text-gray-300 { color:#45566e; }
+.workspace-app .text-gray-400 { color:#66758a; }
+.workspace-app .text-gray-500 { color:#76849a; }
+.workspace-app .text-gray-600 { color:#8593a8; }
+.workspace-app .hover\\:text-white:hover { color:#1d4ed8; }
+.workspace-app .border-dashed { border-color:#bfd2ef; }
+.workspace-canvas > .flex { min-height:0; }
+/* Keep the original editor features; remove the redundant explanatory paragraphs. */
+.workspace-app .workspace-sheet .bg-primary-500\\/10.text-\\[11px\\] { display:none; }
+@keyframes sheet-in { from { opacity:0; transform:translateX(14px) scale(.985); } to { opacity:1; transform:translateX(0) scale(1); } }
+@media (max-width:767px) {
+  .workspace-header { padding:11px 14px; }
+  .workspace-sheet {
+    left:8px; right:8px; top:auto; bottom:90px; width:auto;
+    height:min(60dvh,610px); border-radius:24px;
+    animation:sheet-up .22s cubic-bezier(.2,.8,.2,1);
+  }
+  .workspace-dock { width:max-content; max-width:calc(100vw - 16px); bottom:calc(8px + env(safe-area-inset-bottom)); }
+  .workspace-dock-item { min-width:58px; padding:8px 9px; }
+  .workspace-import-card { padding:12px; }
+  .workspace-canvas { padding-inline:8px; }
+}
+@keyframes sheet-up { from {opacity:0; transform:translateY(16px)} to {opacity:1; transform:translateY(0)} }
+@media (prefers-reduced-motion:reduce) {
+  .workspace-sheet { animation:none; }
+}
+
+/* Keep the collapsed per-image crop controls unobtrusive. */
+.workspace-app details > summary { list-style: none; }
+.workspace-app details > summary::-webkit-details-marker { display:none; }
+.workspace-app details[open] > summary { color:#2563eb; }
+.workspace-app details[open] > summary span:last-child { display:none; }
+.workspace-app input.text-white { color:#20354f; }
+.workspace-app ::-webkit-scrollbar-thumb { background: rgba(91,125,166,.28); }
+.workspace-app ::-webkit-scrollbar-thumb:hover { background: rgba(91,125,166,.48); }
