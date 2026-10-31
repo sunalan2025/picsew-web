@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import {
   Smartphone, RefreshCw, Images, WandSparkles, PencilRuler, AlertTriangle,
-  Sparkles, Download, Plus, X, Check, ChevronRight
+  Sparkles, Download, Plus, X, Check
 } from 'lucide-react';
 import type {
   StitchedImage,
@@ -742,7 +742,7 @@ function App() {
                 onAddAnnotation={handleAddAnnotation}
                 selectedTool={selectedTool}
                 activeTab={cropMode ? 'view' : panelOpen ? activeTab : 'view'}
-      compact={cropMode}
+      compact={panelOpen}
       focusSliceIndex={cropMode ? Math.max(0, images.findIndex(img => img.id === cropSelectedId)) : undefined}
       focusedSeam={!cropMode ? focusedSeam : null}
                 color={color}
@@ -805,7 +805,7 @@ function App() {
         </div>
       </header>
 
-      <main className="workspace-main relative flex min-h-0 flex-1 flex-col">
+      <main className={`workspace-main relative flex min-h-0 flex-1 flex-col ${panelOpen ? 'with-inspector' : ''}`}>
         {images.length === 0 ? (
           <section className="workspace-welcome mx-auto flex w-full max-w-[680px] flex-1 flex-col items-center justify-center px-5 pb-25 text-center">
             <div className="workspace-welcome-icon mb-5 flex h-17 w-17 items-center justify-center rounded-[24px]">
@@ -825,57 +825,10 @@ function App() {
           </section>
         ) : (
           <>
-            {cropMode ? (
-              <section className="crop-studio-shell" aria-label="可视化裁剪工作区">
-                <div className="crop-studio-heading">
-                  <div className="min-w-0">
-                    <span className="crop-studio-eyebrow">PICSEW · VISUAL EDITOR</span>
-                    <h2 className="text-lg font-bold tracking-tight text-slate-900 md:text-xl">自由裁剪</h2>
-                    <p className="hidden text-xs text-slate-500 sm:block">左边裁剪当前截图，右边同步显示最终拼接画面。</p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <button type="button" onClick={handleUndo} disabled={historyIndex === 0}
-                      className="crop-soft-btn px-3 py-2 text-xs font-semibold disabled:opacity-40">
-                      撤销
-                    </button>
-                    <button type="button" onClick={() => setAdvancedCutOpen(true)}
-                      className="crop-soft-btn px-3 py-2 text-xs font-semibold">高级分割</button>
-                    <button type="button" onClick={closePanel}
-                      className="crop-done-btn px-4 py-2.5 text-xs font-bold">
-                      <Check className="h-4 w-4"/> 完成裁剪
-                    </button>
-                  </div>
-                </div>
-                <div className="crop-studio-grid">
-                  <section className="crop-studio-panel crop-studio-editor-pane">
-                    <ImageCropEditor images={images} selectedId={cropSelectedId}
-                      onSelect={setCropSelectedId} onChange={handleAdjustCrop}
-                      onCommit={handleDragEnd} onReset={handleResetOneCrop}/>
-                  </section>
-                  <section className="crop-studio-panel crop-studio-result-pane" aria-label="实时拼接预览">
-                    <div className="crop-result-heading">
-                      <div>
-                        <span className="crop-studio-eyebrow">OUTPUT / 完整结果</span>
-                        <h3 className="text-sm font-bold text-slate-800">实时拼接预览</h3>
-                      </div>
-                      <span className="crop-live-indicator"><span className="crop-live-dot"/> 实时更新</span>
-                    </div>
-                    <div className="crop-result-canvas">{previewCanvas}</div>
-                    <div className="crop-result-caption">
-                      <span>与下载内容使用同一画布</span>
-                      <button type="button" onClick={handleAutoStitch} disabled={isStitching || images.length < 2}
-                        className="font-semibold text-blue-600 disabled:opacity-40">
-                        重新智能对齐
-                      </button>
-                    </div>
-                  </section>
-                </div>
-              </section>
-            ) : (
-              <section className="workspace-canvas min-h-0 flex-1 px-2 pb-25 pt-2 md:px-6 md:pb-25">
-                {previewCanvas}
-              </section>
-            )}
+            <section className="workspace-canvas min-h-0 flex-1 px-2 pb-25 pt-2 md:px-6 md:pb-25"
+              aria-label="始终可见的拼接画布">
+              {previewCanvas}
+            </section>
             {images.length > 1 && !panelOpen && (
               <button
                 type="button"
@@ -897,14 +850,8 @@ function App() {
           </div>
         )}
 
-        {panelOpen && !cropMode && (
+        {panelOpen && (
           <>
-            <button
-              type="button"
-              aria-label="关闭工具面板"
-              onClick={closePanel}
-              className="workspace-backdrop absolute inset-0 z-30"
-            />
             <aside className="workspace-sheet absolute z-40 flex flex-col overflow-hidden" aria-label={toolName}>
               <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200/60 px-5 py-4">
                 <div>
@@ -912,7 +859,7 @@ function App() {
                   {advancedCutOpen
                     ? <button type="button" onClick={() => setAdvancedCutOpen(false)}
                         className="mt-1 text-xs font-semibold text-blue-600">← 返回四边裁剪</button>
-                    : <p className="mt-1 text-[11px] text-slate-500">按需调整，完成后点击空白处返回画布</p>}
+                    : <p className="mt-1 text-[11px] text-slate-500">画布常驻可见 · 调整即刻预览</p>}
                 </div>
                 <button type="button" aria-label="关闭面板" onClick={closePanel} className="workspace-icon-button rounded-xl p-2">
                   <X className="h-4 w-4" />
@@ -937,7 +884,17 @@ function App() {
                 </div>
               )}
               <div className="min-h-0 flex-1 overflow-hidden">
-                <ControlPanel
+                {cropMode ? (
+                  <div className="h-full overflow-y-auto">
+                    <ImageCropEditor images={images} selectedId={cropSelectedId}
+                      onSelect={setCropSelectedId} onChange={handleAdjustCrop}
+                      onCommit={handleDragEnd} onReset={handleResetOneCrop}/>
+                    <button type="button" onClick={() => setAdvancedCutOpen(true)}
+                      className="mx-4 mb-5 w-[calc(100%-2rem)] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-500 hover:bg-slate-50">
+                      高级：分割当前截图
+                    </button>
+                  </div>
+                ) : <ControlPanel
                   hideTabNavigation
                   activeTab={activeTab}
                   setActiveTab={setActiveTab}
@@ -984,10 +941,10 @@ function App() {
                   images={images}
                   onImagesChange={handleImagesChange}
                   onAutoStitchTrigger={handleAutoStitch}
-                />
+                />}
               </div>
               <div className="workspace-sheet-footer shrink-0 px-5 py-3 text-xs text-slate-400">
-                <ChevronRight className="mr-1 inline h-3 w-3" /> 所有调整实时显示在画布中
+                <Check className="mr-1 inline h-3 w-3 text-emerald-600" /> 同一画布 · 自动保留编辑内容
               </div>
             </aside>
           </>
