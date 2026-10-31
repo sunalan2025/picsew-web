@@ -546,6 +546,30 @@ function App() {
     }
   };
 
+  const handleShareImage = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    if (!navigator.share || !navigator.canShare) {
+      setCopyStatus('当前浏览器不支持直接分享图片，请先下载。');
+      return;
+    }
+    void runExport(async () => {
+      const blob = await canvasToBlob(canvas, 'image/png');
+      const file = new File([blob], `Picsew_${getFormattedDateTime()}.png`, { type: 'image/png' });
+      const shareData = { files: [file], title: 'Picsew 长截图' };
+      if (!navigator.canShare(shareData)) {
+        throw new Error('当前设备不支持分享此图片，请改用下载。');
+      }
+      try {
+        await navigator.share(shareData);
+      } catch (error) {
+        // Closing the OS share sheet is a normal operation, not an export error.
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        throw error;
+      }
+    });
+  };
+
   const handleDownloadPDF = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -800,6 +824,7 @@ function App() {
                   setExportConfig={setExportConfig}
                   onDownloadImage={handleDownloadImage}
                   onCopyImage={handleCopyImage}
+                  onShareImage={handleShareImage}
                   copyStatus={copyStatus}
                   onDownloadPDF={handleDownloadPDF}
                   onDownloadZip={handleDownloadZip}
