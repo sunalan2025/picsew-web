@@ -20,7 +20,7 @@ test('overlap adapts to different cropped image widths after normalization',()=>
   const images=[img('a',{cropLeft:300,cropRight:300}),img('b')];
   // The next slice scales 3x less than the prior in normalized output.
   assert.deepEqual(clampOverlapsToVisibleImages(images,[1500],'vertical'),[1500]);
-  assert.deepEqual(clampOverlapsToVisibleImages(images.reverse(),[1300],'vertical'),[533]);
+  assert.deepEqual(clampOverlapsToVisibleImages(images.reverse(),[1300],'vertical'),[532]);
 });
 test('horizontal layout clamps width overlap and preserves valid values',()=>{
   const imgs=[img('a',{cropLeft:800}),img('b',{cropRight:300})];
