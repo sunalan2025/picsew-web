@@ -34,7 +34,7 @@ export function ImageCropEditor({ images, selectedId, onSelect, onChange, onComm
   // A tall phone screenshot must stay tall when additional controls expand.
   // Compute a width from the height budget, retaining the original aspect.
   const previewHeightBudget = window.innerWidth <= 830
-    ? Math.max(190, Math.min(260, Math.round(window.innerHeight * 0.29)))
+    ? Math.max(175, Math.min(220, Math.round(window.innerHeight * 0.24)))
     : 520;
   const previewWidth = Math.min(520, previewHeightBudget * image.width / image.height);
   const units = getCropFractions(image);

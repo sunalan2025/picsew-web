@@ -299,3 +299,17 @@ button:disabled { cursor: not-allowed; }
 @media(max-width:830px) {
   .crop-editor-ui .crop-original-stage {min-height:245px;}
 }
+
+/* Mobile: keep all four handles on-screen without hiding the live output. */
+@media(max-width:830px) {
+  .crop-studio-grid {
+    grid-template-rows:minmax(355px,1.85fr) minmax(170px,1fr);
+  }
+  .crop-studio-heading .crop-studio-eyebrow,
+  .crop-editor-ui .crop-studio-eyebrow {display:none;}
+  .crop-editor-ui {padding:10px;gap:6px;}
+  .crop-editor-ui .crop-original-stage {min-height:220px;padding:7px;}
+  .crop-thumb {min-width:42px;padding:3px;}
+  .crop-thumb img {width:30px;height:32px;}
+  .crop-small-step {height:40px;}
+}
