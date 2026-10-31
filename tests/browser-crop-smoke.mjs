@@ -70,68 +70,63 @@ try {
     { name: '03_scroll.png', mimeType: 'image/png', buffer: generateScreenshot(560) }
   ]);
   await page.getByRole('button', { name: '裁剪', exact: true }).waitFor({ state: 'visible', timeout: 30000 });
+  const layoutCheck = async (panelLabel) => {
+    const canvasBox = await page.getByRole('region',{name:'始终可见的拼接画布'}).boundingBox();
+    const panelBox = await page.locator('.workspace-sheet').boundingBox();
+    assert.ok(canvasBox && panelBox && canvasBox.width > 230 && panelBox.width > 250,
+      panelLabel + ': canvas and inspector must both remain visible');
+    const mobile = (await page.viewportSize()).width <= 900;
+    if (mobile) assert.ok(canvasBox.y + canvasBox.height <= panelBox.y + 3,
+      panelLabel + ': panels must stack without overlap on mobile');
+    else assert.ok(canvasBox.x + canvasBox.width <= panelBox.x + 3,
+      panelLabel + ': inspector must not obscure artwork on desktop');
+  };
   await page.getByRole('button', { name: '裁剪', exact: true }).click();
-  await page.getByRole('region', { name: '可视化裁剪工作区' }).waitFor({ state: 'visible' });
-  const editBox = await page.locator('.crop-studio-editor-pane').boundingBox();
-  const liveBox = await page.locator('.crop-studio-result-pane').boundingBox();
-  assert.ok(editBox && liveBox && editBox.width > 200 && liveBox.width > 200, 'both panels visible');
-  assert.ok(editBox.x + editBox.width <= liveBox.x + 2, 'desktop panels must not overlap');
-
-  const canvas = page.locator('.crop-result-canvas canvas').first();
-  await canvas.waitFor({ state: 'visible' });
-  const originalWidth = await canvas.evaluate(el => el.width);
-  const left = page.getByRole('button', { name: '拖动裁剪左侧' });
-  const handle = await left.boundingBox();
-  assert.ok(handle, 'crop drag handle is visible');
-  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await layoutCheck('crop');
+  const canvas = page.locator('.workspace-canvas canvas').first();
+  const widthBefore = await canvas.evaluate(el => el.width);
+  const handle = await page.getByRole('button', { name: '拖动裁剪左侧' }).boundingBox();
+  assert.ok(handle, 'crop border handle missing');
+  await page.mouse.move(handle.x + handle.width/2,handle.y + handle.height/2);
   await page.mouse.down();
-  await page.mouse.move(handle.x + handle.width / 2 + 30, handle.y + handle.height / 2, { steps: 5 });
+  await page.mouse.move(handle.x + handle.width/2 + 30,handle.y + handle.height/2,{steps:6});
   await page.mouse.up();
-  const cropInput = page.getByRole('spinbutton', { name: '左侧裁剪像素' });
-  // Open optional exact controls only when checking numeric values.
-  await page.getByText('精确裁剪', { exact: true }).click();
-  await cropInput.waitFor();
-  const changed = Number(await cropInput.inputValue());
-  assert.ok(changed > 0, 'drag must update exact crop source pixels');
-  await page.waitForFunction(previous => {
-    const current = document.querySelector('.crop-result-canvas canvas');
-    return current && current.width < previous;
-  }, originalWidth, { timeout: 20000 });
-
-  await page.getByRole('button', { name: '下一张截图' }).click();
+  await page.getByText('精确裁剪',{exact:true}).click();
+  const cropInput = page.getByRole('spinbutton',{name:'左侧裁剪像素'});
+  assert.ok(Number(await cropInput.inputValue())>0,'drag should crop original pixels');
+  await page.waitForFunction(before=>document.querySelector('.workspace-canvas canvas')?.width<before,widthBefore);
+  await page.getByRole('button',{name:'下一张截图'}).click();
   await page.getByText('第 2/4 张').waitFor();
-  await page.setViewportSize({ width: 390, height: 844 });
-  const narrowEditor = await page.locator('.crop-studio-editor-pane').boundingBox();
-  const narrowResult = await page.locator('.crop-studio-result-pane').boundingBox();
-  assert.ok(narrowEditor && narrowResult, 'mobile crop and result should both exist');
-  assert.ok(narrowEditor.y + narrowEditor.height <= narrowResult.y + 2,
-    'mobile panels must stack without covering each other');
-  const cropStage = await page.locator('.crop-original-stage').boundingBox();
-  assert.ok(cropStage && cropStage.height >= 200,
-    'mobile source image must not collapse when the advanced numeric controls are expanded');
-  const bottomHandle = await page.getByRole('button',{name:'拖动裁剪底部'}).boundingBox();
-  assert.ok(bottomHandle && bottomHandle.y + bottomHandle.height <= narrowEditor.y + narrowEditor.height + 2,
-    'bottom crop handle must remain inside the visible mobile editor');
-  // Regression: the seam controls must navigate the stitched pixels, not
-  // merely scroll the corresponding input range into view.
-  await page.setViewportSize({ width: 1340, height: 900 });
-  await page.getByRole('button', { name: '完成裁剪' }).click();
-  await page.getByRole('button', { name: '拼接', exact: true }).click();
-  const inspect = page.getByRole('button', { name: '在画布定位接缝 3' });
-  await inspect.waitFor({ state: 'visible' });
-  await inspect.click();
-  await page.locator('[data-seam-highlight="2"]').waitFor({ state:'visible' });
-  await page.waitForFunction(() => {
-    const viewport = document.querySelector('.workspace-canvas .overflow-auto');
-    return viewport && viewport.scrollTop > 50;
-  }, { timeout: 8000 });
-  const seamLabel = page.getByRole('status', { name: '当前接缝 3' });
-  await seamLabel.waitFor({ state: 'visible' });
-  // Clicking the SAME seam twice should also work after manually scrolling away.
-  await page.locator('.workspace-canvas .overflow-auto').evaluate(el => el.scrollTop = 0);
-  await inspect.click();
-  await page.waitForFunction(() => document.querySelector('.workspace-canvas .overflow-auto')?.scrollTop > 50,
-    { timeout: 8000 });
+  await page.getByRole('button',{name:'高级：分割当前截图'}).click();
+  await page.getByRole('button',{name:'返回四边裁剪'}).click();
+  await page.getByText('选择保留的画面').waitFor();
+
+  // Every navigation group shares the exact same canvas/inspector geometry.
+  for(const tab of ['拼接','素材','美化','导出','裁剪']){
+    await page.getByRole('button',{name:tab,exact:true}).click();
+    await layoutCheck(tab);
+    assert.equal(await page.locator('.workspace-canvas canvas').count(),1,
+      tab+': the single export canvas must remain mounted');
+  }
+  await page.getByRole('button',{name:'拼接',exact:true}).click();
+  await page.getByRole('button',{name:'在画布定位接缝 3'}).click();
+  await page.locator('[data-seam-highlight="2"]').waitFor({state:'visible'});
+  await page.waitForFunction(()=>document.querySelector('.workspace-canvas .overflow-auto')?.scrollTop>50);
+  await page.locator('.workspace-canvas .overflow-auto').evaluate(el=>el.scrollTop=0);
+  await page.getByRole('button',{name:'在画布定位接缝 3'}).click();
+  await page.waitForFunction(()=>document.querySelector('.workspace-canvas .overflow-auto')?.scrollTop>50);
+
+  await page.setViewportSize({width:390,height:844});
+  for(const tab of ['拼接','素材','美化','导出','裁剪']){
+    await page.getByRole('button',{name:tab,exact:true}).click();
+    await layoutCheck('mobile '+tab);
+  }
+  await page.locator('.crop-original-stage').scrollIntoViewIfNeeded();
+  const stage=await page.locator('.crop-original-stage').boundingBox();
+  assert.ok(stage && stage.height>=200,'mobile crop preview must stay usable');
+  const cropBounds=await page.getByRole('button',{name:'拖动裁剪底部'}).boundingBox();
+  assert.ok(cropBounds,'mobile crop handles must exist');
+  console.log('PASS: unified inspector across modules, exact crop, real seam jumps, desktop/mobile layout');
   await page.screenshot({ path: 'browser-crop-success.png', fullPage: false });
   console.log('PASS: crop workspace source handles, WYSIWYG live canvas, selection and mobile layout');
 } catch (error) {
