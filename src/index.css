@@ -279,3 +279,12 @@ button:disabled { cursor: not-allowed; }
 @media (max-height:680px) and (min-width:831px) {
   .crop-editor-ui .crop-original-stage > div {max-height:39dvh;}
 }
+
+.crop-preview-toolbar {display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;
+  gap:6px;padding:9px 12px;margin-bottom:6px;border:1px solid #e0e8f5;border-radius:12px;
+  background:#fff;box-shadow:0 2px 7px rgba(30,68,120,.035);}
+.crop-preview-action {padding:5px 8px;border-radius:7px;background:#f0f5ff;
+  color:#3066c7;font-size:11px;font-weight:750;}
+.crop-preview-action:hover {background:#e2edff;}
+@media(max-width:830px){.crop-preview-toolbar{padding:5px 8px;margin-bottom:4px;}
+  .crop-preview-action{padding:4px 6px;}}

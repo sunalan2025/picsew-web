@@ -79,3 +79,10 @@ export function getCropRect(image: StitchedImage): { left:number; top:number; wi
     height: Math.max(0, image.height - image.cropTop - image.cropBottom)
   };
 }
+
+/** The shade on the editor and source rectangle for Canvas drawImage are identical. */
+export function getCropFractions(image: StitchedImage) {
+  const rect = getCropRect(image);
+  return { top: rect.top / image.height, bottom: image.cropBottom / image.height,
+    left: rect.left / image.width, right: image.cropRight / image.width };
+}

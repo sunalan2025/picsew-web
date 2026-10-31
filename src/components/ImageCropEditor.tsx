@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { ChevronLeft, ChevronRight, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import type { StitchedImage } from '../types';
-import { clampCropValue, getCropRect } from '../utils/imageState';
+import { clampCropValue, getCropRect, getCropFractions } from '../utils/imageState';
 
 type Edge = 'cropTop' | 'cropBottom' | 'cropLeft' | 'cropRight';
 const fields: { edge: Edge; title: string; short: string }[] = [
@@ -31,8 +31,9 @@ export function ImageCropEditor({ images, selectedId, onSelect, onChange, onComm
   if (!image) return <div className="p-6 text-sm text-slate-500">还没有可裁剪的截图。</div>;
 
   const rect = getCropRect(image);
-  const fraction = { top: rect.top / image.height * 100, bottom: image.cropBottom / image.height * 100,
-    left: rect.left / image.width * 100, right: image.cropRight / image.width * 100 };
+  const units = getCropFractions(image);
+  const fraction = { top: units.top * 100, bottom: units.bottom * 100,
+    left: units.left * 100, right: units.right * 100 };
 
   const begin = (event: React.PointerEvent<HTMLButtonElement>, edge: Edge) => {
     const dimensions = box.current?.getBoundingClientRect();
@@ -124,7 +125,7 @@ export function ImageCropEditor({ images, selectedId, onSelect, onChange, onComm
       <span className="crop-dimension shrink-0">{rect.width} × {rect.height} px</span>
     </div>
 
-    <details className="crop-numeric-details rounded-xl border border-slate-200 bg-white" open={undefined}>
+    <details className="crop-numeric-details rounded-xl border border-slate-200 bg-white" >
       <summary className="flex cursor-pointer items-center justify-between gap-2 px-3 py-2.5 text-xs font-semibold text-slate-600">
         <span className="flex items-center gap-2"><SlidersHorizontal className="h-3.5 w-3.5"/> 精确裁剪</span>
         <span className="text-[11px] font-normal text-slate-400">四边独立 · px</span>

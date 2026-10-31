@@ -1113,7 +1113,9 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
       {/* 2. Main Scrollable Viewport (CSS Centering Scroll cutoff Fix) */}
       <div
         ref={containerRef}
-        className="flex-1 w-full h-full flex overflow-auto p-4 md:p-6 bg-white/60 rounded-2xl border border-slate-200/80"
+        className={compact
+          ? 'flex-1 min-h-0 w-full flex overflow-auto p-2 bg-white/70 rounded-xl border border-slate-200/80'
+          : 'flex-1 w-full h-full flex overflow-auto p-4 md:p-6 bg-white/60 rounded-2xl border border-slate-200/80'}
       >
         {images.length === 0 ? (
           <div className="m-auto text-gray-500 text-sm flex flex-col items-center select-none">
