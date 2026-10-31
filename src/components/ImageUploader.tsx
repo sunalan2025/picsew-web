@@ -1,7 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Upload, X, ChevronUp, ChevronDown, Crop, GripVertical } from 'lucide-react';
+import { Upload, X, ChevronUp, ChevronDown, Crop, GripVertical, Film, Ban } from 'lucide-react';
 import type { StitchedImage } from '../types';
 import { clampCropValue, reorderImages } from '../utils/imageState';
+import { extractVideoFrames } from '../utils/videoFrames';
 
 interface ImageUploaderProps {
   images: StitchedImage[];
@@ -15,12 +16,15 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   onAutoStitchTrigger
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const videoAbortRef = useRef<AbortController | null>(null);
   const importingRef = useRef(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadMessage, setUploadMessage] = useState('');
   const [dragSourceId, setDragSourceId] = useState<string | null>(null);
   const [dragTargetId, setDragTargetId] = useState<string | null>(null);
+  const [videoProgress, setVideoProgress] = useState<{ done: number; total: number } | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -121,6 +125,47 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       setUploadMessage('图片导入失败，请重试。');
     } finally {
       importingRef.current = false;
+      setIsImporting(false);
+    }
+  };
+
+  // Cancel an in-progress video decode when the upload view is closed.
+  useEffect(() => () => videoAbortRef.current?.abort(), []);
+
+  const handleVideoFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (importingRef.current) {
+      setUploadMessage('请先完成当前的导入任务');
+      return;
+    }
+    importingRef.current = true;
+    setIsImporting(true);
+    setUploadMessage('');
+    setVideoProgress({ done: 0, total: 0 });
+    const controller = new AbortController();
+    videoAbortRef.current = controller;
+    try {
+      const result = await extractVideoFrames(
+        file,
+        Math.min(40, 50 - images.length),
+        controller.signal,
+        (done, total) => setVideoProgress({ done, total })
+      );
+      if (controller.signal.aborted) return;
+      if (result.images.length > 0) await onImagesChange([...images, ...result.images]);
+      setUploadMessage(
+        `录屏已提取 ${result.images.length} 张不同画面（分析 ${result.considered} 帧）。请检查接缝；快滚动建议使用较短录屏。`
+      );
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        setUploadMessage(error instanceof Error ? error.message : '录屏解析失败');
+      }
+    } finally {
+      if (videoAbortRef.current === controller) videoAbortRef.current = null;
+      importingRef.current = false;
+      setVideoProgress(null);
       setIsImporting(false);
     }
   };
@@ -229,8 +274,40 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         </p>
         <p className="text-xs text-gray-400 mt-1">PNG / JPEG / WebP / GIF · 最多 50 张</p>
       </div>
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/mp4,video/webm,video/quicktime,.mov,.m4v"
+        className="hidden"
+        onChange={handleVideoFileChange}
+        disabled={isImporting}
+      />
+      <div className="mb-3 flex items-center gap-2">
+        <button
+          type="button"
+          disabled={isImporting}
+          onClick={() => videoInputRef.current?.click()}
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-dark-700 bg-white px-3 py-2.5 text-xs font-semibold text-gray-300 hover:bg-primary-50 disabled:opacity-50"
+        >
+          <Film className="h-4 w-4 text-primary-500" /> 从录屏提取
+        </button>
+        {videoProgress && (
+          <button type="button" className="flex items-center gap-1 rounded-xl px-3 py-2 text-xs text-red-500"
+            onClick={() => videoAbortRef.current?.abort()}>
+            <Ban className="h-4 w-4" /> 取消
+          </button>
+        )}
+      </div>
+      {videoProgress && (
+        <div className="mb-3" role="status" aria-live="polite">
+          <div className="mb-1 flex justify-between text-xs text-gray-400">
+            <span>正在提取录屏帧</span><span>{videoProgress.total ? Math.round(videoProgress.done / videoProgress.total * 100) : 0}%</span>
+          </div>
+          <progress className="h-2 w-full accent-primary-500" value={videoProgress.done} max={videoProgress.total || 1} />
+        </div>
+      )}
       {uploadMessage && (
-        <p role="status" aria-live="polite" className="text-xs text-amber-300 mb-3 rounded-lg bg-amber-500/10 px-3 py-2">
+        <p role="status" aria-live="polite" className="text-xs text-amber-600 mb-3 rounded-lg bg-amber-500/10 px-3 py-2">
           {uploadMessage}
         </p>
       )}
