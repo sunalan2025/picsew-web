@@ -3,6 +3,7 @@ import { Upload, X, ChevronUp, ChevronDown, Crop, GripVertical, Film, Ban } from
 import type { StitchedImage } from '../types';
 import { clampCropValue, reorderImages } from '../utils/imageState';
 import { extractVideoFrames } from '../utils/videoFrames';
+import { sortScreenshotFiles } from '../utils/importOrder';
 
 interface ImageUploaderProps {
   images: StitchedImage[];
@@ -55,7 +56,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     const MAX_PIXELS = 25_000_000;
     const supportedTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
     const available = Math.max(0, 50 - images.length);
-    const filesToProcess = files.slice(0, available);
+    const filesToProcess = sortScreenshotFiles(files).slice(0, available);
     skipped.limit = files.length - filesToProcess.length;
     const loaded: StitchedImage[] = [];
 
@@ -125,9 +126,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         skipped.pixels && `超过 2500 万像素 ${skipped.pixels} 张`,
         skipped.failed && `读取失败 ${skipped.failed} 张`
       ].filter(Boolean);
-      if (warnings.length) {
-        setUploadMessage(`已导入 ${loaded.length} 张；跳过：${warnings.join('、')}。`);
-      }
+      setUploadMessage(`按文件名顺序导入 ${loaded.length} 张，可拖动调整顺序。` +
+        (warnings.length ? ` 跳过：${warnings.join('、')}。` : ''));
     } catch (error) {
       console.error('Image import failed', error);
       setUploadMessage('图片导入失败，请重试。');
@@ -389,6 +389,16 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         </button>
       )}
 
+      {images.length > 1 && (
+        <div className="mb-2 flex items-center justify-between gap-2 text-xs text-slate-500">
+          <span>从上往下拼接 · {images.length} 张</span>
+          <button type="button" onClick={() => onImagesChange([...images].sort((a,b) =>
+            new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' }).compare(a.name, b.name)))}
+            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-blue-600 font-semibold">
+            按文件名重排
+          </button>
+        </div>
+      )}
       {/* Image list */}
       <div className="flex-1 overflow-y-auto space-y-3 pr-1">
         {images.length === 0 ? (
@@ -414,6 +424,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
               className={`p-3 rounded-xl relative group flex flex-col gap-2 transition-all ${dragTargetId === img.id && dragSourceId !== img.id ? 'bg-blue-50 border-2 border-blue-400' : 'bg-dark-800 border border-dark-700/50'} ${dragSourceId === img.id ? 'opacity-50' : ''}`}
             >
               <div className="flex items-center gap-2">
+                <span className="shrink-0 text-xs font-bold text-blue-600" title="拼接顺序">{index + 1}</span>
                 <button
                   type="button"
                   draggable

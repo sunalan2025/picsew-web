@@ -98,7 +98,7 @@ export function analyzeOverlapSamples(
     return total / keep;
   };
 
-  // The source is already downsampled to at most 340 axis pixels.
+  // Search at native scroll-axis resolution, without rounding seam coordinates.
   // Search EVERY possible displacement: a coarse stride can completely miss
   // the one correct offset in text-rich or JPEG-compressed screenshots,
   // especially with fixed navigation bars. 340 candidates remain inexpensive.
@@ -157,9 +157,10 @@ export function detectOverlapDetailed(
   const maxOverlap = Math.min(3600, Math.floor(alongA * 0.97),
     Math.floor(alongB * 0.97), Math.floor(Math.min(alongA, alongB) * maxOverlapRatio));
   if (maxOverlap < 40) return empty;
-  const axisPixels = Math.min(340, maxOverlap);
+  // Preserve full native pixel resolution along the stitching direction.
+  const axisPixels = maxOverlap;
   const sampleSpan = Math.min(96, acrossA, acrossB);
-  const scale = maxOverlap / axisPixels;
+  const scale = 1;
   if (!cachedCanvasA) cachedCanvasA = document.createElement('canvas');
   if (!cachedCanvasB) cachedCanvasB = document.createElement('canvas');
   const a = cachedCanvasA;
