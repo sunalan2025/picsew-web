@@ -245,8 +245,10 @@ export async function extractVideoFrames(
           if (middle > acceptedTime + 0.065 && middle < time - 0.065) {
             scanTimes.splice(i, 0, middle);
             refinements++;
-            // This loop will revisit the current time after evaluating midpoint.
+            // Revisit the newly inserted midpoint on the next iteration.
+            // Without i--, the for-loop increment skips it and cannot heal gaps.
             onProgress(i, scanTimes.length);
+            i--;
             continue;
           }
         }
