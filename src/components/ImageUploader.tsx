@@ -263,7 +263,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     onClick={() => moveImage(index, 'up')}
                     aria-label="上移图片"
                     title="上移图片"
-                    className="p-0.5 hover:bg-dark-700 text-gray-400 disabled:text-gray-600 disabled:hover:bg-transparent rounded focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
+                    className="p-2 hover:bg-dark-700 text-gray-400 disabled:text-gray-600 disabled:hover:bg-transparent rounded-lg focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
                   >
                     <ChevronUp className="w-4 h-4" />
                   </button>
@@ -272,7 +272,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     onClick={() => moveImage(index, 'down')}
                     aria-label="下移图片"
                     title="下移图片"
-                    className="p-0.5 hover:bg-dark-700 text-gray-400 disabled:text-gray-600 disabled:hover:bg-transparent rounded focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
+                    className="p-2 hover:bg-dark-700 text-gray-400 disabled:text-gray-600 disabled:hover:bg-transparent rounded-lg focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none"
                   >
                     <ChevronDown className="w-4 h-4" />
                   </button>
@@ -282,7 +282,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                   onClick={() => removeImage(img.id)}
                   aria-label="移除图片"
                   title="移除图片"
-                  className="p-1 hover:bg-red-500/10 text-red-400 hover:text-red-300 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-red-500 focus:outline-none"
+                  className="p-2 hover:bg-red-500/10 text-red-400 hover:text-red-300 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-red-500 focus:outline-none"
                 >
                   <X className="w-4 h-4" />
                 </button>

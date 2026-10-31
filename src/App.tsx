@@ -14,6 +14,7 @@ import { ImageUploader } from './components/ImageUploader';
 import { ControlPanel } from './components/ControlPanel';
 import { PreviewCanvas } from './components/PreviewCanvas';
 import { detectOverlap, loadImage } from './utils/stitching';
+import { restoreOriginalImages } from './utils/imageState';
 import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
 
@@ -58,6 +59,7 @@ function App() {
   // Unified Undo/Redo stacks
   const [history, setHistory] = useState<HistoryState[]>([{ images: [], overlaps: [], annotations: [] }]);
   const [historyIndex, setHistoryIndex] = useState<number>(0);
+  const [copyStatus, setCopyStatus] = useState('');
 
   // Status Bar Overlays config
   const [statusBar, setStatusBar] = useState<StatusBarConfig>({
@@ -120,13 +122,13 @@ function App() {
     setHistoryIndex(newHistory.length - 1);
   };
 
-  // Revert all edits (crops, splits, annotations) back to the original uploaded state
+  // Reset independently of the bounded undo history.
   const handleResetAll = () => {
-    if (history.length > 0) {
-      if (window.confirm("确定要重置并清空所有修改吗？")) {
-        const firstState = history[0];
-        commitState(firstState.images, firstState.overlaps, firstState.annotations);
-      }
+    if (!images.length) return;
+    if (window.confirm('确定要重置全部裁剪、分割、重合度和标注吗？')) {
+      const resetImages = restoreOriginalImages(images);
+      commitState(resetImages, Array(Math.max(0, resetImages.length - 1)).fill(0), []);
+      setSelectedTool('select');
     }
   };
 
@@ -234,6 +236,27 @@ function App() {
     }
   };
 
+  // Ctrl/Cmd+Z to undo; Ctrl/Cmd+Shift+Z or Ctrl+Y to redo.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((!event.ctrlKey && !event.metaKey) || event.altKey) return;
+      const target = event.target;
+      if (target instanceof HTMLElement &&
+          target.closest('input, textarea, select, [contenteditable="true"]')) return;
+      const key = event.key.toLowerCase();
+      if (key === 'z' && !event.shiftKey && historyIndex > 0) {
+        event.preventDefault();
+        handleUndo();
+      } else if (((key === 'z' && event.shiftKey) || key === 'y') &&
+                 historyIndex < history.length - 1) {
+        event.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [history, historyIndex]);
+
   const handleClearAnnotations = () => {
     commitState(images, overlaps, []);
   };
@@ -288,12 +311,14 @@ function App() {
       sliceA = {
         ...slice,
         id: crypto.randomUUID(),
+        originalId: slice.originalId ?? slice.id,
         cropBottom: slice.height - splitPixel,
       };
 
       sliceB = {
         ...slice,
         id: crypto.randomUUID(),
+        originalId: slice.originalId ?? slice.id,
         cropTop: splitPixel,
       };
     } else {
@@ -308,12 +333,14 @@ function App() {
       sliceA = {
         ...slice,
         id: crypto.randomUUID(),
+        originalId: slice.originalId ?? slice.id,
         cropRight: slice.width - splitPixel,
       };
 
       sliceB = {
         ...slice,
         id: crypto.randomUUID(),
+        originalId: slice.originalId ?? slice.id,
         cropLeft: splitPixel,
       };
     }
@@ -328,22 +355,11 @@ function App() {
     setSelectedTool('select'); // Set tool back to select so they can drag to crop
   };
 
-  // --- Reset All Slices Crops & Splits ---
+  // Reset cropping and collapse split slices without clearing annotations.
   const handleResetCropsAndSplits = () => {
-    if (images.length === 0) return;
-
-    // Retrieve original unsplit images by filtering duplicates or originalId mapping
-    // To make it simple, we just restore all cropTop/cropBottom/cropLeft/cropRight to 0, 
-    // and keep overlaps as 0, preserving splits, or resetting overlaps to 0.
-    const resetImgs = images.map(img => ({
-      ...img,
-      cropTop: 0,
-      cropBottom: 0,
-      cropLeft: 0,
-      cropRight: 0
-    }));
-    const resetOverlaps = overlaps.map(() => 0);
-    commitState(resetImgs, resetOverlaps, annotations);
+    if (!images.length) return;
+    const resetImages = restoreOriginalImages(images);
+    commitState(resetImages, Array(Math.max(0, resetImages.length - 1)).fill(0), annotations);
   };
 
   // --- Export / Download Actions ---
@@ -420,6 +436,25 @@ function App() {
     const dataUrl = canvas.toDataURL(mime, exportConfig.quality);
 
     triggerDownload(dataUrl, mime, filename);
+  };
+
+  const handleCopyImage = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+      setCopyStatus('当前浏览器不支持复制图片，请使用下载功能。');
+      return;
+    }
+    try {
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(result => result ? resolve(result) : reject(new Error('Canvas export failed')), 'image/png');
+      });
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      setCopyStatus('已复制 PNG 图片，可直接粘贴。');
+    } catch (error) {
+      console.error('Could not copy image', error);
+      setCopyStatus('复制失败，请检查剪贴板权限或改用下载。');
+    }
   };
 
   const handleDownloadPDF = () => {
@@ -624,6 +659,8 @@ function App() {
               exportConfig={exportConfig}
               setExportConfig={setExportConfig}
               onDownloadImage={handleDownloadImage}
+              onCopyImage={handleCopyImage}
+              copyStatus={copyStatus}
               onDownloadPDF={handleDownloadPDF}
               onDownloadZip={handleDownloadZip}
               hasImages={images.length > 0}
