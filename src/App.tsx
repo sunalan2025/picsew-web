@@ -748,7 +748,9 @@ function App() {
             <Smartphone className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <h1 className="m-0 text-[16px] font-bold tracking-tight text-slate-900">Picsew Web</h1>
+            <h1 className="m-0 whitespace-nowrap text-[14px] font-bold tracking-tight text-slate-900 sm:text-[16px]">
+              <span className="sm:hidden">Picsew</span><span className="hidden sm:inline">Picsew Web</span>
+            </h1>
             <p className="hidden text-[11px] text-slate-500 sm:block">轻松拼接每一张截图</p>
           </div>
         </div>
