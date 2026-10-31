@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Upload, X, ChevronUp, ChevronDown, Crop, GripVertical, Film, Ban } from 'lucide-react';
+import { Upload, X, ChevronUp, ChevronDown, GripVertical, Film, Ban } from 'lucide-react';
 import type { StitchedImage } from '../types';
-import { clampCropValue, reorderImages } from '../utils/imageState';
+import { reorderImages } from '../utils/imageState';
 import { extractVideoFrames } from '../utils/videoFrames';
 import { sortScreenshotFiles } from '../utils/importOrder';
 
@@ -293,16 +293,6 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     onImagesChange(updated);
   };
 
-  const updateCrop = (id: string, field: 'cropTop' | 'cropBottom' | 'cropLeft' | 'cropRight', value: number) => {
-    onImagesChange(
-      images.map(img => {
-        if (img.id === id) {
-          return { ...img, [field]: clampCropValue(img, field, value) };
-        }
-        return img;
-      })
-    );
-  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -499,56 +489,6 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                 </button>
               </div>
 
-              {/* Crop Fine-Tuning (4 Borders) */}
-              <details className="bg-dark-900/60 p-2 rounded-lg mt-1 border border-dark-700/30">
-                <summary className="flex cursor-pointer items-center gap-1.5 text-xs text-gray-400 font-medium">
-                  <Crop className="w-3.5 h-3.5 text-primary-400" />
-                  <span>微调裁剪</span>
-                  <span className="ml-auto text-[10px] opacity-60">展开</span>
-                </summary>
-                <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-                  <div>
-                    <label htmlFor={`cropTop-${img.id}`} className="text-[10px] text-gray-500 font-medium">顶部</label>
-                    <input
-                      id={`cropTop-${img.id}`}
-                      type="number"
-                      value={img.cropTop}
-                      onChange={(e) => updateCrop(img.id, 'cropTop', parseInt(e.target.value) || 0)}
-                      className="w-full bg-dark-800 border border-dark-700 rounded px-1.5 py-0.5 text-gray-300 mt-0.5 focus:border-primary-500 outline-hidden"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor={`cropBottom-${img.id}`} className="text-[10px] text-gray-500 font-medium">底部</label>
-                    <input
-                      id={`cropBottom-${img.id}`}
-                      type="number"
-                      value={img.cropBottom}
-                      onChange={(e) => updateCrop(img.id, 'cropBottom', parseInt(e.target.value) || 0)}
-                      className="w-full bg-dark-800 border border-dark-700 rounded px-1.5 py-0.5 text-gray-300 mt-0.5 focus:border-primary-500 outline-hidden"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor={`cropLeft-${img.id}`} className="text-[10px] text-gray-500 font-medium">左侧</label>
-                    <input
-                      id={`cropLeft-${img.id}`}
-                      type="number"
-                      value={img.cropLeft}
-                      onChange={(e) => updateCrop(img.id, 'cropLeft', parseInt(e.target.value) || 0)}
-                      className="w-full bg-dark-800 border border-dark-700 rounded px-1.5 py-0.5 text-gray-300 mt-0.5 focus:border-primary-500 outline-hidden"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor={`cropRight-${img.id}`} className="text-[10px] text-gray-500 font-medium">右侧</label>
-                    <input
-                      id={`cropRight-${img.id}`}
-                      type="number"
-                      value={img.cropRight}
-                      onChange={(e) => updateCrop(img.id, 'cropRight', parseInt(e.target.value) || 0)}
-                      className="w-full bg-dark-800 border border-dark-700 rounded px-1.5 py-0.5 text-gray-300 mt-0.5 focus:border-primary-500 outline-hidden"
-                    />
-                  </div>
-                </div>
-              </details>
             </div>
           ))
         )}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { ImageCropEditor } from './ImageCropEditor';
 import {
   Scissors, Type, Battery, ShieldAlert, Monitor, Download, Copy, Share2, FileText, Split, Undo, Redo, Trash2, Check, Layers, FolderOpen
 } from 'lucide-react';
@@ -70,6 +71,9 @@ interface ControlPanelProps {
   images?: StitchedImage[];
   onImagesChange?: (imgs: StitchedImage[]) => void;
   onAutoStitchTrigger?: () => void;
+  onCropPreview?: (index: number, edge: 'cropTop'|'cropBottom'|'cropLeft'|'cropRight', value: number) => void;
+  onCropCommit?: () => void;
+  onResetOneCrop?: (index: number) => void;
 }
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -116,7 +120,10 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   isMobile = false,
   images,
   onImagesChange,
-  onAutoStitchTrigger
+  onAutoStitchTrigger,
+  onCropPreview,
+  onCropCommit,
+  onResetOneCrop
 }) => {
   const tabs = [
     ...(isMobile ? [{ id: 'upload', label: '素材', icon: FolderOpen }] : []),
@@ -280,7 +287,10 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
                 {/* Only surface seams where alignment confidence is insufficient. */}
                 {uncertainSeams.length > 0 && (
-                  <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
+                  <details className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                    <summary className="cursor-pointer font-semibold">
+                      {uncertainSeams.length} 处匹配不确定 · 展开查看
+                    </summary>
                     <p className="font-bold">有 {uncertainSeams.length} 处接缝需要检查</p>
                     <p className="mt-1 leading-5">这些图片的内容相似或无法找到可靠的重叠位置。请检查对应连接点并手动微调，其他接缝无需操作。</p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -292,7 +302,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                         </button>
                       ))}
                     </div>
-                  </div>
+                  </details>
                 )}
 
                 {/* Manual overlaps */}
@@ -333,6 +343,15 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             {/* 2. Cut Tab */}
             {activeTab === 'cut' && (
               <div className="space-y-4">
+                {images && onCropPreview && onCropCommit && onResetOneCrop && (
+                  <ImageCropEditor images={images} onChange={onCropPreview}
+                    onCommit={onCropCommit} onReset={onResetOneCrop}/>
+                )}
+                <details className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <summary className="cursor-pointer text-xs font-semibold text-slate-600">
+                    高级：分割图片（可选）
+                  </summary>
+                  <div className="mt-3 space-y-4">
                 <div className="bg-primary-500/10 border border-primary-500/20 p-3 rounded-xl text-xs text-primary-200 space-y-2">
                   <p className="font-semibold">使用指南：</p>
                   <ol className="list-decimal list-inside text-gray-400 leading-relaxed space-y-1.5">
@@ -407,6 +426,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     重置所有裁剪与分割
                   </button>
                 )}
+                  </div>
+                </details>
               </div>
             )}
 
