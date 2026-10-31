@@ -68,3 +68,14 @@ export function clampOverlapsToVisibleImages(
       Math.max(0,Math.floor(Math.min(nextLimit,prevLimit))));
   });
 }
+
+/** Canonical original-pixel crop used by the editor AND Canvas drawImage.
+ * Keeping one rectangle model avoids a visually different editor preview. */
+export function getCropRect(image: StitchedImage): { left:number; top:number; width:number; height:number } {
+  return {
+    left: image.cropLeft,
+    top: image.cropTop,
+    width: Math.max(0, image.width - image.cropLeft - image.cropRight),
+    height: Math.max(0, image.height - image.cropTop - image.cropBottom)
+  };
+}

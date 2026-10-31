@@ -14,6 +14,7 @@ import type {
 } from './types';
 import { ImageUploader } from './components/ImageUploader';
 import { ControlPanel } from './components/ControlPanel';
+import { ImageCropEditor } from './components/ImageCropEditor';
 import { PreviewCanvas } from './components/PreviewCanvas';
 import { detectOverlapDetailed, loadImage, visibleImageSource } from './utils/stitching';
 import { clampCropValue, clampOverlapsToVisibleImages, restoreOriginalImages } from './utils/imageState';
@@ -30,6 +31,7 @@ interface HistoryState {
 function App() {
   // Images/Slices list
   const [images, setImages] = useState<StitchedImage[]>([]);
+  const [cropSelectedId, setCropSelectedId] = useState<string | null>(null);
   // Overlaps between adjacent slices
   const [overlaps, setOverlaps] = useState<number[]>([]);
   // A low-confidence join must be highlighted for review, never silently trimmed.
@@ -705,6 +707,34 @@ function App() {
     : currentGroup === 'cut' ? '裁剪与标注'
     : currentGroup === 'mockup' ? '外观美化' : '保存与分享';
 
+  const cropMode = panelOpen && activeTab === 'cut';
+  const previewCanvas = (
+    <PreviewCanvas
+                images={images}
+                direction={direction}
+                gap={gap}
+                overlaps={overlaps}
+                statusBar={statusBar}
+                mockup={mockup}
+                watermark={watermark}
+                annotations={annotations}
+                onAddAnnotation={handleAddAnnotation}
+                selectedTool={selectedTool}
+                activeTab={cropMode ? 'view' : panelOpen ? activeTab : 'view'}
+                color={color}
+                strokeWidth={strokeWidth}
+                fontSize={fontSize}
+                canvasRef={canvasRef}
+                onAdjustOverlap={handleAdjustOverlap}
+                onAdjustCrop={handleAdjustCrop}
+                onSplitImage={handleSplitImage}
+                onDragEnd={handleDragEnd}
+                onUndo={handleUndo}
+                canUndo={historyIndex > 0}
+                onResetAll={handleResetAll}
+              />
+  );
+
   return (
     <div className="workspace-app flex h-dvh w-screen flex-col overflow-hidden text-slate-800">
       <header className="workspace-header relative z-20 flex shrink-0 items-center justify-between gap-3 px-4 py-3 md:px-7">
@@ -769,32 +799,55 @@ function App() {
           </section>
         ) : (
           <>
-            <section className="workspace-canvas min-h-0 flex-1 px-2 pb-25 pt-2 md:px-6 md:pb-25">
-              <PreviewCanvas
-                images={images}
-                direction={direction}
-                gap={gap}
-                overlaps={overlaps}
-                statusBar={statusBar}
-                mockup={mockup}
-                watermark={watermark}
-                annotations={annotations}
-                onAddAnnotation={handleAddAnnotation}
-                selectedTool={selectedTool}
-                activeTab={panelOpen ? activeTab : 'view'}
-                color={color}
-                strokeWidth={strokeWidth}
-                fontSize={fontSize}
-                canvasRef={canvasRef}
-                onAdjustOverlap={handleAdjustOverlap}
-                onAdjustCrop={handleAdjustCrop}
-                onSplitImage={handleSplitImage}
-                onDragEnd={handleDragEnd}
-                onUndo={handleUndo}
-                canUndo={historyIndex > 0}
-                onResetAll={handleResetAll}
-              />
-            </section>
+            {cropMode ? (
+              <section className="crop-studio-shell" aria-label="可视化裁剪工作区">
+                <div className="crop-studio-heading">
+                  <div className="min-w-0">
+                    <span className="crop-studio-eyebrow">PICSEW · VISUAL EDITOR</span>
+                    <h2 className="text-lg font-bold tracking-tight text-slate-900 md:text-xl">自由裁剪</h2>
+                    <p className="hidden text-xs text-slate-500 sm:block">左边裁剪当前截图，右边同步显示最终拼接画面。</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button type="button" onClick={handleUndo} disabled={historyIndex === 0}
+                      className="crop-soft-btn px-3 py-2 text-xs font-semibold disabled:opacity-40">
+                      撤销
+                    </button>
+                    <button type="button" onClick={closePanel}
+                      className="crop-done-btn px-4 py-2.5 text-xs font-bold">
+                      <Check className="h-4 w-4"/> 完成裁剪
+                    </button>
+                  </div>
+                </div>
+                <div className="crop-studio-grid">
+                  <section className="crop-studio-panel crop-studio-editor-pane">
+                    <ImageCropEditor images={images} selectedId={cropSelectedId}
+                      onSelect={setCropSelectedId} onChange={handleAdjustCrop}
+                      onCommit={handleDragEnd} onReset={handleResetOneCrop}/>
+                  </section>
+                  <section className="crop-studio-panel crop-studio-result-pane" aria-label="实时拼接预览">
+                    <div className="crop-result-heading">
+                      <div>
+                        <span className="crop-studio-eyebrow">OUTPUT / 完整结果</span>
+                        <h3 className="text-sm font-bold text-slate-800">实时拼接预览</h3>
+                      </div>
+                      <span className="crop-live-indicator"><span className="crop-live-dot"/> 同步中</span>
+                    </div>
+                    <div className="crop-result-canvas">{previewCanvas}</div>
+                    <div className="crop-result-caption">
+                      <span>与下载内容使用同一画布</span>
+                      <button type="button" onClick={handleAutoStitch} disabled={isStitching || images.length < 2}
+                        className="font-semibold text-blue-600 disabled:opacity-40">
+                        重新智能对齐
+                      </button>
+                    </div>
+                  </section>
+                </div>
+              </section>
+            ) : (
+              <section className="workspace-canvas min-h-0 flex-1 px-2 pb-25 pt-2 md:px-6 md:pb-25">
+                {previewCanvas}
+              </section>
+            )}
             {images.length > 1 && !panelOpen && (
               <button
                 type="button"
@@ -816,7 +869,7 @@ function App() {
           </div>
         )}
 
-        {panelOpen && (
+        {panelOpen && !cropMode && (
           <>
             <button
               type="button"
@@ -898,9 +951,6 @@ function App() {
                   images={images}
                   onImagesChange={handleImagesChange}
                   onAutoStitchTrigger={handleAutoStitch}
-                  onCropPreview={handleAdjustCrop}
-                  onCropCommit={handleDragEnd}
-                  onResetOneCrop={handleResetOneCrop}
                 />
               </div>
               <div className="workspace-sheet-footer shrink-0 px-5 py-3 text-xs text-slate-400">
