@@ -5,6 +5,8 @@
  * silently deleting incorrect rows. Samples are centred on the cross axis so
  * UI bars/side gutters have less influence than the scrolling article itself.
  */
+import { getCropRect } from './imageState.ts';
+
 export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -230,15 +232,17 @@ export function visibleImageSource(
   source: HTMLImageElement,
   crop: {cropTop:number;cropBottom:number;cropLeft:number;cropRight:number}
 ): CanvasImageSource {
-  const width = source.naturalWidth - crop.cropLeft - crop.cropRight;
-  const height = source.naturalHeight - crop.cropTop - crop.cropBottom;
+  const visible = getCropRect({
+    width: source.naturalWidth, height: source.naturalHeight, ...crop
+  });
   if (!crop.cropTop && !crop.cropBottom && !crop.cropLeft && !crop.cropRight) return source;
-  if (width < 10 || height < 10) throw new Error('裁剪区域太小，无法自动对齐');
+  if (visible.width < 10 || visible.height < 10) throw new Error('裁剪区域太小，无法自动对齐');
   const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = visible.width;
+  canvas.height = visible.height;
   const context = canvas.getContext('2d');
   if (!context) throw new Error('无法创建裁剪预览');
-  context.drawImage(source, crop.cropLeft, crop.cropTop, width, height, 0, 0, width, height);
+  context.drawImage(source, visible.left, visible.top, visible.width, visible.height,
+    0, 0, visible.width, visible.height);
   return canvas;
 }

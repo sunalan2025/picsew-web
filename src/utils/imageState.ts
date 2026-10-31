@@ -71,7 +71,7 @@ export function clampOverlapsToVisibleImages(
 
 /** Canonical original-pixel crop used by the editor AND Canvas drawImage.
  * Keeping one rectangle model avoids a visually different editor preview. */
-export function getCropRect(image: StitchedImage): { left:number; top:number; width:number; height:number } {
+export function getCropRect(image: Pick<StitchedImage, 'width'|'height'|'cropTop'|'cropBottom'|'cropLeft'|'cropRight'>): { left:number; top:number; width:number; height:number } {
   return {
     left: image.cropLeft,
     top: image.cropTop,

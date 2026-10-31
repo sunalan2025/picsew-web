@@ -14,7 +14,7 @@ import type {
 import { drawStatusBar } from '../utils/statusBar';
 import { drawMockup } from '../utils/mockup';
 import { canInteractWithCanvas } from '../utils/canvasInteraction';
-import { getStitchedImageLocation } from '../utils/imageState';
+import { getCropRect, getStitchedImageLocation } from '../utils/imageState';
 
 interface PreviewCanvasProps {
   images: StitchedImage[];
@@ -344,13 +344,15 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
     for (let i = 0; i < images.length; i++) {
       const img = images[i];
       
-      const cropL = img.cropLeft;
+      // Use the exact source rectangle shown by the editor's mask and
+      // used by automatic alignment, instead of a separate crop formula.
+      const crop = getCropRect(img);
+      const cropL = crop.left;
       const cropR = img.cropRight;
-      const cropT = img.cropTop;
+      const cropT = crop.top;
       const cropB = img.cropBottom;
-
-      const visibleW = img.width - cropL - cropR;
-      const visibleH = img.height - cropT - cropB;
+      const visibleW = crop.width;
+      const visibleH = crop.height;
 
       if (direction === 'vertical') {
         const scale = baseW / Math.max(10, visibleW);
