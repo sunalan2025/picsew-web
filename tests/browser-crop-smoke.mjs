@@ -117,7 +117,9 @@ try {
   await page.waitForFunction(()=>document.querySelector('.workspace-canvas .overflow-auto')?.scrollTop>50);
 
   await page.setViewportSize({width:390,height:844});
-  for(const tab of ['拼接','素材','美化','导出','裁剪']){
+  // Start with a *different* tool: selecting the already active tool is an
+  // intentional shortcut to close the inspector.
+  for(const tab of ['素材','拼接','美化','导出','裁剪']){
     await page.getByRole('navigation',{name:'主要工具'}).getByRole('button',{name:tab,exact:true}).click();
     await layoutCheck('mobile '+tab);
   }
