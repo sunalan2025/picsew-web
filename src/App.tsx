@@ -19,6 +19,7 @@ import { detectOverlap, loadImage } from './utils/stitching';
 import { restoreOriginalImages } from './utils/imageState';
 import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
+import { planPdfExport } from './utils/pdfExport';
 
 interface HistoryState {
   images: StitchedImage[];
@@ -63,6 +64,8 @@ function App() {
   const [history, setHistory] = useState<HistoryState[]>([{ images: [], overlaps: [], annotations: [] }]);
   const [historyIndex, setHistoryIndex] = useState<number>(0);
   const [copyStatus, setCopyStatus] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+  const exportInFlightRef = useRef(false);
   const [watermark, setWatermark] = useState<WatermarkConfig>({
     enabled: false,
     text: 'Picsew Web',
@@ -463,7 +466,7 @@ function App() {
       a.href = url;
       a.download = filename;
       a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 100);
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
     } else {
       // Content is base64 dataUrl
       let base64 = content;
@@ -488,15 +491,40 @@ function App() {
     }
   };
 
+  const canvasToBlob = (canvas: HTMLCanvasElement, mime: string, quality?: number): Promise<Blob> =>
+    new Promise((resolve, reject) => {
+      try {
+        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('图片编码失败')), mime, quality);
+      } catch (error) { reject(error); }
+    });
+
+  const runExport = async (task: () => Promise<void>) => {
+    if (exportInFlightRef.current) return;
+    exportInFlightRef.current = true;
+    setIsExporting(true);
+    setCopyStatus('');
+    try {
+      await task();
+    } catch (error) {
+      console.error('Export error', error);
+      setCopyStatus(error instanceof Error ? error.message : '导出失败，请重试');
+    } finally {
+      setIsExporting(false);
+      exportInFlightRef.current = false;
+    }
+  };
+
   const handleDownloadImage = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const mime = exportConfig.format === 'png' ? 'image/png' : 'image/jpeg';
-    const filename = `Picsew_${getFormattedDateTime()}.${exportConfig.format}`;
-    const dataUrl = canvas.toDataURL(mime, exportConfig.quality);
-
-    triggerDownload(dataUrl, mime, filename);
+    void runExport(async () => {
+      const mime = exportConfig.format === 'png' ? 'image/png' : 'image/jpeg';
+      triggerDownload(
+        await canvasToBlob(canvas, mime, exportConfig.quality),
+        mime,
+        `Picsew_${getFormattedDateTime()}.${exportConfig.format}`
+      );
+    });
   };
 
   const handleCopyImage = async () => {
@@ -521,83 +549,62 @@ function App() {
   const handleDownloadPDF = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const a4W = 595.28;
-    const a4H = 841.89;
-
-    const canvasRatio = canvas.height / canvas.width;
-    const scaledHeight = a4W * canvasRatio;
-
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-    const filename = exportConfig.pdfPageMode === 'single'
-      ? `Picsew_${getFormattedDateTime()}.pdf`
-      : `Picsew_paginated_${getFormattedDateTime()}.pdf`;
-
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'pt',
-      format: exportConfig.pdfPageMode === 'single' ? [a4W, scaledHeight] : 'a4'
-    });
-
-    if (exportConfig.pdfPageMode === 'single') {
-      pdf.addImage(dataUrl, 'JPEG', 0, 0, a4W, scaledHeight);
-    } else {
-      const pagesCount = Math.ceil(scaledHeight / a4H);
-      for (let i = 0; i < pagesCount; i++) {
-        if (i > 0) pdf.addPage();
-        pdf.addImage(dataUrl, 'JPEG', 0, -i * a4H, a4W, scaledHeight);
+    void runExport(async () => {
+      const plan = planPdfExport(canvas.width, canvas.height, exportConfig.pdfPageMode);
+      if (plan.mode !== exportConfig.pdfPageMode) {
+        setCopyStatus('单页 PDF 太长，已自动改为 A4 分页，避免截断。');
       }
-    }
-
-    const pdfBlob = pdf.output('blob');
-    triggerDownload(pdfBlob, 'application/pdf', filename);
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'pt',
+        format: plan.mode === 'single' ? [plan.widthPt, plan.heightPt] : 'a4'
+      });
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width = canvas.width;
+      for (let i = 0; i < plan.count; i++) {
+        const offsetY = i * plan.pageHeightPx;
+        const height = Math.min(plan.pageHeightPx, canvas.height - offsetY);
+        pageCanvas.height = height;
+        const ctx = pageCanvas.getContext('2d');
+        if (!ctx) throw new Error('无法创建 PDF 页面画布');
+        ctx.drawImage(canvas, 0, offsetY, canvas.width, height, 0, 0, canvas.width, height);
+        const jpeg = await canvasToBlob(pageCanvas, 'image/jpeg', 0.9);
+        if (i > 0) pdf.addPage();
+        pdf.addImage(new Uint8Array(await jpeg.arrayBuffer()), 'JPEG',
+          0, 0, plan.widthPt, height / canvas.width * plan.widthPt);
+      }
+      triggerDownload(pdf.output('blob'), 'application/pdf',
+        `Picsew_${getFormattedDateTime()}.pdf`);
+    });
   };
 
-  const handleDownloadZip = async () => {
+  const handleDownloadZip = () => {
     const canvas = canvasRef.current;
-    const sliceH = Math.floor(exportConfig.scale);
-    if (!canvas || sliceH <= 0) return;
-
-    const zip = new JSZip();
-    const totalH = canvas.height;
-    const totalW = canvas.width;
-    const slicesCount = Math.ceil(totalH / sliceH);
-
-    // SECURITY: Limit maximum slices to prevent browser crash / DoS
-    if (slicesCount > 500) {
-      alert(`切片数量过多 (${slicesCount} > 500)，请增加切片高度以防止浏览器崩溃 (Too many slices, please increase slice height)`);
-      return;
-    }
-
-    const mime = exportConfig.format === 'png' ? 'image/png' : 'image/jpeg';
-    const ext = exportConfig.format;
-
-    const tempCanvas = document.createElement('canvas');
-    const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
-
-    if (tempCtx) {
-      for (let i = 0; i < slicesCount; i++) {
-        const currentSliceH = Math.min(sliceH, totalH - i * sliceH);
-
-        let resized = false;
-        if (tempCanvas.width !== totalW) { tempCanvas.width = totalW; resized = true; }
-        if (tempCanvas.height !== currentSliceH) { tempCanvas.height = currentSliceH; resized = true; }
-        if (!resized) tempCtx.clearRect(0, 0, totalW, currentSliceH);
-
-        tempCtx.drawImage(
-          canvas,
-          0, i * sliceH, totalW, currentSliceH,
-          0, 0, totalW, currentSliceH
-        );
-
-        const sliceDataUrl = tempCanvas.toDataURL(mime, exportConfig.quality);
-        const base64Data = sliceDataUrl.split(',')[1];
-        zip.file(`slice_${i + 1}.${ext}`, base64Data, { base64: true });
+    const sliceHeight = Math.floor(exportConfig.scale);
+    if (!canvas || sliceHeight <= 0) return;
+    void runExport(async () => {
+      const parts = Math.ceil(canvas.height / sliceHeight);
+      if (parts > 160) throw new Error(`需要 ${parts} 段切片，请增大高度；最多支持 160 段。`);
+      const archive = new JSZip();
+      const mime = exportConfig.format === 'png' ? 'image/png' : 'image/jpeg';
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = canvas.width;
+      for (let i = 0; i < parts; i++) {
+        const height = Math.min(sliceHeight, canvas.height - i * sliceHeight);
+        tempCanvas.height = height;
+        const ctx = tempCanvas.getContext('2d');
+        if (!ctx) throw new Error('无法创建切片画布');
+        ctx.drawImage(canvas, 0, i * sliceHeight, canvas.width, height,
+          0, 0, canvas.width, height);
+        archive.file(`slice_${String(i + 1).padStart(3, '0')}.${exportConfig.format}`,
+          await canvasToBlob(tempCanvas, mime, exportConfig.quality));
       }
-    }
-
-    const zipBlob = await zip.generateAsync({ type: 'blob' });
-    triggerDownload(zipBlob, 'application/zip', `Picsew_slices_${getFormattedDateTime()}.zip`);
+      const blob = await archive.generateAsync({
+        type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 3 }
+      });
+      triggerDownload(blob, 'application/zip',
+        `Picsew_slices_${getFormattedDateTime()}.zip`);
+    });
   };
 
   const tools = [
@@ -643,7 +650,7 @@ function App() {
           <button
             type="button"
             onClick={handleDownloadImage}
-            disabled={!images.length}
+            disabled={!images.length || isExporting}
             className="workspace-primary flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-semibold text-white disabled:opacity-40"
           >
             <Download className="h-4 w-4" /> 导出
@@ -713,10 +720,12 @@ function App() {
           </>
         )}
 
-        {isStitching && (
+        {(isStitching || isExporting) && (
           <div className="workspace-processing absolute inset-0 z-60 flex flex-col items-center justify-center gap-3">
             <RefreshCw className="h-8 w-8 animate-spin text-blue-600" />
-            <p className="text-sm font-semibold text-slate-700">正在智能对齐截图…</p>
+            <p className="text-sm font-semibold text-slate-700">
+              {isStitching ? '正在智能对齐截图…' : '正在生成文件…'}
+            </p>
           </div>
         )}
 
