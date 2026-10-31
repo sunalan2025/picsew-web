@@ -14,6 +14,7 @@ import type {
 import { drawStatusBar } from '../utils/statusBar';
 import { drawMockup } from '../utils/mockup';
 import { canInteractWithCanvas } from '../utils/canvasInteraction';
+import { getStitchedImageLocation } from '../utils/imageState';
 
 interface PreviewCanvasProps {
   images: StitchedImage[];
@@ -42,6 +43,7 @@ interface PreviewCanvasProps {
   canUndo: boolean;
   onResetAll: () => void;
   compact?: boolean;
+  focusSliceIndex?: number;
 }
 
 const drawArrow = (
@@ -190,7 +192,8 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
   onUndo,
   canUndo,
   onResetAll,
-  compact = false
+  compact = false,
+  focusSliceIndex
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -270,6 +273,27 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
       return () => clearTimeout(timer);
     }
   }, [images.length, direction, handleFitWidth, handleFitHeight]);
+
+  // When the editor switches source pictures, automatically reveal that
+  // section of the *real* composite without changing the user's zoom.
+  useEffect(() => {
+    if (focusSliceIndex === undefined || focusSliceIndex < 0 || !images.length) return;
+    const timer = window.setTimeout(() => {
+      const view = containerRef.current;
+      const canvas = canvasRef.current;
+      if (!view || !canvas) return;
+      const { start, total } = getStitchedImageLocation(images, overlaps, gap, direction, focusSliceIndex);
+      const fraction = Math.min(1, Math.max(0,start / Math.max(1,total)));
+      const extent = (direction === 'vertical' ? canvas.height : canvas.width) * zoom;
+      const widthAxis = direction === 'horizontal';
+      const viewExtent = widthAxis ? view.clientWidth : view.clientHeight;
+      const target = Math.max(0, fraction * extent - viewExtent * 0.23);
+      if (widthAxis) view.scrollTo({left:target,behavior:'smooth'});
+      else view.scrollTo({top:target,behavior:'smooth'});
+    }, 280);
+    return () => window.clearTimeout(timer);
+    // Only follow an explicit picture selection; don't fight crop handle drag.
+  }, [focusSliceIndex, direction, images.length, canvasRef]);
 
   // Core Render Loop: Builds the stitched image + statusbar + crops
   const renderStitchedImage = useCallback((): HTMLCanvasElement => {

@@ -725,6 +725,7 @@ function App() {
                 selectedTool={selectedTool}
                 activeTab={cropMode ? 'view' : panelOpen ? activeTab : 'view'}
       compact={cropMode}
+      focusSliceIndex={cropMode ? Math.max(0, images.findIndex(img => img.id === cropSelectedId)) : undefined}
                 color={color}
                 strokeWidth={strokeWidth}
                 fontSize={fontSize}
