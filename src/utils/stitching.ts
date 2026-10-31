@@ -5,7 +5,7 @@
  * silently deleting incorrect rows. Samples are centred on the cross axis so
  * UI bars/side gutters have less influence than the scrolling article itself.
  */
-import { getCropRect } from './imageState';
+import { getCropRect } from './imageState.ts';
 
 export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
