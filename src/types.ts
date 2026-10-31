@@ -85,8 +85,8 @@ export interface MockupConfig {
 }
 
 export interface ExportConfig {
-  format: 'png' | 'jpeg' | 'pdf';
+  format: 'png' | 'jpeg';
   quality: number; // 0.1 to 1.0 (for jpeg)
-  scale: number; // 1 = original, 2 = 2x, etc.
+  scale: number; // Slice height in pixels; 0 disables ZIP slicing.
   pdfPageMode: 'single' | 'multi'; // single long page or split pages
 }

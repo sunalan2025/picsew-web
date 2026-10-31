@@ -467,6 +467,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     <button
                       onClick={onUndo}
                       disabled={!canUndo}
+                      title={canUndo ? '撤销' : '没有可撤销的操作'}
                       className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-dark-800 hover:bg-dark-700 text-gray-300 disabled:text-gray-600 disabled:hover:bg-dark-800 text-xs font-semibold rounded-lg border border-dark-750 transition"
                     >
                       <Undo className="w-3.5 h-3.5" />
@@ -475,6 +476,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     <button
                       onClick={onRedo}
                       disabled={!canRedo}
+                      title={canRedo ? '重做' : '没有可重做的操作'}
                       className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-dark-800 hover:bg-dark-700 text-gray-300 disabled:text-gray-600 disabled:hover:bg-dark-800 text-xs font-semibold rounded-lg border border-dark-750 transition"
                     >
                       <Redo className="w-3.5 h-3.5" />
@@ -850,7 +852,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   {exportConfig.scale > 0 && (
                     <button
                       onClick={onDownloadZip}
-                      className="w-full flex items-center justify-center gap-2 bg-dark-800 hover:bg-dark-750 text-gray-200 font-medium py-2 px-4 rounded-xl border border-dark-700 transition duration-200 text-sm animate-pulse"
+                      className="w-full flex items-center justify-center gap-2 bg-dark-800 hover:bg-dark-750 text-gray-200 font-medium py-2 px-4 rounded-xl border border-dark-700 transition duration-200 text-sm"
                     >
                       <Split className="w-4 h-4 text-green-400" />
                       打包下载分段切片 (.zip)
