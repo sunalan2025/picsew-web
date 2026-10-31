@@ -109,7 +109,10 @@ export function analyzeOverlapSamples(
   for (let v = minimum; v <= maxOverlap; v++) {
     candidates.push({ v, error: evaluate(v) });
   }
-  candidates.sort((x, y) => x.error - y.error);
+  // On sparse pages, short all-white bands can tie with the genuine seam
+  // at zero error. Among equally exact offsets prefer the longer supported
+  // region; long repetitive wallpaper still fails the ambiguity guard below.
+  candidates.sort((x, y) => x.error - y.error || y.v - x.v);
   const best = candidates[0];
   // Compare non-neighbouring alternatives; repeated wallpapers produce many
   // similarly scored offsets and must NOT trigger destructive auto-cropping.
