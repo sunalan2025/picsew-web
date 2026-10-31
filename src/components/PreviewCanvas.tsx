@@ -13,6 +13,7 @@ import type {
 } from '../types';
 import { drawStatusBar } from '../utils/statusBar';
 import { drawMockup } from '../utils/mockup';
+import { canInteractWithCanvas } from '../utils/canvasInteraction';
 
 interface PreviewCanvasProps {
   images: StitchedImage[];
@@ -944,6 +945,8 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
   };
 
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    // In normal preview mode, never hijack swipes or two-finger zoom.
+    if (!canInteractWithCanvas(activeTab)) return;
     if (e.touches.length === 1) {
       const touch = e.touches[0];
       const mockEvent = {
@@ -955,6 +958,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!canInteractWithCanvas(activeTab)) return;
     if (e.touches.length === 1) {
       if (e.cancelable) e.preventDefault();
       const touch = e.touches[0];
@@ -967,7 +971,18 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
   };
 
   const handleTouchEnd = () => {
-    handleMouseUp();
+    if (canInteractWithCanvas(activeTab)) handleMouseUp();
+  };
+
+  const handleTouchCancel = () => {
+    setIsDrawing(false);
+    setDragMode('none');
+    setDraggedSliceIdx(-1);
+    setDraggedField('none');
+    setDragStartScreen(null);
+    setStartPoint(null);
+    setCurrentPoint(null);
+    setPenPoints([]);
   };
 
   const saveTextInput = () => {
@@ -1104,11 +1119,13 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
+              onTouchCancel={handleTouchCancel}
               onMouseLeave={() => {
                 setHoverY(null);
                 setHoverX(null);
               }}
               style={{
+                touchAction: canInteractWithCanvas(activeTab) ? 'none' : 'pan-x pan-y pinch-zoom',
                 width: canvasRef.current ? `${canvasRef.current.width * zoom}px` : 'auto',
                 height: canvasRef.current ? `${canvasRef.current.height * zoom}px` : 'auto',
                 imageRendering: zoom > 1.0 ? 'pixelated' : 'auto'
