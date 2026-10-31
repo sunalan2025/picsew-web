@@ -47,7 +47,8 @@ function generateScreenshot(offset, width = 220, height = 600) {
 }
 
 const server = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173', '--strictPort'],
-  { stdio: ['ignore', 'pipe', 'pipe'] });
+  { stdio: ['ignore', 'ignore', 'ignore'], detached: true });
+server.unref();
 let browser;
 let page;
 try {
@@ -111,5 +112,6 @@ try {
   process.exitCode = 1;
 } finally {
   await browser?.close();
-  server.kill('SIGTERM');
+  // Stop the full npm → Vite process group, not just the npm wrapper.
+  try { if (server.pid) process.kill(-server.pid, 'SIGTERM'); } catch { /* already stopped */ }
 }
