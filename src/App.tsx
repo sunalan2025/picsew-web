@@ -70,6 +70,11 @@ function App() {
   // Unified Undo/Redo stacks
   const [history, setHistory] = useState<HistoryState[]>([{ images: [], overlaps: [], annotations: [] }]);
   const [historyIndex, setHistoryIndex] = useState<number>(0);
+  // A synchronous timeline prevents rapid consecutive commits from using stale renders.
+  const historyRef = useRef<{ entries: HistoryState[]; index: number }>({
+    entries: [{images: [], overlaps: [], annotations: []}], index: 0
+  });
+  const pendingOverlapRef = useRef<number[] | null>(null);
   const [copyStatus, setCopyStatus] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const exportInFlightRef = useRef(false);
@@ -123,7 +128,8 @@ function App() {
     setOverlaps(newOverlaps);
     setAnnotations(newAnnos);
 
-    const newHistory = history.slice(0, historyIndex + 1);
+    const timeline = historyRef.current;
+    const newHistory = timeline.entries.slice(0, timeline.index + 1);
     newHistory.push({
       images: newImgs.map(img => ({ ...img })),
       overlaps: [...newOverlaps],
@@ -140,14 +146,19 @@ function App() {
       newHistory.shift();
     }
 
+    const index = newHistory.length - 1;
+    historyRef.current = { entries: newHistory, index };
     setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
+    setHistoryIndex(index);
   };
 
   // Reset independently of the bounded undo history.
   const handleResetAll = () => {
     if (!images.length) return;
     if (window.confirm('确定要重置全部裁剪、分割、重合度和标注吗？')) {
+      imageChangeSequenceRef.current++;
+      pendingOverlapRef.current = null;
+      setIsStitching(false);
       const resetImages = restoreOriginalImages(images);
       commitState(resetImages, Array(Math.max(0, resetImages.length - 1)).fill(0), []);
       setUncertainSeams([]);
@@ -331,26 +342,34 @@ function App() {
 
   const handleUndo = () => {
     pendingCropRef.current = null;
-    if (historyIndex > 0) {
-      const prevIdx = historyIndex - 1;
-      setHistoryIndex(prevIdx);
-      setImages(history[prevIdx].images);
-      setOverlaps(history[prevIdx].overlaps);
-      setAnnotations(history[prevIdx].annotations);
-      setUncertainSeams([]);
-    }
+    pendingOverlapRef.current = null;
+    const timeline = historyRef.current;
+    if (timeline.index <= 0) return;
+    imageChangeSequenceRef.current++;
+    setIsStitching(false);
+    const index = timeline.index - 1;
+    historyRef.current = {...timeline,index};
+    setHistoryIndex(index);
+    setImages(timeline.entries[index].images);
+    setOverlaps(timeline.entries[index].overlaps);
+    setAnnotations(timeline.entries[index].annotations);
+    setUncertainSeams([]);
   };
 
   const handleRedo = () => {
     pendingCropRef.current = null;
-    if (historyIndex < history.length - 1) {
-      const nextIdx = historyIndex + 1;
-      setHistoryIndex(nextIdx);
-      setImages(history[nextIdx].images);
-      setOverlaps(history[nextIdx].overlaps);
-      setAnnotations(history[nextIdx].annotations);
-      setUncertainSeams([]);
-    }
+    pendingOverlapRef.current = null;
+    const timeline = historyRef.current;
+    if (timeline.index >= timeline.entries.length - 1) return;
+    imageChangeSequenceRef.current++;
+    setIsStitching(false);
+    const index = timeline.index + 1;
+    historyRef.current = {...timeline,index};
+    setHistoryIndex(index);
+    setImages(timeline.entries[index].images);
+    setOverlaps(timeline.entries[index].overlaps);
+    setAnnotations(timeline.entries[index].annotations);
+    setUncertainSeams([]);
   };
 
   // Ctrl/Cmd+Z to undo; Ctrl/Cmd+Shift+Z or Ctrl+Y to redo.
@@ -381,18 +400,24 @@ function App() {
   // --- Drag Adjustment Callbacks ---
   const handleAdjustOverlap = (idx: number, val: number) => {
     setUncertainSeams(prev => prev.filter(index => index !== idx));
-    // Modify state in real-time for rendering smoothness (don't push history yet)
     setOverlaps(prev => {
       const updated = [...prev];
-      updated[idx] = Math.max(0, val);
-      return updated;
+      updated[idx] = val;
+      return clampOverlapsToVisibleImages(images, updated, direction);
     });
   };
 
   const handleManualOverlapsChange = (newVals: number[]) => {
     const safe = clampOverlapsToVisibleImages(images, newVals, direction);
+    pendingOverlapRef.current = safe;
     setUncertainSeams(prev => prev.filter(idx => overlaps[idx] === safe[idx]));
     setOverlaps(safe);
+  };
+  const handleManualOverlapCommit = () => {
+    const accepted = pendingOverlapRef.current;
+    if (!accepted) return;
+    pendingOverlapRef.current = null;
+    commitState(images, accepted, annotations);
   };
 
   const pendingCropRef = useRef<{images: StitchedImage[]; overlaps: number[]} | null>(null);
@@ -438,6 +463,9 @@ function App() {
     scale: number,
     type: 'horizontal' | 'vertical'
   ) => {
+    imageChangeSequenceRef.current++;
+    pendingOverlapRef.current = null;
+    setIsStitching(false);
     const slice = images[sliceIndex];
     const minMargin = 20;
 
@@ -504,6 +532,9 @@ function App() {
   // Reset cropping and collapse split slices without clearing annotations.
   const handleResetCropsAndSplits = () => {
     if (!images.length) return;
+    imageChangeSequenceRef.current++;
+    pendingOverlapRef.current = null;
+    setIsStitching(false);
     const resetImages = restoreOriginalImages(images);
     commitState(resetImages, Array(Math.max(0, resetImages.length - 1)).fill(0), annotations);
     setUncertainSeams([]);
@@ -904,6 +935,7 @@ function App() {
                   setGap={setGap}
                   overlaps={overlaps}
                   setOverlaps={handleManualOverlapsChange}
+                  onOverlapCommit={handleManualOverlapCommit}
                   uncertainSeams={uncertainSeams}
                   focusedSeamIndex={focusedSeam?.index ?? null}
                   onInspectSeam={inspectSeam}
