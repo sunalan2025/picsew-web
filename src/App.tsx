@@ -16,7 +16,7 @@ import { ImageUploader } from './components/ImageUploader';
 import { ControlPanel } from './components/ControlPanel';
 import { PreviewCanvas } from './components/PreviewCanvas';
 import { detectOverlapDetailed, loadImage, visibleImageSource } from './utils/stitching';
-import { clampCropValue, restoreOriginalImages } from './utils/imageState';
+import { clampCropValue, clampOverlapsToVisibleImages, restoreOriginalImages } from './utils/imageState';
 import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
 import { planPdfExport } from './utils/pdfExport';
@@ -201,7 +201,7 @@ function App() {
     }
 
     if (sequence !== imageChangeSequenceRef.current) return;
-    commitState(newImgs, newOverlaps, annotations);
+    commitState(newImgs, clampOverlapsToVisibleImages(newImgs, newOverlaps, direction), annotations);
     setUncertainSeams(newWarnings);
     // Importing a new batch immediately returns to the finished canvas.
     if (newImgs.length > images.length) {
@@ -235,7 +235,7 @@ function App() {
       
       if (imageChangeSequenceRef.current !== sequence) return;
       // Automatic alignment must not unexpectedly erase manual cropping.
-      commitState(images, newOverlaps, annotations);
+      commitState(images, clampOverlapsToVisibleImages(images, newOverlaps, direction), annotations);
       setUncertainSeams(warnings);
       setActiveTab('stitch');
     } catch (err) {
@@ -271,7 +271,7 @@ function App() {
         previous = second;
       }
       if (imageChangeSequenceRef.current !== sequence) return;
-      commitState(images, detected, annotations);
+      commitState(images, clampOverlapsToVisibleImages(images, detected, nextDirection), annotations);
       setUncertainSeams(warnings);
     } catch (error) {
       console.error('Cannot recalculate overlap after switching direction', error);
@@ -373,15 +373,19 @@ function App() {
   };
 
   const handleManualOverlapsChange = (newVals: number[]) => {
-    setUncertainSeams(prev => prev.filter(idx => overlaps[idx] === newVals[idx]));
-    setOverlaps(newVals);
+    const safe = clampOverlapsToVisibleImages(images, newVals, direction);
+    setUncertainSeams(prev => prev.filter(idx => overlaps[idx] === safe[idx]));
+    setOverlaps(safe);
   };
 
   const handleAdjustCrop = (sliceIndex: number, field: 'cropTop' | 'cropBottom' | 'cropLeft' | 'cropRight', val: number) => {
-    // Crop geometry invalidates earlier alignment requests and adjacent seams.
+    // Cropping invalidates cached seam geometry and in-flight auto matching.
     imageChangeSequenceRef.current++;
-    setImages(prev => prev.map((img, idx) => idx === sliceIndex
-      ? { ...img, [field]: clampCropValue(img, field, val) } : img));
+    setIsStitching(false);
+    const next = images.map((img, idx) => idx === sliceIndex
+      ? { ...img, [field]: clampCropValue(img, field, val) } : img);
+    setImages(next);
+    setOverlaps(prev => clampOverlapsToVisibleImages(next, prev, direction));
     setUncertainSeams(prev => Array.from(new Set([
       ...prev, ...(sliceIndex > 0 ? [sliceIndex - 1] : []),
       ...(sliceIndex < images.length - 1 ? [sliceIndex] : [])
@@ -392,7 +396,7 @@ function App() {
     imageChangeSequenceRef.current++;
     const next = images.map((img, i) => i === index
       ? { ...img, cropTop:0, cropBottom:0, cropLeft:0, cropRight:0 } : img);
-    commitState(next, overlaps, annotations);
+    commitState(next, clampOverlapsToVisibleImages(next, overlaps, direction), annotations);
     setUncertainSeams(prev => Array.from(new Set([
       ...prev, ...(index > 0 ? [index - 1] : []),
       ...(index < images.length - 1 ? [index] : [])

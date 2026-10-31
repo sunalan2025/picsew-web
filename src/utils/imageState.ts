@@ -46,3 +46,25 @@ export function reorderImages(images: StitchedImage[], sourceId: string, targetI
   changed.splice(to, 0, item);
   return changed;
 }
+
+/** Avoid negative canvas geometry after aggressive per-image cropping.
+ * Overlap for a join is measured in the *next* slice's source pixels.
+ * Both images are independently normalized to the same cross-axis width. */
+export function clampOverlapsToVisibleImages(
+  images: StitchedImage[], overlaps: number[], direction: 'vertical'|'horizontal'
+): number[] {
+  const vertical = direction === 'vertical';
+  const along = (img:StitchedImage) => vertical
+    ? Math.max(10, img.height-img.cropTop-img.cropBottom)
+    : Math.max(10, img.width-img.cropLeft-img.cropRight);
+  const across = (img:StitchedImage) => vertical
+    ? Math.max(10, img.width-img.cropLeft-img.cropRight)
+    : Math.max(10, img.height-img.cropTop-img.cropBottom);
+  return Array.from({length:Math.max(0, images.length-1)},(_,i)=>{
+    const previous=images[i], next=images[i+1];
+    const nextLimit=along(next)-1;
+    const prevLimit=along(previous)*across(next)/across(previous)-1;
+    return Math.min(Math.max(0, Math.floor(overlaps[i]??0)),
+      Math.max(0,Math.floor(Math.min(nextLimit,prevLimit))));
+  });
+}
