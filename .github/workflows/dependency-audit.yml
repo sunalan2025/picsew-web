@@ -1,0 +1,51 @@
+name: Dependency security audit
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/dependency-audit.yml"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/dependabot.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "11 5 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Summarize known dependency advisories
+        shell: bash
+        run: |
+          npm audit --json > audit-all.json || true
+          npm audit --omit=dev --json > audit-production.json || true
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          for (const [name, filename] of [
+            ['all', 'audit-all.json'],
+            ['production', 'audit-production.json']
+          ]) {
+            const json = JSON.parse(fs.readFileSync(filename, 'utf8'));
+            const counts = json.metadata?.vulnerabilities || {};
+            console.log(name + ' audit: ' + JSON.stringify(counts));
+            for (const [pkg, entry] of Object.entries(json.vulnerabilities || {})) {
+              console.log(JSON.stringify({
+                package: pkg,
+                severity: entry.severity,
+                direct: entry.isDirect,
+                range: entry.range,
+                fix: entry.fixAvailable
+              }));
+            }
+          }
+          NODE
