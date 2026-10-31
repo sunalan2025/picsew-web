@@ -20,3 +20,18 @@ export function restoreOriginalImages(images: StitchedImage[]): StitchedImage[] 
   }
   return result;
 }
+
+/** Clamp one crop edge without subtracting the edge being edited twice. */
+export function clampCropValue(
+  image: StitchedImage,
+  field: 'cropTop' | 'cropBottom' | 'cropLeft' | 'cropRight',
+  requested: number
+): number {
+  const vertical = field === 'cropTop' || field === 'cropBottom';
+  const opposite = field === 'cropTop' ? image.cropBottom
+    : field === 'cropBottom' ? image.cropTop
+    : field === 'cropLeft' ? image.cropRight : image.cropLeft;
+  const dimension = vertical ? image.height : image.width;
+  const maximum = Math.max(0, dimension - opposite - 10);
+  return Math.min(maximum, Math.max(0, Number.isFinite(requested) ? Math.floor(requested) : 0));
+}
