@@ -121,8 +121,9 @@ try {
   const maxBefore = await overlapControl.getAttribute('max');
   const originalOverlap = Number(await overlapControl.inputValue());
   await overlapControl.focus();
-  await overlapControl.press('ArrowLeft');
-  await page.waitForFunction(value => Number(document.querySelector('#overlap-2')?.value) < value,
+  // Uncertain seams correctly start at 0: ArrowLeft would then be a no-op.
+  await overlapControl.press(originalOverlap > 0 ? 'ArrowLeft' : 'ArrowRight');
+  await page.waitForFunction(value => Number(document.querySelector('#overlap-2')?.value) !== value,
     originalOverlap);
   const updatedOverlap = Number(await overlapControl.inputValue());
   assert.equal(await overlapControl.getAttribute('max'), maxBefore,
