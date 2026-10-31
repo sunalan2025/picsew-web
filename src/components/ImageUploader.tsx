@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Upload, X, ChevronUp, ChevronDown, Crop } from 'lucide-react';
+import { Upload, X, ChevronUp, ChevronDown, Crop, GripVertical } from 'lucide-react';
 import type { StitchedImage } from '../types';
-import { clampCropValue } from '../utils/imageState';
+import { clampCropValue, reorderImages } from '../utils/imageState';
 
 interface ImageUploaderProps {
   images: StitchedImage[];
@@ -19,6 +19,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   const [isImporting, setIsImporting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadMessage, setUploadMessage] = useState('');
+  const [dragSourceId, setDragSourceId] = useState<string | null>(null);
+  const [dragTargetId, setDragTargetId] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -156,6 +158,15 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     if (e.dataTransfer.files.length) void addFiles(Array.from(e.dataTransfer.files));
   };
 
+  const onSortDrop = (targetId: string) => {
+    if (dragSourceId) {
+      const changed = reorderImages(images, dragSourceId, targetId);
+      if (changed !== images) onImagesChange(changed);
+    }
+    setDragSourceId(null);
+    setDragTargetId(null);
+  };
+
   const removeImage = (id: string) => {
     onImagesChange(images.filter(img => img.id !== id));
   };
@@ -245,9 +256,38 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           images.map((img, index) => (
             <div
               key={img.id}
-              className="p-3 bg-dark-800 border border-dark-700/50 rounded-xl relative group flex flex-col gap-2"
+              onDragOver={e => {
+                if (dragSourceId) {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  setDragTargetId(img.id);
+                }
+              }}
+              onDrop={e => {
+                e.preventDefault();
+                onSortDrop(img.id);
+              }}
+              className={`p-3 rounded-xl relative group flex flex-col gap-2 transition-all ${dragTargetId === img.id && dragSourceId !== img.id ? 'bg-blue-50 border-2 border-blue-400' : 'bg-dark-800 border border-dark-700/50'} ${dragSourceId === img.id ? 'opacity-50' : ''}`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  draggable
+                  onDragStart={e => {
+                    setDragSourceId(img.id);
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', img.id);
+                  }}
+                  onDragEnd={() => {
+                    setDragSourceId(null);
+                    setDragTargetId(null);
+                  }}
+                  aria-label={`拖动调整第 ${index + 1} 张图片顺序`}
+                  title="拖动排序"
+                  className="cursor-grab rounded-lg p-1.5 text-gray-400 hover:bg-dark-700 active:cursor-grabbing"
+                >
+                  <GripVertical className="h-4 w-4" />
+                </button>
                 {/* Thumbnail */}
                 <div className="w-12 h-16 rounded-md overflow-hidden bg-dark-900 border border-dark-700 flex-shrink-0 flex items-center justify-center">
                   <img
