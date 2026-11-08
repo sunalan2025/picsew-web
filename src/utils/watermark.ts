@@ -1,7 +1,11 @@
 import type { WatermarkConfig } from '../types';
 
 /** Sparse watermark positions, with an upper bound even for very long screenshots. */
-export function watermarkPositions(width: number, height: number, repeat: boolean): { x: number; y: number }[] {
+export function watermarkPositions(
+  width: number,
+  height: number,
+  repeat: boolean
+): { x: number; y: number }[] {
   if (width <= 0 || height <= 0) return [];
   if (!repeat) return [{ x: width / 2, y: height / 2 }];
   const stepX = Math.max(240, width / 8);
@@ -15,7 +19,11 @@ export function watermarkPositions(width: number, height: number, repeat: boolea
   return result;
 }
 
-export function drawWatermark(canvas: HTMLCanvasElement, config: WatermarkConfig): void {
+export function drawWatermark(
+  canvas: HTMLCanvasElement,
+  config: WatermarkConfig,
+  region?: { width: number; height: number; y: number }
+): void {
   const label = config.text.trim().slice(0, 100);
   if (!config.enabled || !label) return;
   const ctx = canvas.getContext('2d');
@@ -29,11 +37,20 @@ export function drawWatermark(canvas: HTMLCanvasElement, config: WatermarkConfig
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = `600 ${size}px system-ui, -apple-system, sans-serif`;
-  for (const { x, y } of watermarkPositions(canvas.width, canvas.height, config.repeat)) {
+  for (const { x, y } of watermarkPositions(
+    region?.width ?? canvas.width,
+    region?.height ?? canvas.height,
+    config.repeat
+  )) {
     ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(angle * Math.PI / 180);
-    ctx.fillText(label, 0, 0, Math.max(100, canvas.width * 0.72));
+    ctx.translate(x, y - (region?.y ?? 0));
+    ctx.rotate((angle * Math.PI) / 180);
+    ctx.fillText(
+      label,
+      0,
+      0,
+      Math.max(100, (region?.width ?? canvas.width) * 0.72)
+    );
     ctx.restore();
   }
   ctx.restore();

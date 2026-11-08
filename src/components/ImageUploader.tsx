@@ -1,11 +1,22 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { Upload, X, ChevronUp, ChevronDown, GripVertical, Film, Ban } from 'lucide-react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
+import {
+  Upload,
+  X,
+  ChevronUp,
+  ChevronDown,
+  GripVertical,
+  Film,
+  Ban,
+} from 'lucide-react';
 import type { StitchedImage } from '../types';
 import { reorderImages } from '../utils/imageState';
 import { extractVideoFrames } from '../utils/videoFrames';
 import { sortScreenshotFiles } from '../utils/importOrder';
 
 interface ImageUploaderProps {
+  onImportMessage?: (message: string) => void;
+  incomingFiles?: File[];
+  onIncomingConsumed?: () => void;
   images: StitchedImage[];
   onImagesChange: (images: StitchedImage[]) => void;
   onAutoStitchTrigger: () => void;
@@ -13,8 +24,11 @@ interface ImageUploaderProps {
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({
   images,
+  incomingFiles,
+  onIncomingConsumed,
+  onImportMessage,
   onImagesChange,
-  onAutoStitchTrigger
+  onAutoStitchTrigger,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -25,7 +39,23 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   const [uploadMessage, setUploadMessage] = useState('');
   const [dragSourceId, setDragSourceId] = useState<string | null>(null);
   const [dragTargetId, setDragTargetId] = useState<string | null>(null);
-  const [videoProgress, setVideoProgress] = useState<{ done: number; total: number } | null>(null);
+  const [pendingVideo, setPendingVideo] = useState<File | null>(null);
+  const [videoUrl, setVideoUrl] = useState('');
+  const [videoRange, setVideoRange] = useState({ start: 0, end: 180 });
+  const videoPreviewRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (!pendingVideo) {
+      setVideoUrl('');
+      return;
+    }
+    const url = URL.createObjectURL(pendingVideo);
+    setVideoUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [pendingVideo]);
+  const [videoProgress, setVideoProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const touchSortRef = useRef<{
     sourceId: string;
     targetId: string;
@@ -35,6 +65,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     timer: ReturnType<typeof setTimeout> | null;
   } | null>(null);
 
+  const consumedIncoming = useRef<File[] | null>(null);
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     // Allow choosing the same screenshot again after removing it.
@@ -42,107 +73,138 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     if (files.length) void addFiles(files);
   };
 
-  const addFiles = async (files: File[]) => {
-    if (importingRef.current) {
-      setUploadMessage('图片正在导入，请完成后再添加。');
-      return;
-    }
-    importingRef.current = true;
-    setIsImporting(true);
-    setUploadMessage('');
-
-    const skipped = { limit: 0, format: 0, size: 0, pixels: 0, failed: 0 };
-    const MAX_FILE_SIZE = 50 * 1024 * 1024;
-    const MAX_PIXELS = 25_000_000;
-    const supportedTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
-    const available = Math.max(0, 50 - images.length);
-    const filesToProcess = sortScreenshotFiles(files).slice(0, available);
-    skipped.limit = files.length - filesToProcess.length;
-    const loaded: StitchedImage[] = [];
-
-    try {
-      // Decode sequentially instead of allocating dozens of large images at once.
-      for (const file of filesToProcess) {
-        if (!supportedTypes.has(file.type) || file.name.toLowerCase().endsWith('.svg')) {
-          skipped.format++;
-          continue;
-        }
-        if (file.size > MAX_FILE_SIZE) {
-          skipped.size++;
-          continue;
-        }
-
-        try {
-          const image = await new Promise<StitchedImage>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onerror = () => reject(new Error('read'));
-            reader.onabort = () => reject(new Error('read'));
-            reader.onload = () => {
-              const src = reader.result;
-              if (typeof src !== 'string' || !src.startsWith('data:image/')) {
-                reject(new Error('read'));
-                return;
-              }
-              const img = new Image();
-              img.onerror = () => reject(new Error('decode'));
-              img.onload = () => {
-                if (!img.naturalWidth || !img.naturalHeight ||
-                    img.naturalWidth * img.naturalHeight > MAX_PIXELS) {
-                  reject(new Error('pixels'));
-                  return;
-                }
-                resolve({
-                  id: crypto.randomUUID(),
-                  name: file.name,
-                  src,
-                  width: img.naturalWidth,
-                  height: img.naturalHeight,
-                  cropTop: 0,
-                  cropBottom: 0,
-                  cropLeft: 0,
-                  cropRight: 0
-                });
-              };
-              img.src = src;
-            };
-            try {
-              reader.readAsDataURL(file);
-            } catch {
-              reject(new Error('read'));
-            }
-          });
-          loaded.push(image);
-        } catch (error) {
-          if (error instanceof Error && error.message === 'pixels') skipped.pixels++;
-          else skipped.failed++;
-        }
+  const addFiles = useCallback(
+    async (files: File[]) => {
+      if (importingRef.current) {
+        setUploadMessage('图片正在导入，请完成后再添加。');
+        return;
       }
+      importingRef.current = true;
+      setIsImporting(true);
+      setUploadMessage('');
 
-      if (loaded.length) await onImagesChange([...images, ...loaded]);
-      const warnings = [
-        skipped.limit && `超过 50 张上限 ${skipped.limit} 张`,
-        skipped.format && `格式不支持 ${skipped.format} 张`,
-        skipped.size && `超过 50 MB ${skipped.size} 张`,
-        skipped.pixels && `超过 2500 万像素 ${skipped.pixels} 张`,
-        skipped.failed && `读取失败 ${skipped.failed} 张`
-      ].filter(Boolean);
-      setUploadMessage(`按文件名顺序导入 ${loaded.length} 张，可拖动调整顺序。` +
-        (warnings.length ? ` 跳过：${warnings.join('、')}。` : ''));
-    } catch (error) {
-      console.error('Image import failed', error);
-      setUploadMessage('图片导入失败，请重试。');
-    } finally {
-      importingRef.current = false;
-      setIsImporting(false);
+      const skipped = { limit: 0, format: 0, size: 0, pixels: 0, failed: 0 };
+      const MAX_FILE_SIZE = 50 * 1024 * 1024;
+      const MAX_PIXELS = 25_000_000;
+      const supportedTypes = new Set([
+        'image/png',
+        'image/jpeg',
+        'image/webp',
+        'image/gif',
+      ]);
+      const available = Math.max(0, 50 - images.length);
+      const filesToProcess = sortScreenshotFiles(files).slice(0, available);
+      skipped.limit = files.length - filesToProcess.length;
+      const loaded: StitchedImage[] = [];
+      let totalPixels = images.reduce(
+        (n, img) => n + img.width * img.height,
+        0
+      );
+
+      try {
+        // Decode sequentially instead of allocating dozens of large images at once.
+        for (const file of filesToProcess) {
+          if (
+            !supportedTypes.has(file.type) ||
+            file.name.toLowerCase().endsWith('.svg')
+          ) {
+            skipped.format++;
+            continue;
+          }
+          if (file.size > MAX_FILE_SIZE) {
+            skipped.size++;
+            continue;
+          }
+
+          try {
+            const src = URL.createObjectURL(file);
+            let image: StitchedImage;
+            try {
+              const element = new Image();
+              element.src = src;
+              await element.decode();
+              const pixels = element.naturalWidth * element.naturalHeight;
+              if (
+                !pixels ||
+                pixels > MAX_PIXELS ||
+                totalPixels + pixels > 80_000_000
+              )
+                throw new Error('pixels');
+              image = {
+                id: crypto.randomUUID(),
+                name: file.name,
+                src,
+                width: element.naturalWidth,
+                height: element.naturalHeight,
+                cropTop: 0,
+                cropBottom: 0,
+                cropLeft: 0,
+                cropRight: 0,
+              };
+              totalPixels += pixels;
+              element.src = '';
+            } catch (error) {
+              URL.revokeObjectURL(src);
+              throw error;
+            }
+            loaded.push(image);
+          } catch (error) {
+            if (error instanceof Error && error.message === 'pixels')
+              skipped.pixels++;
+            else skipped.failed++;
+          }
+        }
+
+        if (loaded.length) await onImagesChange([...images, ...loaded]);
+        const warnings = [
+          skipped.limit && `超过 50 张上限 ${skipped.limit} 张`,
+          skipped.format && `格式不支持 ${skipped.format} 张`,
+          skipped.size && `超过 50 MB ${skipped.size} 张`,
+          skipped.pixels &&
+            `超过单图 2500 万 / 项目 8000 万像素预算 ${skipped.pixels} 张`,
+          skipped.failed && `读取失败 ${skipped.failed} 张`,
+        ].filter(Boolean);
+        setUploadMessage(
+          `按文件名顺序导入 ${loaded.length} 张，可拖动调整顺序。` +
+            (warnings.length ? ` 跳过：${warnings.join('、')}。` : '')
+        );
+        if (warnings.length)
+          onImportMessage?.(
+            `已导入 ${loaded.length} 张，跳过：${warnings.join('、')}`
+          );
+        return loaded.length;
+      } catch (error) {
+        console.error('Image import failed', error);
+        setUploadMessage('图片导入失败，请重试。');
+        return 0;
+      } finally {
+        importingRef.current = false;
+        setIsImporting(false);
+      }
+    },
+    [images, onImagesChange, onImportMessage]
+  );
+
+  useEffect(() => {
+    if (incomingFiles?.length && consumedIncoming.current !== incomingFiles) {
+      consumedIncoming.current = incomingFiles;
+      void addFiles(incomingFiles).then((count) => {
+        if (count) onIncomingConsumed?.();
+      });
     }
-  };
-
+  }, [incomingFiles, addFiles, onIncomingConsumed]);
   // Cancel an in-progress video decode when the upload view is closed.
   useEffect(() => () => videoAbortRef.current?.abort(), []);
 
-  const handleVideoFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleVideoFileChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     event.target.value = '';
+    if (file && !importingRef.current) setPendingVideo(file);
+  };
+  const importVideo = async (singleFrame = false) => {
+    const file = pendingVideo;
     if (!file) return;
     if (importingRef.current) {
       setUploadMessage('请先完成当前的导入任务');
@@ -159,18 +221,39 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         file,
         Math.min(40, 50 - images.length),
         controller.signal,
-        (done, total) => setVideoProgress({ done, total })
+        (done, total) => setVideoProgress({ done, total }),
+        singleFrame
+          ? {
+              singleFrameTime:
+                videoPreviewRef.current?.currentTime ?? videoRange.start,
+            }
+          : videoRange
       );
       if (controller.signal.aborted) return;
-      if (result.images.length > 0) await onImagesChange([...images, ...result.images]);
-      setUploadMessage(
+      const budget =
+        images.reduce((n, img) => n + img.width * img.height, 0) +
+        result.images.reduce((n, img) => n + img.width * img.height, 0);
+      if (budget > 80_000_000) {
+        for (const image of result.images) URL.revokeObjectURL(image.src);
+        throw new Error('抽帧结果超出项目像素预算，请缩短区间或减少保留帧');
+      }
+      if (result.images.length > 0)
+        await onImagesChange([...images, ...result.images]);
+      const message =
         `录屏已分析 ${result.considered} 帧，提取 ${result.images.length} 张滚动画面。` +
-        (result.uncertainTransitions ? ` 有 ${result.uncertainTransitions} 处变化尚无法可靠对齐，请检查拼接接缝。` : '') +
-        (result.truncated ? ' 已达到截图张数上限，部分尾部内容尚未导入；请拆分录屏。' : '')
-      );
+        (result.uncertainTransitions
+          ? ` 有 ${result.uncertainTransitions} 处变化尚无法可靠对齐，请检查拼接接缝。`
+          : '') +
+        (result.truncated
+          ? ' 已达到截图张数上限，部分尾部内容尚未导入；请拆分录屏。'
+          : '');
+      setUploadMessage(message);
+      onImportMessage?.(message);
     } catch (error) {
       if (!controller.signal.aborted) {
-        setUploadMessage(error instanceof Error ? error.message : '录屏解析失败');
+        setUploadMessage(
+          error instanceof Error ? error.message : '录屏解析失败'
+        );
       }
     } finally {
       if (videoAbortRef.current === controller) videoAbortRef.current = null;
@@ -180,23 +263,6 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     }
   };
 
-  // Paste screenshots directly from the clipboard while the import view is open.
-  useEffect(() => {
-    const onPaste = (event: ClipboardEvent) => {
-      const target = event.target;
-      if (target instanceof HTMLElement &&
-          target.closest('input, textarea, [contenteditable="true"]')) return;
-      const pasted = Array.from(event.clipboardData?.files ?? [])
-        .filter(file => file.type.startsWith('image/'));
-      if (pasted.length) {
-        event.preventDefault();
-        void addFiles(pasted);
-      }
-    };
-    window.addEventListener('paste', onPaste);
-    return () => window.removeEventListener('paste', onPaste);
-  });
-
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     if (!isImporting) setIsDragging(true);
@@ -204,22 +270,30 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
-    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setIsDragging(false);
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null))
+      setIsDragging(false);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    if (e.dataTransfer.files.length) void addFiles(Array.from(e.dataTransfer.files));
+    if (e.dataTransfer.files.length)
+      void addFiles(Array.from(e.dataTransfer.files));
   };
 
   // Long-press the grab handle on touchscreens. All other areas keep native scrolling.
-  const onTouchSortStart = (event: React.PointerEvent<HTMLButtonElement>, sourceId: string) => {
+  const onTouchSortStart = (
+    event: React.PointerEvent<HTMLButtonElement>,
+    sourceId: string
+  ) => {
     if (event.pointerType === 'mouse' || images.length < 2) return;
     const gesture = {
-      sourceId, targetId: sourceId, active: false,
-      x: event.clientX, y: event.clientY,
-      timer: null as ReturnType<typeof setTimeout> | null
+      sourceId,
+      targetId: sourceId,
+      active: false,
+      x: event.clientX,
+      y: event.clientY,
+      timer: null as ReturnType<typeof setTimeout> | null,
     };
     touchSortRef.current = gesture;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -235,13 +309,16 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     const gesture = touchSortRef.current;
     if (!gesture) return;
     if (!gesture.active) {
-      if (Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 12) {
+      if (
+        Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 12
+      ) {
         if (gesture.timer) clearTimeout(gesture.timer);
         touchSortRef.current = null;
       }
       return;
     }
-    const target = document.elementFromPoint(event.clientX, event.clientY)
+    const target = document
+      .elementFromPoint(event.clientX, event.clientY)
       ?.closest<HTMLElement>('[data-picsew-image-id]');
     const targetId = target?.dataset.picsewImageId;
     if (targetId) {
@@ -279,13 +356,13 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   };
 
   const removeImage = (id: string) => {
-    onImagesChange(images.filter(img => img.id !== id));
+    onImagesChange(images.filter((img) => img.id !== id));
   };
 
   const moveImage = (index: number, direction: 'up' | 'down') => {
     const newIndex = direction === 'up' ? index - 1 : index + 1;
     if (newIndex < 0 || newIndex >= images.length) return;
-    
+
     const updated = [...images];
     const temp = updated[index];
     updated[index] = updated[newIndex];
@@ -293,9 +370,88 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     onImagesChange(updated);
   };
 
-
   return (
     <div className="flex flex-col h-full overflow-hidden">
+      {pendingVideo && (
+        <section
+          className="mb-3 space-y-2 rounded-xl border p-3 text-xs"
+          aria-label="录屏区间选择"
+        >
+          <video
+            ref={videoPreviewRef}
+            src={videoUrl}
+            controls
+            playsInline
+            preload="metadata"
+            className="max-h-44 w-full rounded-lg"
+            onLoadedMetadata={(e) =>
+              setVideoRange({
+                start: 0,
+                end: Math.min(180, e.currentTarget.duration),
+              })
+            }
+          />
+          <div className="flex gap-2">
+            <label>
+              开始（秒）
+              <input
+                type="number"
+                aria-label="录屏开始时间"
+                min={0}
+                step={0.1}
+                value={videoRange.start}
+                onChange={(e) =>
+                  setVideoRange((r) => ({
+                    ...r,
+                    start: Number(e.target.value),
+                  }))
+                }
+                className="w-full"
+              />
+            </label>
+            <label>
+              结束（秒）
+              <input
+                type="number"
+                aria-label="录屏结束时间"
+                min={0}
+                step={0.1}
+                value={videoRange.end}
+                onChange={(e) =>
+                  setVideoRange((r) => ({ ...r, end: Number(e.target.value) }))
+                }
+                className="w-full"
+              />
+            </label>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={isImporting}
+              className="rounded-lg bg-blue-600 px-3 py-2 text-white"
+              onClick={() => void importVideo()}
+            >
+              提取所选区间
+            </button>
+            <button
+              type="button"
+              disabled={isImporting}
+              className="rounded-lg border px-3 py-2"
+              onClick={() => void importVideo(true)}
+            >
+              补入当前帧
+            </button>
+            <button
+              type="button"
+              disabled={isImporting}
+              className="rounded-lg border px-3 py-2"
+              onClick={() => setPendingVideo(null)}
+            >
+              关闭预览
+            </button>
+          </div>
+        </section>
+      )}
       {/* Upload Zone */}
       <div
         role="button"
@@ -304,7 +460,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         aria-disabled={isImporting}
-        onClick={() => { if (!isImporting) fileInputRef.current?.click(); }}
+        onClick={() => {
+          if (!isImporting) fileInputRef.current?.click();
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -326,9 +484,15 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           <Upload className="w-6 h-6" />
         </div>
         <p className="text-sm font-medium text-slate-700">
-          {isImporting ? '正在导入图片…' : isDragging ? '松开即可添加图片' : '点击或拖拽添加截图'}
+          {isImporting
+            ? '正在导入图片…'
+            : isDragging
+              ? '松开即可添加图片'
+              : '点击或拖拽添加截图'}
         </p>
-        <p className="text-xs text-slate-600 mt-1">PNG / JPEG / WebP / GIF · 最多 50 张</p>
+        <p className="text-xs text-slate-600 mt-1">
+          PNG / JPEG / WebP / GIF · 最多 50 张
+        </p>
       </div>
       <input
         ref={videoInputRef}
@@ -348,8 +512,11 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           <Film className="h-4 w-4 text-primary-500" /> 从录屏提取
         </button>
         {videoProgress && (
-          <button type="button" className="flex items-center gap-1 rounded-xl px-3 py-2 text-xs text-red-500"
-            onClick={() => videoAbortRef.current?.abort()}>
+          <button
+            type="button"
+            className="flex items-center gap-1 rounded-xl px-3 py-2 text-xs text-red-500"
+            onClick={() => videoAbortRef.current?.abort()}
+          >
             <Ban className="h-4 w-4" /> 取消
           </button>
         )}
@@ -357,13 +524,27 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       {videoProgress && (
         <div className="mb-3" role="status" aria-live="polite">
           <div className="mb-1 flex justify-between text-xs text-slate-600">
-            <span>正在提取录屏帧</span><span>{videoProgress.total ? Math.round(videoProgress.done / videoProgress.total * 100) : 0}%</span>
+            <span>正在提取录屏帧</span>
+            <span>
+              {videoProgress.total
+                ? Math.round((videoProgress.done / videoProgress.total) * 100)
+                : 0}
+              %
+            </span>
           </div>
-          <progress className="h-2 w-full accent-primary-500" value={videoProgress.done} max={videoProgress.total || 1} />
+          <progress
+            className="h-2 w-full accent-primary-500"
+            value={videoProgress.done}
+            max={videoProgress.total || 1}
+          />
         </div>
       )}
       {uploadMessage && (
-        <p role="status" aria-live="polite" className="text-xs text-amber-600 mb-3 rounded-lg bg-amber-500/10 px-3 py-2">
+        <p
+          role="status"
+          aria-live="polite"
+          className="text-xs text-amber-600 mb-3 rounded-lg bg-amber-500/10 px-3 py-2"
+        >
           {uploadMessage}
         </p>
       )}
@@ -382,9 +563,20 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       {images.length > 1 && (
         <div className="mb-2 flex items-center justify-between gap-2 text-xs text-slate-500">
           <span>从上往下拼接 · {images.length} 张</span>
-          <button type="button" onClick={() => onImagesChange([...images].sort((a,b) =>
-            new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' }).compare(a.name, b.name)))}
-            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-blue-600 font-semibold">
+          <button
+            type="button"
+            onClick={() =>
+              onImagesChange(
+                [...images].sort((a, b) =>
+                  new Intl.Collator('zh-CN', {
+                    numeric: true,
+                    sensitivity: 'base',
+                  }).compare(a.name, b.name)
+                )
+              )
+            }
+            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-blue-600 font-semibold"
+          >
             按文件名重排
           </button>
         </div>
@@ -400,30 +592,35 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             <div
               key={img.id}
               data-picsew-image-id={img.id}
-              onDragOver={e => {
+              onDragOver={(e) => {
                 if (dragSourceId) {
                   e.preventDefault();
                   e.dataTransfer.dropEffect = 'move';
                   setDragTargetId(img.id);
                 }
               }}
-              onDrop={e => {
+              onDrop={(e) => {
                 e.preventDefault();
                 onSortDrop(img.id);
               }}
               className={`p-3 rounded-xl relative group flex flex-col gap-2 transition-all ${dragTargetId === img.id && dragSourceId !== img.id ? 'bg-blue-50 border-2 border-blue-400' : 'bg-slate-50 border border-slate-200'} ${dragSourceId === img.id ? 'opacity-50' : ''}`}
             >
               <div className="flex items-center gap-2">
-                <span className="shrink-0 text-xs font-bold text-blue-600" title="拼接顺序">{index + 1}</span>
+                <span
+                  className="shrink-0 text-xs font-bold text-blue-600"
+                  title="拼接顺序"
+                >
+                  {index + 1}
+                </span>
                 <button
                   type="button"
                   draggable
-                  onPointerDown={e => onTouchSortStart(e, img.id)}
+                  onPointerDown={(e) => onTouchSortStart(e, img.id)}
                   onPointerMove={onTouchSortMove}
                   onPointerUp={endTouchSort}
                   onPointerCancel={cancelTouchSort}
                   style={{ touchAction: 'none' }}
-                  onDragStart={e => {
+                  onDragStart={(e) => {
                     setDragSourceId(img.id);
                     e.dataTransfer.effectAllowed = 'move';
                     e.dataTransfer.setData('text/plain', img.id);
@@ -488,7 +685,6 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                   <X className="w-4 h-4" />
                 </button>
               </div>
-
             </div>
           ))
         )}

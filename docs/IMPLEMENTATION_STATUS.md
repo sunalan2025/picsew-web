@@ -1,0 +1,56 @@
+# Picsew Web implementation and validation
+
+This work extends the existing local-first web editor. It does not claim feature parity with the proprietary iOS application. The GitHub Pages workflow validates and builds on Node 24, uses the official npm registry, and emits build-info.json and a page build marker so the published commit can be verified.
+
+## Implemented
+
+- Complete project history: images, crops, seams, direction, gap, annotations, status bar, device frame, watermark, and export settings. Up to 50 undo steps; successive changes to the same setting are grouped. Direction changes create an atomic history step before asynchronous alignment, so undo also cancels an in-flight direction change correctly.
+- Shared source-image layout and original-pixel annotation anchors. Cropping, reordering, normalization and split slices reuse original coordinates. Selection, dragging, proportional resizing, recoloring, text editing, and deleting individual annotations.
+- Independent final renderer used by image, clipboard, share, PDF and ZIP export. Editing guides and temporarily hidden frames cannot alter the saved result.
+- Mixed-resolution seam matching normalizes both axes into the next image's pixel scale. Candidate search runs in a dedicated worker. Per-seam overlay magnifier, opacity, 1/10-pixel adjustments, keyboard controls and individual rematching.
+- Stable top/bottom band suggestions with explicit confirmation; manual proportional batch cropping remains available.
+- Unified pointer capture, one-finger browsing, two-finger focal-point zoom, double-tap/double-click zoom, and edge scrolling while marking. Releasing a gesture outside the canvas still completes it.
+- Video interval preview, extraction of a selected interval (up to 180 seconds), supplemental extraction at the current frame, source timestamps, progress and cancellation. Image frame storage uses Blob URLs rather than Base64.
+- Blob-based imports with a per-image 25 MP limit and a total project 80 MP budget. Sequential thumbnail decoding, bounded preview buffers (8 MP / 8192-pixel long axis), and release of assets no longer referenced by the project or undo history.
+- Export content-width control, JPEG quality, actual encoded dimensions/size feedback, single-page PDF PPI and landscape support. Long unframed PDF/ZIP output is rendered in tiles; watermarks keep their global position and neighboring pixels are included for blur/mosaic at tile boundaries.
+- IndexedDB draft save, explicit restore/new-project choice, and recovery of source blobs and complete project settings. Storage failures are shown; an existing draft is not silently overwritten before the user chooses.
+- PWA manifest and icons, production service worker precaching including export chunks and stitch worker, offline app shell, local-only multipart share target, and global clipboard import.
+- Additional iPhone 16 Pro and generic Android frame presets, frame color/width, and content rotation. These are original vector approximations, not official Apple device artwork.
+- Android image share intents; a bounded reader exposes only attachments received by the activity. Native export callbacks distinguish success, failure and cancellation. Legacy save API remains supported.
+- Official Gradle and Maven sources replace regional mirrors; wrapper distribution checksum is pinned. PDF/ZIP libraries load on demand.
+
+## Validation
+
+Run:
+
+```sh
+npm run lint
+npm test
+npm run build
+# Install the same isolated browser tooling used by CI.
+npm install --no-save --package-lock=false playwright@1.55.0
+npx playwright install chromium
+npm run test:browser
+```
+
+A local system Chromium can be selected with `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium`. The browser tests start and stop their own servers. Tests cover mouse and emulated touch, crop geometry, actual downloaded PNG pixels, project history, annotation editing, draft restore, real WebM decode/seek/cancellation, worker matching, tile watermark/mosaic parity, native bridge results and offline share import.
+
+For Android, use JDK 21, Android SDK 36 and Build Tools 35.0.0 (the Android Gradle plugin's default) plus 36.0.0:
+
+```sh
+npm run build
+npx cap sync android
+cd android
+./gradlew assembleDebug --no-daemon --max-workers=2
+```
+
+The cloud validation uses the inherited HTTPS proxy and supplied Java CA trust; no TLS or artifact integrity verification is disabled. The local Android SDK and JDK are development prerequisites outside the repository, not committed source.
+
+## Explicit remaining limits
+
+- Android API 24/26/28/29/33/36 device or emulator tests, iOS Safari tests, installed OS share-sheet behavior, and actual photo-library save visibility still need device validation. Desktop Chromium emulation does not establish these.
+- Real, authorized iOS/Android recording datasets are still needed to report seam error, dropped/duplicated text, performance and peak memory. The included test video is synthetic and demonstrates decoding, not real-world stitching accuracy.
+- Preview resolution is bounded. Full PNG/JPEG output is limited to 32 MP and a 30000-pixel side. Larger unframed documents can use tiled PDF/ZIP; very large framed output must be reduced in width. Input remains capped at 50 images and video extraction at 40 retained frames.
+- HEIC decoding/export, searchable OCR PDFs, browser-wide full-page capture, iOS native extensions and Shortcuts are not implemented in the pure web editor. They need codec/native/extension work beyond these browser capabilities; no arbitrary URL capture or private content upload is introduced.
+- PWA installation and POST share targets depend on browser/OS support. Offline mode is available after a successful production service-worker installation; first-ever offline visits cannot load an uncached application.
+- Drafts are local browser storage, subject to quota, browser eviction and private-mode restrictions; they are not cloud backups.

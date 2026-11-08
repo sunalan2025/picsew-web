@@ -17,6 +17,11 @@ import com.getcapacitor.BridgeActivity;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import org.json.JSONObject;
+import org.json.JSONArray;
+import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
 
 /**
  * Save exports on Android 7+ without legacy broad storage permissions.
@@ -30,34 +35,105 @@ public class MainActivity extends BridgeActivity {
     // Only touched on the main thread. At most one pending Android 7-9 SAF request.
     private String pendingLegacyBase64;
     private String pendingLegacyName;
+    private String pendingLegacyRequestId;
+    private final ArrayList<Uri> sharedImages = new ArrayList<>();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         WebView webView = getBridge().getWebView();
+        captureSharedIntent(getIntent());
         webView.addJavascriptInterface(new Object() {
             @JavascriptInterface
+            public String listSharedImages() {
+                JSONArray result = new JSONArray();
+                synchronized (sharedImages) {
+                    for (int i = 0; i < sharedImages.size(); i++) {
+                        try {
+                            JSONObject file = new JSONObject(); file.put("index", i);
+                            file.put("mime", getContentResolver().getType(sharedImages.get(i)));
+                            result.put(file);
+                        } catch (Exception ignored) { }
+                    }
+                }
+                return result.toString();
+            }
+            @JavascriptInterface
+            public String readSharedImage(int index) {
+                final Uri uri;
+                synchronized (sharedImages) {
+                    if (index < 0 || index >= sharedImages.size()) return "";
+                    uri = sharedImages.get(index);
+                }
+                try (InputStream input = getContentResolver().openInputStream(uri);
+                     ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+                    if (input == null) return "";
+                    byte[] buffer = new byte[16384]; int count;
+                    while ((count = input.read(buffer)) != -1) {
+                        if (output.size() + count > 20 * 1024 * 1024) return "";
+                        output.write(buffer, 0, count);
+                    }
+                    return Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP);
+                } catch (Exception error) { return ""; }
+            }
+            @JavascriptInterface
+            public void finishSharedImport() { synchronized (sharedImages) { sharedImages.clear(); } }
+
+            @JavascriptInterface
             public void saveBase64File(String base64Data, String mimeType, String filename) {
+                saveFile(base64Data, mimeType, filename, "");
+            }
+            @JavascriptInterface
+            public void saveFile(String base64Data, String mimeType, String filename, String requestId) {
                 final String name = sanitizeFilename(filename);
                 final String mime = allowedMime(mimeType);
                 if (base64Data == null || base64Data.isEmpty() ||
                         base64Data.length() > MAX_ENCODED_LENGTH ||
                         (base64Data.length() % 4 != 0)) {
-                    showToast("文件无效或过大，请尝试降低导出画质");
+                    reportExport(requestId, false, false, "文件无效或过大，请尝试降低导出画质");
                     return;
                 }
                 if (mime == null) {
-                    showToast("不支持的导出格式");
+                    reportExport(requestId, false, false, "不支持的导出格式");
                     return;
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    new Thread(() -> saveWithMediaStore(base64Data, mime, name),
+                    new Thread(() -> saveWithMediaStore(base64Data, mime, name, requestId),
                             "picsew-export").start();
                 } else {
-                    runOnUiThread(() -> openLegacyDocumentPicker(base64Data, mime, name));
+                    runOnUiThread(() -> openLegacyDocumentPicker(base64Data, mime, name, requestId));
                 }
             }
         }, "AndroidApp");
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent); setIntent(intent); captureSharedIntent(intent);
+        getBridge().getWebView().post(() -> getBridge().getWebView().evaluateJavascript(
+            "window.dispatchEvent(new Event('picsew-share-ready'));", null));
+    }
+
+    @SuppressWarnings("deprecation")
+    private void captureSharedIntent(Intent intent) {
+        if (intent == null || intent.getType() == null || !intent.getType().startsWith("image/")) return;
+        ArrayList<Uri> uris = new ArrayList<>();
+        if (Intent.ACTION_SEND.equals(intent.getAction())) {
+            Uri uri = intent.getParcelableExtra(Intent.EXTRA_STREAM); if (uri != null) uris.add(uri);
+        } else if (Intent.ACTION_SEND_MULTIPLE.equals(intent.getAction())) {
+            ArrayList<Uri> received = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
+            if (received != null) uris.addAll(received);
+        }
+        synchronized (sharedImages) {
+            for (Uri uri : uris) {
+                if (uri == null) continue;
+                if (sharedImages.size() >= 10) break;
+                try {
+                    String mime = getContentResolver().getType(uri);
+                    if ("content".equals(uri.getScheme()) && mime != null && mime.startsWith("image/")) sharedImages.add(uri);
+                } catch (SecurityException ignored) { /* ignore inaccessible share attachments */ }
+            }
+        }
     }
 
     private static String allowedMime(String mime) {
@@ -91,7 +167,7 @@ public class MainActivity extends BridgeActivity {
         output.flush();
     }
 
-    private void saveWithMediaStore(String base64, String mime, String name) {
+    private void saveWithMediaStore(String base64, String mime, String name, String requestId) {
         Uri uri = null;
         try {
             ContentValues values = new ContentValues();
@@ -108,23 +184,24 @@ public class MainActivity extends BridgeActivity {
             ContentValues completed = new ContentValues();
             completed.put(MediaStore.MediaColumns.IS_PENDING, 0);
             getContentResolver().update(uri, completed, null, null);
-            showToast("已保存到下载目录：" + name);
+            reportExport(requestId, true, false, "已保存到下载目录：" + name);
         } catch (Exception error) {
             if (uri != null) {
                 try { getContentResolver().delete(uri, null, null); }
                 catch (Exception ignored) { /* cleanup is best-effort */ }
             }
-            showToast("文件保存失败：" + error.getMessage());
+            reportExport(requestId, false, false, "文件保存失败：" + error.getMessage());
         }
     }
 
-    private void openLegacyDocumentPicker(String base64, String mime, String name) {
+    private void openLegacyDocumentPicker(String base64, String mime, String name, String requestId) {
         if (pendingLegacyBase64 != null) {
-            showToast("请先完成上一个文件的保存");
+            reportExport(requestId, false, false, "请先完成上一个文件的保存");
             return;
         }
         pendingLegacyBase64 = base64;
         pendingLegacyName = name;
+        pendingLegacyRequestId = requestId;
         try {
             Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -134,7 +211,8 @@ public class MainActivity extends BridgeActivity {
         } catch (Exception error) {
             pendingLegacyBase64 = null;
             pendingLegacyName = null;
-            showToast("无法打开保存窗口：" + error.getMessage());
+            pendingLegacyRequestId = null;
+            reportExport(requestId, false, false, "无法打开保存窗口：" + error.getMessage());
         }
     }
 
@@ -144,10 +222,12 @@ public class MainActivity extends BridgeActivity {
         if (requestCode != CREATE_DOCUMENT_REQUEST) return;
         String encoded = pendingLegacyBase64;
         String name = pendingLegacyName;
+        String requestId = pendingLegacyRequestId;
+        pendingLegacyRequestId = null;
         pendingLegacyBase64 = null;
         pendingLegacyName = null;
         if (resultCode != Activity.RESULT_OK || data == null || data.getData() == null) {
-            showToast("已取消保存");
+            reportExport(requestId, false, true, "已取消保存");
             return;
         }
         if (encoded == null) return;
@@ -156,11 +236,22 @@ public class MainActivity extends BridgeActivity {
             try (OutputStream out = getContentResolver().openOutputStream(destination, "w")) {
                 if (out == null) throw new IOException("无法写入选中的位置");
                 writeDecodedBase64(encoded, out);
-                showToast("已保存：" + name);
+                reportExport(requestId, true, false, "已保存：" + name);
             } catch (Exception error) {
-                showToast("文件保存失败：" + error.getMessage());
+                reportExport(requestId, false, false, "文件保存失败：" + error.getMessage());
             }
         }, "picsew-legacy-export").start();
+    }
+
+    private void reportExport(String id, boolean success, boolean cancelled, String message) {
+        showToast(message);
+        if (id == null || id.isEmpty()) return;
+        try {
+            JSONObject detail = new JSONObject();
+            detail.put("id", id); detail.put("success", success); detail.put("cancelled", cancelled); detail.put("message", message);
+            String script = "window.dispatchEvent(new CustomEvent('picsew-export-result',{detail:" + detail.toString() + "}));";
+            runOnUiThread(() -> getBridge().getWebView().evaluateJavascript(script, null));
+        } catch (Exception ignored) { /* toast remains available if WebView was closed */ }
     }
 
     private void showToast(String message) {

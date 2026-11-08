@@ -1,48 +1,207 @@
 import { useState, useRef, useEffect } from 'react';
 import {
-  Smartphone, RefreshCw, Images, WandSparkles, PencilRuler, AlertTriangle,
-  Sparkles, Download, Plus, X, Check
+  Smartphone,
+  RefreshCw,
+  Images,
+  WandSparkles,
+  PencilRuler,
+  AlertTriangle,
+  Sparkles,
+  Download,
+  Plus,
+  X,
+  Check,
 } from 'lucide-react';
-import type {
-  StitchedImage,
-  Annotation,
-  AnnotationType,
-  StatusBarConfig,
-  MockupConfig,
-  ExportConfig,
-  WatermarkConfig
-} from './types';
+import type { StitchedImage, Annotation, AnnotationType } from './types';
 import { ImageUploader } from './components/ImageUploader';
 import { ControlPanel } from './components/ControlPanel';
 import { ImageCropEditor } from './components/ImageCropEditor';
 import { PreviewCanvas } from './components/PreviewCanvas';
-import { detectOverlapDetailed, loadImage, visibleImageSource } from './utils/stitching';
-import { clampCropValue, clampOverlapsToVisibleImages, restoreOriginalImages } from './utils/imageState';
-import { jsPDF } from 'jspdf';
-import JSZip from 'jszip';
+import {
+  detectOverlapAsync,
+  loadImage,
+  visibleImageSource,
+} from './utils/stitching';
+import {
+  clampCropValue,
+  clampOverlapsToVisibleImages,
+  restoreOriginalImages,
+} from './utils/imageState';
+import {
+  readIncomingShare,
+  acknowledgeIncomingShare,
+} from './utils/incomingShare';
+import { useDraft } from './hooks/useDraft';
+import { useEditorProject } from './hooks/useEditorProject';
+import { renderProject, exportSource } from './utils/renderProject';
+import { anchorAnnotation } from './utils/annotations';
+import { getStitchedLayout } from './utils/imageState';
+import { commonEdgeBands } from './utils/fixedBars';
+import { downloadBlob } from './utils/download';
 import { planPdfExport } from './utils/pdfExport';
 
-interface HistoryState {
-  images: StitchedImage[];
-  overlaps: number[];
-  annotations: Annotation[];
-}
-
 function App() {
-  // Images/Slices list
-  const [images, setImages] = useState<StitchedImage[]>([]);
+  const {
+    images,
+    overlaps,
+    annotations,
+    direction,
+    gap,
+    statusBar,
+    mockup,
+    watermark,
+    exportConfig,
+    setImages,
+    setOverlaps,
+    setAnnotations,
+    setDirection,
+    setGap,
+    setStatusBar,
+    setMockup,
+    setWatermark,
+    setExportConfig,
+    project,
+    restoreProject,
+    commitState,
+    replaceState,
+    undo,
+    redo,
+    history,
+    historyIndex,
+  } = useEditorProject();
+  const draft = useDraft(project, (next) => {
+    // Restoration is a project command: invalidate any older import/alignment result.
+    imageChangeSequenceRef.current++;
+    pendingCropRef.current = null;
+    pendingOverlapRef.current = null;
+    setIsStitching(false);
+    setUncertainSeams([]);
+    setFocusedSeam(null);
+    setSelectedAnnotationId(null);
+    restoreProject(next);
+  });
+  const [incomingShare, setIncomingShare] = useState<{
+    id: string;
+    files: File[];
+  } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    readIncomingShare()
+      .then((share) => {
+        if (alive && share) {
+          setIncomingShare(share);
+          setActiveTab('upload');
+          setPanelOpen(true);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const consumeShare = () => {
+    if (!incomingShare) return;
+    if (incomingShare.id === 'native') {
+      (
+        window as unknown as { AndroidApp?: { finishSharedImport: () => void } }
+      ).AndroidApp?.finishSharedImport();
+      setIncomingShare(null);
+    } else if (incomingShare.id)
+      void acknowledgeIncomingShare(incomingShare.id).then(() =>
+        setIncomingShare(null)
+      );
+    else setIncomingShare(null);
+  };
+  useEffect(() => {
+    const paste = (event: ClipboardEvent) => {
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.closest('input,textarea,[contenteditable="true"]')
+      )
+        return;
+      const files = Array.from(event.clipboardData?.files ?? []).filter((f) =>
+        f.type.startsWith('image/')
+      );
+      if (files.length) {
+        event.preventDefault();
+        setIncomingShare({ id: '', files });
+        setActiveTab('upload');
+        setPanelOpen(true);
+      }
+    };
+    const native = async () => {
+      const bridge = (
+        window as unknown as {
+          AndroidApp?: {
+            listSharedImages?: () => string;
+            readSharedImage: (i: number) => string;
+          };
+        }
+      ).AndroidApp;
+      if (!bridge?.listSharedImages) return;
+      try {
+        const entries = JSON.parse(bridge.listSharedImages()) as {
+          index: number;
+          mime: string;
+        }[];
+        const files: File[] = [];
+        let sharedBytes = 0;
+        for (const entry of entries) {
+          const data = bridge.readSharedImage(entry.index);
+          if (!data)
+            throw new Error('分享图片过大或无法读取，请从素材页手动导入');
+          const blob = await (
+            await fetch(`data:${entry.mime};base64,${data}`)
+          ).blob();
+          sharedBytes += blob.size;
+          if (sharedBytes > 48 * 1024 * 1024)
+            throw new Error('分享图片总量过大，请分批导入');
+          files.push(
+            new File(
+              [blob],
+              `shared-${entry.index + 1}.${entry.mime.split('/')[1] || 'png'}`,
+              { type: entry.mime }
+            )
+          );
+        }
+        if (files.length) {
+          setIncomingShare({ id: 'native', files });
+          setActiveTab('upload');
+          setPanelOpen(true);
+        }
+      } catch (error) {
+        setCopyStatus(
+          error instanceof Error ? error.message : '无法读取系统分享'
+        );
+      }
+    };
+    window.addEventListener('paste', paste);
+    window.addEventListener('picsew-share-ready', native);
+    void native();
+    return () => {
+      window.removeEventListener('paste', paste);
+      window.removeEventListener('picsew-share-ready', native);
+    };
+  }, []);
+  const [barSuggestion, setBarSuggestion] = useState<{
+    top: number;
+    bottom: number;
+  } | null>(null);
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState<
+    string | null
+  >(null);
   const [cropSelectedId, setCropSelectedId] = useState<string | null>(null);
   const [advancedCutOpen, setAdvancedCutOpen] = useState(false);
   // Overlaps between adjacent slices
-  const [overlaps, setOverlaps] = useState<number[]>([]);
   // A low-confidence join must be highlighted for review, never silently trimmed.
   const [uncertainSeams, setUncertainSeams] = useState<number[]>([]);
-  const [focusedSeam, setFocusedSeam] = useState<{ index: number; token: number } | null>(null);
+  const [focusedSeam, setFocusedSeam] = useState<{
+    index: number;
+    token: number;
+  } | null>(null);
   const seamNavigationSequence = useRef(0);
-  
+
   // Stitching process states
-  const [direction, setDirection] = useState<'vertical' | 'horizontal'>('vertical');
-  const [gap, setGap] = useState<number>(0);
   const [isStitching, setIsStitching] = useState<boolean>(false);
 
   // Mobile responsiveness check
@@ -61,96 +220,21 @@ function App() {
   const [panelOpen, setPanelOpen] = useState(false);
 
   // Annotation/Markup parameters
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [selectedTool, setSelectedTool] = useState<AnnotationType | 'select' | 'cut-horizontal' | 'cut-vertical'>('select');
+  const [selectedTool, setSelectedTool] = useState<
+    AnnotationType | 'select' | 'cut-horizontal' | 'cut-vertical'
+  >('select');
   const [color, setColor] = useState<string>('#ff3b30'); // Red
   const [strokeWidth, setStrokeWidth] = useState<number>(5);
   const [fontSize, setFontSize] = useState<number>(24);
 
-  // Unified Undo/Redo stacks
-  const [history, setHistory] = useState<HistoryState[]>([{ images: [], overlaps: [], annotations: [] }]);
-  const [historyIndex, setHistoryIndex] = useState<number>(0);
-  // A synchronous timeline prevents rapid consecutive commits from using stale renders.
-  const historyRef = useRef<{ entries: HistoryState[]; index: number }>({
-    entries: [{images: [], overlaps: [], annotations: []}], index: 0
-  });
   const pendingOverlapRef = useRef<number[] | null>(null);
   const [copyStatus, setCopyStatus] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const exportInFlightRef = useRef(false);
-  const [watermark, setWatermark] = useState<WatermarkConfig>({
-    enabled: false,
-    text: 'Picsew Web',
-    opacity: 0.18,
-    angle: -25,
-    size: 36,
-    repeat: true,
-    color: '#1e3a8a'
-  });
-
-  // Status Bar Overlays config
-  const [statusBar, setStatusBar] = useState<StatusBarConfig>({
-    enabled: false,
-    time: '09:41',
-    battery: 100,
-    wifi: 'wifi',
-    style: 'light',
-  });
-
-  // Mockups device shell config
-  const [mockup, setMockup] = useState<MockupConfig>({
-    device: 'none',
-    bgColorType: 'gradient',
-    bgGradientStart: '#8b5cf6',
-    bgGradientEnd: '#ec4899',
-    bgSolid: '#18181b',
-    padding: 40,
-    shadow: true,
-    extendBottom: true,
-  });
-
-  // Export configs
-  const [exportConfig, setExportConfig] = useState<ExportConfig>({
-    format: 'png',
-    quality: 0.9,
-    scale: 0,
-    pdfPageMode: 'single',
-  });
-
   // Canvas Reference to fetch rendered bitmap
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   // Ignore the results of an older asynchronous image list change.
   const imageChangeSequenceRef = useRef(0);
-
-  // Helper to commit state change and record history
-  const commitState = (newImgs: StitchedImage[], newOverlaps: number[], newAnnos: Annotation[]) => {
-    setImages(newImgs);
-    setOverlaps(newOverlaps);
-    setAnnotations(newAnnos);
-
-    const timeline = historyRef.current;
-    const newHistory = timeline.entries.slice(0, timeline.index + 1);
-    newHistory.push({
-      images: newImgs.map(img => ({ ...img })),
-      overlaps: [...newOverlaps],
-      annotations: newAnnos.map(anno => {
-        if (anno.type === 'pen') {
-          return { ...anno, points: [...anno.points] };
-        }
-        return { ...anno };
-      })
-    });
-
-    // Capping undo history to at most 5 steps back (meaning max 6 states total: initial state + 5 edits)
-    if (newHistory.length > 6) {
-      newHistory.shift();
-    }
-
-    const index = newHistory.length - 1;
-    historyRef.current = { entries: newHistory, index };
-    setHistory(newHistory);
-    setHistoryIndex(index);
-  };
 
   // Reset independently of the bounded undo history.
   const handleResetAll = () => {
@@ -160,7 +244,11 @@ function App() {
       pendingOverlapRef.current = null;
       setIsStitching(false);
       const resetImages = restoreOriginalImages(images);
-      commitState(resetImages, Array(Math.max(0, resetImages.length - 1)).fill(0), []);
+      commitState(
+        resetImages,
+        Array(Math.max(0, resetImages.length - 1)).fill(0),
+        []
+      );
       setUncertainSeams([]);
       setSelectedTool('select');
     }
@@ -170,16 +258,21 @@ function App() {
   // Reorder/removal must not inherit an overlap from a different image pair.
   const handleImagesChange = async (newImgs: StitchedImage[]) => {
     const sequence = ++imageChangeSequenceRef.current;
-    const previousPairs = new Map<string, { pixels: number; review: boolean }>();
+    const previousPairs = new Map<
+      string,
+      { pixels: number; review: boolean }
+    >();
     for (let i = 0; i < images.length - 1; i++) {
       previousPairs.set(`${images[i].id}:${images[i + 1].id}`, {
         pixels: overlaps[i] ?? 0,
-        review: uncertainSeams.includes(i)
+        review: uncertainSeams.includes(i),
       });
     }
 
     const decodedImages = new Map<string, HTMLImageElement>();
-    const getDecoded = async (img: StitchedImage): Promise<HTMLImageElement> => {
+    const getDecoded = async (
+      img: StitchedImage
+    ): Promise<HTMLImageElement> => {
       const cached = decodedImages.get(img.id);
       if (cached) return cached;
       const element = await loadImage(img.src);
@@ -201,11 +294,14 @@ function App() {
       try {
         const [first, second] = await Promise.all([
           getDecoded(newImgs[i]),
-          getDecoded(newImgs[i + 1])
+          getDecoded(newImgs[i + 1]),
         ]);
-        const match = detectOverlapDetailed(
+        const match = await detectOverlapAsync(
           visibleImageSource(first, newImgs[i]),
-          visibleImageSource(second, newImgs[i+1]), undefined, direction);
+          visibleImageSource(second, newImgs[i + 1]),
+          undefined,
+          direction
+        );
         newOverlaps.push(match.overlap);
         if (match.confidence !== 'high') newWarnings.push(i);
       } catch (error) {
@@ -217,7 +313,11 @@ function App() {
     }
 
     if (sequence !== imageChangeSequenceRef.current) return;
-    commitState(newImgs, clampOverlapsToVisibleImages(newImgs, newOverlaps, direction), annotations);
+    commitState(
+      newImgs,
+      clampOverlapsToVisibleImages(newImgs, newOverlaps, direction),
+      annotations
+    );
     setUncertainSeams(newWarnings);
     // Importing a new batch immediately returns to the finished canvas.
     if (newImgs.length > images.length) {
@@ -232,26 +332,34 @@ function App() {
     if (images.length < 2) return;
     const sequence = ++imageChangeSequenceRef.current;
     setIsStitching(true);
-    
+
     try {
       const newOverlaps: number[] = [];
       const warnings: number[] = [];
       let previousImage: HTMLImageElement | null = null;
       for (let i = 0; i < images.length - 1; i++) {
-        const imgA: HTMLImageElement = previousImage ?? await loadImage(images[i].src);
+        const imgA: HTMLImageElement =
+          previousImage ?? (await loadImage(images[i].src));
         const imgB = await loadImage(images[i + 1].src);
-        const match = detectOverlapDetailed(
+        const match = await detectOverlapAsync(
           visibleImageSource(imgA, images[i]),
-          visibleImageSource(imgB, images[i + 1]), undefined, direction);
+          visibleImageSource(imgB, images[i + 1]),
+          undefined,
+          direction
+        );
         if (imageChangeSequenceRef.current !== sequence) return;
         newOverlaps.push(match.overlap);
         if (match.confidence !== 'high') warnings.push(i);
         previousImage = imgB;
       }
-      
+
       if (imageChangeSequenceRef.current !== sequence) return;
       // Automatic alignment must not unexpectedly erase manual cropping.
-      commitState(images, clampOverlapsToVisibleImages(images, newOverlaps, direction), annotations);
+      commitState(
+        images,
+        clampOverlapsToVisibleImages(images, newOverlaps, direction),
+        annotations
+      );
       setUncertainSeams(warnings);
       setActiveTab('stitch');
     } catch (err) {
@@ -262,12 +370,18 @@ function App() {
     }
   };
 
-  const handleDirectionChange = async (nextDirection: 'vertical' | 'horizontal') => {
+  const handleDirectionChange = async (
+    nextDirection: 'vertical' | 'horizontal'
+  ) => {
     if (nextDirection === direction) return;
     const sequence = ++imageChangeSequenceRef.current;
     setDirection(nextDirection);
     // Old seam values belong to a different axis; never reuse them.
-    setOverlaps(Array(Math.max(0, images.length - 1)).fill(0));
+    commitState(
+      images,
+      Array(Math.max(0, images.length - 1)).fill(0),
+      annotations
+    );
     setUncertainSeams([]);
     if (images.length < 2) return;
     setIsStitching(true);
@@ -276,23 +390,115 @@ function App() {
       const warnings: number[] = [];
       let previous: HTMLImageElement | null = null;
       for (let i = 0; i < images.length - 1; i++) {
-        const first: HTMLImageElement = previous ?? await loadImage(images[i].src);
+        const first: HTMLImageElement =
+          previous ?? (await loadImage(images[i].src));
         const second = await loadImage(images[i + 1].src);
-        const match = detectOverlapDetailed(
+        const match = await detectOverlapAsync(
           visibleImageSource(first, images[i]),
-          visibleImageSource(second, images[i + 1]), undefined, nextDirection);
+          visibleImageSource(second, images[i + 1]),
+          undefined,
+          nextDirection
+        );
         if (imageChangeSequenceRef.current !== sequence) return;
         detected.push(match.overlap);
         if (match.confidence !== 'high') warnings.push(i);
         previous = second;
       }
       if (imageChangeSequenceRef.current !== sequence) return;
-      commitState(images, clampOverlapsToVisibleImages(images, detected, nextDirection), annotations);
+      replaceState(
+        images,
+        clampOverlapsToVisibleImages(images, detected, nextDirection),
+        annotations
+      );
       setUncertainSeams(warnings);
     } catch (error) {
-      console.error('Cannot recalculate overlap after switching direction', error);
+      console.error(
+        'Cannot recalculate overlap after switching direction',
+        error
+      );
     } finally {
       if (imageChangeSequenceRef.current === sequence) setIsStitching(false);
+    }
+  };
+
+  const detectBars = async () => {
+    try {
+      const samples = [];
+      for (const image of images.slice(0, 4)) {
+        const source = await loadImage(image.src),
+          canvas = document.createElement('canvas');
+        canvas.width = 48;
+        canvas.height = 240;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(source, 0, 0, 48, 240);
+        samples.push(ctx.getImageData(0, 0, 48, 240).data);
+        source.src = '';
+      }
+      const bands = commonEdgeBands(samples, 48, 240);
+      setBarSuggestion(bands);
+    } catch {
+      setCopyStatus('无法读取顶栏样本，请手动裁剪');
+    }
+  };
+  const applyBars = () => {
+    if (!barSuggestion) return;
+    const next = images.map((image) => ({
+      ...image,
+      cropTop: clampCropValue(
+        image,
+        'cropTop',
+        Math.max(image.cropTop, Math.round(image.height * barSuggestion.top))
+      ),
+      cropBottom: clampCropValue(
+        image,
+        'cropBottom',
+        Math.max(
+          image.cropBottom,
+          Math.round(image.height * barSuggestion.bottom)
+        )
+      ),
+    }));
+    commitState(
+      next,
+      clampOverlapsToVisibleImages(next, overlaps, direction),
+      annotations
+    );
+    setUncertainSeams(next.slice(1).map((_, i) => i));
+    setBarSuggestion(null);
+  };
+
+  const rematchSeam = async (index: number) => {
+    if (!images[index + 1]) return;
+    const sequence = ++imageChangeSequenceRef.current;
+    setIsStitching(true);
+    try {
+      const [a, b] = await Promise.all([
+        loadImage(images[index].src),
+        loadImage(images[index + 1].src),
+      ]);
+      const match = await detectOverlapAsync(
+        visibleImageSource(a, images[index]),
+        visibleImageSource(b, images[index + 1]),
+        undefined,
+        direction
+      );
+      if (sequence !== imageChangeSequenceRef.current) return;
+      const next = [...overlaps];
+      next[index] = match.overlap;
+      commitState(
+        images,
+        clampOverlapsToVisibleImages(images, next, direction),
+        annotations
+      );
+      setUncertainSeams((prev) =>
+        match.confidence === 'high'
+          ? prev.filter((i) => i !== index)
+          : Array.from(new Set([...prev, index]))
+      );
+    } catch {
+      setCopyStatus('这处接缝无法自动匹配，请手动精调');
+    } finally {
+      if (sequence === imageChangeSequenceRef.current) setIsStitching(false);
     }
   };
 
@@ -336,57 +542,56 @@ function App() {
 
   // --- Drawing History / Undo-Redo Stack ---
   const handleAddAnnotation = (anno: Annotation) => {
-    const updated = [...annotations, anno];
+    const updated = [
+      ...annotations,
+      ...anchorAnnotation(
+        anno,
+        getStitchedLayout(images, overlaps, gap, direction).placements
+      ),
+    ];
     commitState(images, overlaps, updated);
   };
 
   const handleUndo = () => {
     pendingCropRef.current = null;
     pendingOverlapRef.current = null;
-    const timeline = historyRef.current;
-    if (timeline.index <= 0) return;
     imageChangeSequenceRef.current++;
     setIsStitching(false);
-    const index = timeline.index - 1;
-    historyRef.current = {...timeline,index};
-    setHistoryIndex(index);
-    setImages(timeline.entries[index].images);
-    setOverlaps(timeline.entries[index].overlaps);
-    setAnnotations(timeline.entries[index].annotations);
+    undo();
     setUncertainSeams([]);
   };
 
   const handleRedo = () => {
     pendingCropRef.current = null;
     pendingOverlapRef.current = null;
-    const timeline = historyRef.current;
-    if (timeline.index >= timeline.entries.length - 1) return;
     imageChangeSequenceRef.current++;
     setIsStitching(false);
-    const index = timeline.index + 1;
-    historyRef.current = {...timeline,index};
-    setHistoryIndex(index);
-    setImages(timeline.entries[index].images);
-    setOverlaps(timeline.entries[index].overlaps);
-    setAnnotations(timeline.entries[index].annotations);
+    redo();
     setUncertainSeams([]);
   };
 
+  const keyboardActions = useRef({ undo: handleUndo, redo: handleRedo });
+  keyboardActions.current = { undo: handleUndo, redo: handleRedo };
   // Ctrl/Cmd+Z to undo; Ctrl/Cmd+Shift+Z or Ctrl+Y to redo.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((!event.ctrlKey && !event.metaKey) || event.altKey) return;
       const target = event.target;
-      if (target instanceof HTMLElement &&
-          target.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (
+        target instanceof HTMLElement &&
+        target.closest('input, textarea, select, [contenteditable="true"]')
+      )
+        return;
       const key = event.key.toLowerCase();
       if (key === 'z' && !event.shiftKey && historyIndex > 0) {
         event.preventDefault();
-        handleUndo();
-      } else if (((key === 'z' && event.shiftKey) || key === 'y') &&
-                 historyIndex < history.length - 1) {
+        keyboardActions.current.undo();
+      } else if (
+        ((key === 'z' && event.shiftKey) || key === 'y') &&
+        historyIndex < history.length - 1
+      ) {
         event.preventDefault();
-        handleRedo();
+        keyboardActions.current.redo();
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -399,8 +604,8 @@ function App() {
 
   // --- Drag Adjustment Callbacks ---
   const handleAdjustOverlap = (idx: number, val: number) => {
-    setUncertainSeams(prev => prev.filter(index => index !== idx));
-    setOverlaps(prev => {
+    setUncertainSeams((prev) => prev.filter((index) => index !== idx));
+    setOverlaps((prev) => {
       const updated = [...prev];
       updated[idx] = val;
       return clampOverlapsToVisibleImages(images, updated, direction);
@@ -410,7 +615,9 @@ function App() {
   const handleManualOverlapsChange = (newVals: number[]) => {
     const safe = clampOverlapsToVisibleImages(images, newVals, direction);
     pendingOverlapRef.current = safe;
-    setUncertainSeams(prev => prev.filter(idx => overlaps[idx] === safe[idx]));
+    setUncertainSeams((prev) =>
+      prev.filter((idx) => overlaps[idx] === safe[idx])
+    );
     setOverlaps(safe);
   };
   const handleManualOverlapCommit = () => {
@@ -420,40 +627,75 @@ function App() {
     commitState(images, accepted, annotations);
   };
 
-  const pendingCropRef = useRef<{images: StitchedImage[]; overlaps: number[]} | null>(null);
-  const handleAdjustCrop = (sliceIndex: number, field: 'cropTop' | 'cropBottom' | 'cropLeft' | 'cropRight', val: number) => {
+  const pendingCropRef = useRef<{
+    images: StitchedImage[];
+    overlaps: number[];
+  } | null>(null);
+  const handleAdjustCrop = (
+    sliceIndex: number,
+    field: 'cropTop' | 'cropBottom' | 'cropLeft' | 'cropRight',
+    val: number
+  ) => {
     imageChangeSequenceRef.current++;
     setIsStitching(false);
     const baseline = pendingCropRef.current?.images ?? images;
-    const next = baseline.map((img, idx) => idx === sliceIndex
-      ? { ...img, [field]: clampCropValue(img, field, val) } : img);
-    const safeOverlaps = clampOverlapsToVisibleImages(next, pendingCropRef.current?.overlaps ?? overlaps, direction);
-    pendingCropRef.current = {images: next, overlaps: safeOverlaps};
+    const next = baseline.map((img, idx) =>
+      idx === sliceIndex
+        ? { ...img, [field]: clampCropValue(img, field, val) }
+        : img
+    );
+    const safeOverlaps = clampOverlapsToVisibleImages(
+      next,
+      pendingCropRef.current?.overlaps ?? overlaps,
+      direction
+    );
+    pendingCropRef.current = { images: next, overlaps: safeOverlaps };
     setImages(next);
     setOverlaps(safeOverlaps);
-    setUncertainSeams(prev => Array.from(new Set([
-      ...prev, ...(sliceIndex > 0 ? [sliceIndex - 1] : []),
-      ...(sliceIndex < next.length - 1 ? [sliceIndex] : [])
-    ])).sort((a,b)=>a-b));
+    setUncertainSeams((prev) =>
+      Array.from(
+        new Set([
+          ...prev,
+          ...(sliceIndex > 0 ? [sliceIndex - 1] : []),
+          ...(sliceIndex < next.length - 1 ? [sliceIndex] : []),
+        ])
+      ).sort((a, b) => a - b)
+    );
   };
 
   const handleResetOneCrop = (index: number) => {
     pendingCropRef.current = null;
     imageChangeSequenceRef.current++;
-    const next = images.map((img, i) => i === index
-      ? { ...img, cropTop:0, cropBottom:0, cropLeft:0, cropRight:0 } : img);
-    commitState(next, clampOverlapsToVisibleImages(next, overlaps, direction), annotations);
-    setUncertainSeams(prev => Array.from(new Set([
-      ...prev, ...(index > 0 ? [index - 1] : []),
-      ...(index < images.length - 1 ? [index] : [])
-    ])).sort((a,b)=>a-b));
+    const next = images.map((img, i) =>
+      i === index
+        ? { ...img, cropTop: 0, cropBottom: 0, cropLeft: 0, cropRight: 0 }
+        : img
+    );
+    commitState(
+      next,
+      clampOverlapsToVisibleImages(next, overlaps, direction),
+      annotations
+    );
+    setUncertainSeams((prev) =>
+      Array.from(
+        new Set([
+          ...prev,
+          ...(index > 0 ? [index - 1] : []),
+          ...(index < images.length - 1 ? [index] : []),
+        ])
+      ).sort((a, b) => a - b)
+    );
   };
 
   // Drag End pushes state to History
   const handleDragEnd = () => {
     const snapshot = pendingCropRef.current;
     pendingCropRef.current = null;
-    commitState(snapshot?.images ?? images, snapshot?.overlaps ?? overlaps, annotations);
+    commitState(
+      snapshot?.images ?? images,
+      snapshot?.overlaps ?? overlaps,
+      annotations
+    );
   };
 
   // --- Image Slice Split Callback (Cut Line) ---
@@ -476,8 +718,11 @@ function App() {
       const dyVisible = relativeCoord / scale;
       const splitPixel = Math.round(slice.cropTop + dyVisible);
 
-      if (splitPixel <= slice.cropTop + minMargin || splitPixel >= slice.height - slice.cropBottom - minMargin) {
-        alert("太靠近边缘了，无法切分！");
+      if (
+        splitPixel <= slice.cropTop + minMargin ||
+        splitPixel >= slice.height - slice.cropBottom - minMargin
+      ) {
+        alert('太靠近边缘了，无法切分！');
         return;
       }
 
@@ -498,8 +743,11 @@ function App() {
       const dxVisible = relativeCoord / scale;
       const splitPixel = Math.round(slice.cropLeft + dxVisible);
 
-      if (splitPixel <= slice.cropLeft + minMargin || splitPixel >= slice.width - slice.cropRight - minMargin) {
-        alert("太靠近边缘了，无法切分！");
+      if (
+        splitPixel <= slice.cropLeft + minMargin ||
+        splitPixel >= slice.width - slice.cropRight - minMargin
+      ) {
+        alert('太靠近边缘了，无法切分！');
         return;
       }
 
@@ -536,7 +784,11 @@ function App() {
     pendingOverlapRef.current = null;
     setIsStitching(false);
     const resetImages = restoreOriginalImages(images);
-    commitState(resetImages, Array(Math.max(0, resetImages.length - 1)).fill(0), annotations);
+    commitState(
+      resetImages,
+      Array(Math.max(0, resetImages.length - 1)).fill(0),
+      annotations
+    );
     setUncertainSeams([]);
   };
 
@@ -553,63 +805,23 @@ function App() {
     return `${YYYY}${MM}${DD}_${hh}${mm}${ss}`;
   };
 
-  const triggerDownload = (content: string | Blob, mimeType: string, filename: string) => {
-    const isAndroidApp = (window as any).AndroidApp;
+  const triggerDownload = downloadBlob;
 
-    if (content instanceof Blob) {
-      if (isAndroidApp) {
-        const reader = new FileReader();
-        reader.onerror = () => console.error("无法读取要保存的文件");
-        reader.onload = () => {
-          if (typeof reader.result !== 'string') return;
-          const base64 = reader.result.split(',')[1];
-          if (!base64) return;
-          try {
-            (window as any).AndroidApp.saveBase64File(base64, mimeType, filename);
-          } catch (e) {
-            console.error("Native blob download failed", e);
-          }
-        };
-        reader.readAsDataURL(content);
-        return;
-      }
-
-      // Standard blob download
-      const url = URL.createObjectURL(content);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
-    } else {
-      // Content is base64 dataUrl
-      let base64 = content;
-      if (content.startsWith('data:')) {
-        base64 = content.split(',')[1];
-      }
-
-      if (isAndroidApp) {
-        try {
-          (window as any).AndroidApp.saveBase64File(base64, mimeType, filename);
-          return;
-        } catch (e) {
-          console.error("Native base64 download failed", e);
-        }
-      }
-
-      // Standard dataUrl download
-      const a = document.createElement('a');
-      a.href = `data:${mimeType};base64,${base64}`;
-      a.download = filename;
-      a.click();
-    }
-  };
-
-  const canvasToBlob = (canvas: HTMLCanvasElement, mime: string, quality?: number): Promise<Blob> =>
+  const canvasToBlob = (
+    canvas: HTMLCanvasElement,
+    mime: string,
+    quality?: number
+  ): Promise<Blob> =>
     new Promise((resolve, reject) => {
       try {
-        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('图片编码失败')), mime, quality);
-      } catch (error) { reject(error); }
+        canvas.toBlob(
+          (blob) => (blob ? resolve(blob) : reject(new Error('图片编码失败'))),
+          mime,
+          quality
+        );
+      } catch (error) {
+        reject(error);
+      }
     });
 
   const runExport = async (task: () => Promise<void>) => {
@@ -621,7 +833,13 @@ function App() {
       await task();
     } catch (error) {
       console.error('Export error', error);
-      setCopyStatus(error instanceof Error ? error.message : '导出失败，请重试');
+      setCopyStatus(
+        error instanceof DOMException && error.name === 'AbortError'
+          ? '已取消保存'
+          : error instanceof Error
+            ? error.message
+            : '导出失败，请重试'
+      );
     } finally {
       setIsExporting(false);
       exportInFlightRef.current = false;
@@ -629,30 +847,42 @@ function App() {
   };
 
   const handleDownloadImage = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!images.length) return;
     void runExport(async () => {
+      const canvas = await renderProject(project);
       const mime = exportConfig.format === 'png' ? 'image/png' : 'image/jpeg';
-      triggerDownload(
-        await canvasToBlob(canvas, mime, exportConfig.quality),
+      const blob = await canvasToBlob(canvas, mime, exportConfig.quality);
+      const result = await triggerDownload(
+        blob,
         mime,
         `Picsew_${getFormattedDateTime()}.${exportConfig.format}`
+      );
+      setCopyStatus(
+        `${result} · ${canvas.width} × ${canvas.height} px · ${(blob.size / 1024 / 1024).toFixed(2)} MB`
       );
     });
   };
 
   const handleCopyImage = async () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!images.length) return;
     if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
       setCopyStatus('当前浏览器不支持复制图片，请使用下载功能。');
       return;
     }
     try {
+      const canvas = await renderProject(project);
       const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob(result => result ? resolve(result) : reject(new Error('Canvas export failed')), 'image/png');
+        canvas.toBlob(
+          (result) =>
+            result
+              ? resolve(result)
+              : reject(new Error('Canvas export failed')),
+          'image/png'
+        );
       });
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob }),
+      ]);
       setCopyStatus('已复制 PNG 图片，可直接粘贴。');
     } catch (error) {
       console.error('Could not copy image', error);
@@ -661,15 +891,17 @@ function App() {
   };
 
   const handleShareImage = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!images.length) return;
     if (!navigator.share || !navigator.canShare) {
       setCopyStatus('当前浏览器不支持直接分享图片，请先下载。');
       return;
     }
     void runExport(async () => {
+      const canvas = await renderProject(project);
       const blob = await canvasToBlob(canvas, 'image/png');
-      const file = new File([blob], `Picsew_${getFormattedDateTime()}.png`, { type: 'image/png' });
+      const file = new File([blob], `Picsew_${getFormattedDateTime()}.png`, {
+        type: 'image/png',
+      });
       const shareData = { files: [file], title: 'Picsew 长截图' };
       if (!navigator.canShare(shareData)) {
         throw new Error('当前设备不支持分享此图片，请改用下载。');
@@ -678,70 +910,88 @@ function App() {
         await navigator.share(shareData);
       } catch (error) {
         // Closing the OS share sheet is a normal operation, not an export error.
-        if (error instanceof DOMException && error.name === 'AbortError') return;
+        if (error instanceof DOMException && error.name === 'AbortError')
+          return;
         throw error;
       }
     });
   };
 
   const handleDownloadPDF = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!images.length) return;
     void runExport(async () => {
-      const plan = planPdfExport(canvas.width, canvas.height, exportConfig.pdfPageMode);
+      const canvas = await exportSource(project);
+      const plan = planPdfExport(
+        canvas.width,
+        canvas.height,
+        exportConfig.pdfPageMode,
+        exportConfig.pdfPpi
+      );
       if (plan.mode !== exportConfig.pdfPageMode) {
         setCopyStatus('单页 PDF 太长，已自动改为 A4 分页，避免截断。');
       }
+      const { jsPDF } = await import('jspdf');
       const pdf = new jsPDF({
-        orientation: 'portrait',
+        orientation: plan.widthPt > plan.heightPt ? 'landscape' : 'portrait',
         unit: 'pt',
-        format: plan.mode === 'single' ? [plan.widthPt, plan.heightPt] : 'a4'
+        format: plan.mode === 'single' ? [plan.widthPt, plan.heightPt] : 'a4',
       });
-      const pageCanvas = document.createElement('canvas');
-      pageCanvas.width = canvas.width;
       for (let i = 0; i < plan.count; i++) {
         const offsetY = i * plan.pageHeightPx;
         const height = Math.min(plan.pageHeightPx, canvas.height - offsetY);
-        pageCanvas.height = height;
-        const ctx = pageCanvas.getContext('2d');
-        if (!ctx) throw new Error('无法创建 PDF 页面画布');
-        ctx.drawImage(canvas, 0, offsetY, canvas.width, height, 0, 0, canvas.width, height);
+        const pageCanvas = await canvas.tile(offsetY, height);
         const jpeg = await canvasToBlob(pageCanvas, 'image/jpeg', 0.9);
         if (i > 0) pdf.addPage();
-        pdf.addImage(new Uint8Array(await jpeg.arrayBuffer()), 'JPEG',
-          0, 0, plan.widthPt, height / canvas.width * plan.widthPt);
+        pdf.addImage(
+          new Uint8Array(await jpeg.arrayBuffer()),
+          'JPEG',
+          0,
+          0,
+          plan.widthPt,
+          (height / canvas.width) * plan.widthPt
+        );
       }
-      triggerDownload(pdf.output('blob'), 'application/pdf',
-        `Picsew_${getFormattedDateTime()}.pdf`);
+      setCopyStatus(
+        await triggerDownload(
+          pdf.output('blob'),
+          'application/pdf',
+          `Picsew_${getFormattedDateTime()}.pdf`
+        )
+      );
     });
   };
 
   const handleDownloadZip = () => {
-    const canvas = canvasRef.current;
     const sliceHeight = Math.floor(exportConfig.scale);
-    if (!canvas || sliceHeight <= 0) return;
+    if (!images.length || sliceHeight <= 0) return;
     void runExport(async () => {
+      const canvas = await exportSource(project);
       const parts = Math.ceil(canvas.height / sliceHeight);
-      if (parts > 160) throw new Error(`需要 ${parts} 段切片，请增大高度；最多支持 160 段。`);
+      if (parts > 160)
+        throw new Error(`需要 ${parts} 段切片，请增大高度；最多支持 160 段。`);
+      const { default: JSZip } = await import('jszip');
       const archive = new JSZip();
       const mime = exportConfig.format === 'png' ? 'image/png' : 'image/jpeg';
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = canvas.width;
       for (let i = 0; i < parts; i++) {
         const height = Math.min(sliceHeight, canvas.height - i * sliceHeight);
-        tempCanvas.height = height;
-        const ctx = tempCanvas.getContext('2d');
-        if (!ctx) throw new Error('无法创建切片画布');
-        ctx.drawImage(canvas, 0, i * sliceHeight, canvas.width, height,
-          0, 0, canvas.width, height);
-        archive.file(`slice_${String(i + 1).padStart(3, '0')}.${exportConfig.format}`,
-          await canvasToBlob(tempCanvas, mime, exportConfig.quality));
+        const tempCanvas = await canvas.tile(i * sliceHeight, height);
+        archive.file(
+          `slice_${String(i + 1).padStart(3, '0')}.${exportConfig.format}`,
+          await canvasToBlob(tempCanvas, mime, exportConfig.quality)
+        );
       }
       const blob = await archive.generateAsync({
-        type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 3 }
+        type: 'blob',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 3 },
       });
-      triggerDownload(blob, 'application/zip',
-        `Picsew_slices_${getFormattedDateTime()}.zip`);
+      setCopyStatus(
+        await triggerDownload(
+          blob,
+          'application/zip',
+          `Picsew_slices_${getFormattedDateTime()}.zip`
+        )
+      );
     });
   };
 
@@ -750,44 +1000,68 @@ function App() {
     { id: 'stitch', label: '拼接', icon: WandSparkles },
     { id: 'cut', label: '裁剪', icon: PencilRuler },
     { id: 'mockup', label: '美化', icon: Sparkles },
-    { id: 'export', label: '导出', icon: Download }
+    { id: 'export', label: '导出', icon: Download },
   ];
-  const currentGroup = activeTab === 'cut' || activeTab === 'markup' ? 'cut'
-    : activeTab === 'statusbar' || activeTab === 'mockup' || activeTab === 'watermark' ? 'mockup' : activeTab;
-  const toolName = currentGroup === 'upload' ? '素材管理'
-    : currentGroup === 'stitch' ? '拼接与对齐'
-    : currentGroup === 'cut' ? '裁剪与标注'
-    : currentGroup === 'mockup' ? '外观美化' : '保存与分享';
+  const currentGroup =
+    activeTab === 'cut' || activeTab === 'markup'
+      ? 'cut'
+      : activeTab === 'statusbar' ||
+          activeTab === 'mockup' ||
+          activeTab === 'watermark'
+        ? 'mockup'
+        : activeTab;
+  const toolName =
+    currentGroup === 'upload'
+      ? '素材管理'
+      : currentGroup === 'stitch'
+        ? '拼接与对齐'
+        : currentGroup === 'cut'
+          ? '裁剪与标注'
+          : currentGroup === 'mockup'
+            ? '外观美化'
+            : '保存与分享';
 
   const cropMode = panelOpen && activeTab === 'cut' && !advancedCutOpen;
   const previewCanvas = (
     <PreviewCanvas
-                images={images}
-                direction={direction}
-                gap={gap}
-                overlaps={overlaps}
-                statusBar={statusBar}
-                mockup={mockup}
-                watermark={watermark}
-                annotations={annotations}
-                onAddAnnotation={handleAddAnnotation}
-                selectedTool={selectedTool}
-                activeTab={cropMode ? 'view' : panelOpen ? activeTab : 'view'}
+      images={images}
+      direction={direction}
+      gap={gap}
+      overlaps={overlaps}
+      statusBar={statusBar}
+      mockup={mockup}
+      watermark={watermark}
+      annotations={annotations}
+      onAddAnnotation={handleAddAnnotation}
+      selectedAnnotationId={selectedAnnotationId}
+      onSelectAnnotation={setSelectedAnnotationId}
+      onUpdateAnnotation={(anno) =>
+        setAnnotations(annotations.map((a) => (a.id === anno.id ? anno : a)))
+      }
+      selectedTool={selectedTool}
+      activeTab={cropMode ? 'view' : panelOpen ? activeTab : 'view'}
       compact={panelOpen}
-      focusSliceIndex={cropMode ? Math.max(0, images.findIndex(img => img.id === cropSelectedId)) : undefined}
+      focusSliceIndex={
+        cropMode
+          ? Math.max(
+              0,
+              images.findIndex((img) => img.id === cropSelectedId)
+            )
+          : undefined
+      }
       focusedSeam={!cropMode ? focusedSeam : null}
-                color={color}
-                strokeWidth={strokeWidth}
-                fontSize={fontSize}
-                canvasRef={canvasRef}
-                onAdjustOverlap={handleAdjustOverlap}
-                onAdjustCrop={handleAdjustCrop}
-                onSplitImage={handleSplitImage}
-                onDragEnd={handleDragEnd}
-                onUndo={handleUndo}
-                canUndo={historyIndex > 0}
-                onResetAll={handleResetAll}
-              />
+      color={color}
+      strokeWidth={strokeWidth}
+      fontSize={fontSize}
+      canvasRef={canvasRef}
+      onAdjustOverlap={handleAdjustOverlap}
+      onAdjustCrop={handleAdjustCrop}
+      onSplitImage={handleSplitImage}
+      onDragEnd={handleDragEnd}
+      onUndo={handleUndo}
+      canUndo={historyIndex > 0}
+      onResetAll={handleResetAll}
+    />
   );
 
   return (
@@ -799,17 +1073,27 @@ function App() {
           </div>
           <div className="min-w-0">
             <h1 className="m-0 whitespace-nowrap text-[14px] font-bold tracking-tight text-slate-900 sm:text-[16px]">
-              <span className="sm:hidden">Picsew</span><span className="hidden sm:inline">Picsew Web</span>
+              <span className="sm:hidden">Picsew</span>
+              <span className="hidden sm:inline">Picsew Web</span>
             </h1>
-            <p className="hidden text-[11px] text-slate-500 sm:block">轻松拼接每一张截图</p>
+            <p className="hidden text-[11px] text-slate-500 sm:block">
+              轻松拼接每一张截图
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {uncertainSeams.length > 0 && (
-            <button type="button" onClick={() => inspectSeam(uncertainSeams[0])}
+            <button
+              type="button"
+              onClick={() => inspectSeam(uncertainSeams[0])}
               className="inline-flex items-center gap-1 rounded-xl bg-amber-50 border border-amber-200 px-2.5 py-2 text-xs font-semibold text-amber-800"
-              title="打开拼接面板，检查无法自动对齐的连接位置">
-              <AlertTriangle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{uncertainSeams.length} 处待检查</span><span className="sm:hidden">{uncertainSeams.length}</span>
+              title="打开拼接面板，检查无法自动对齐的连接位置"
+            >
+              <AlertTriangle className="h-3.5 w-3.5" />{' '}
+              <span className="hidden sm:inline">
+                {uncertainSeams.length} 处待检查
+              </span>
+              <span className="sm:hidden">{uncertainSeams.length}</span>
             </button>
           )}
           {images.length > 0 && (
@@ -823,7 +1107,9 @@ function App() {
             onClick={() => openTool('upload')}
             className="workspace-top-button flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium"
           >
-            <Plus className="h-4 w-4" /> <span className="hidden sm:inline">添加图片</span><span className="sm:hidden">添加</span>
+            <Plus className="h-4 w-4" />{' '}
+            <span className="hidden sm:inline">添加图片</span>
+            <span className="sm:hidden">添加</span>
           </button>
           <button
             type="button"
@@ -836,28 +1122,79 @@ function App() {
         </div>
       </header>
 
-      <main className={`workspace-main relative flex min-h-0 flex-1 flex-col ${panelOpen ? 'with-inspector' : ''}`}>
+      {draft.pending && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center justify-center gap-3 bg-blue-50 px-4 py-2 text-xs text-blue-900"
+        >
+          <span>
+            发现本机草稿 · {draft.pending.project.images.length} 张图片
+          </span>
+          <button
+            className="rounded-lg bg-blue-600 px-3 py-2 text-white"
+            onClick={draft.restore}
+          >
+            恢复草稿
+          </button>
+          <button
+            className="rounded-lg border px-3 py-2"
+            onClick={() =>
+              void draft
+                .discard()
+                .catch(() => setCopyStatus('无法清除草稿，请检查本地存储'))
+            }
+          >
+            新建并替换草稿
+          </button>
+        </div>
+      )}
+      {copyStatus && (
+        <div
+          role="status"
+          className="bg-blue-50 px-4 py-2 text-center text-xs text-blue-800"
+        >
+          {copyStatus}
+        </div>
+      )}
+      <main
+        className={`workspace-main relative flex min-h-0 flex-1 flex-col ${panelOpen ? 'with-inspector' : ''}`}
+      >
         {images.length === 0 ? (
           <section className="workspace-welcome mx-auto flex w-full max-w-[680px] flex-1 flex-col items-center justify-center px-5 pb-25 text-center">
             <div className="workspace-welcome-icon mb-5 flex h-17 w-17 items-center justify-center rounded-[24px]">
               <Images className="h-8 w-8 text-blue-600" />
             </div>
-            <p className="mb-2 text-xs font-bold tracking-[0.18em] text-blue-600">一步开始</p>
-            <h2 className="mb-3 text-2xl font-bold tracking-tight text-slate-900 md:text-4xl">多张截图，一张长图</h2>
-            <p className="mb-7 max-w-[380px] text-sm leading-6 text-slate-500">拖入截图即可自动对齐。裁剪、打码、设备外框与高清导出都在这里完成。</p>
+            <p className="mb-2 text-xs font-bold tracking-[0.18em] text-blue-600">
+              一步开始
+            </p>
+            <h2 className="mb-3 text-2xl font-bold tracking-tight text-slate-900 md:text-4xl">
+              多张截图，一张长图
+            </h2>
+            <p className="mb-7 max-w-[380px] text-sm leading-6 text-slate-500">
+              拖入截图即可自动对齐。裁剪、打码、设备外框与高清导出都在这里完成。
+            </p>
             <div className="workspace-import-card w-full max-w-[450px] rounded-[26px] p-4 text-left">
-              <ImageUploader
-                images={images}
-                onImagesChange={handleImagesChange}
-                onAutoStitchTrigger={handleAutoStitch}
-              />
+              {!panelOpen && (
+                <ImageUploader
+                  images={images}
+                  onImagesChange={handleImagesChange}
+                  onAutoStitchTrigger={handleAutoStitch}
+                  incomingFiles={incomingShare?.files}
+                  onIncomingConsumed={consumeShare}
+                  onImportMessage={setCopyStatus}
+                />
+              )}
             </div>
-            <p className="mt-5 text-xs text-slate-400">图片仅在当前设备处理，不会上传到服务器</p>
+            <p className="mt-5 text-xs text-slate-400">
+              图片仅在当前设备处理，不会上传到服务器
+            </p>
           </section>
         ) : (
           <>
-            <section className="workspace-canvas min-h-0 flex-1 px-2 pb-25 pt-2 md:px-6 md:pb-25"
-              aria-label="始终可见的拼接画布">
+            <section
+              className="workspace-canvas min-h-0 flex-1 px-2 pb-25 pt-2 md:px-6 md:pb-25"
+              aria-label="始终可见的拼接画布"
+            >
               {previewCanvas}
             </section>
             {images.length > 1 && !panelOpen && (
@@ -883,107 +1220,223 @@ function App() {
 
         {panelOpen && (
           <>
-            <aside className="workspace-sheet absolute z-40 flex flex-col overflow-hidden" aria-label={toolName}>
+            <aside
+              className="workspace-sheet absolute z-40 flex flex-col overflow-hidden"
+              aria-label={toolName}
+            >
               <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200/60 px-5 py-4">
                 <div>
-                  <h2 className="text-[17px] font-bold text-slate-900">{advancedCutOpen ? '高级图片分割' : toolName}</h2>
-                  {advancedCutOpen
-                    ? <button type="button" onClick={() => setAdvancedCutOpen(false)}
-                        className="mt-1 text-xs font-semibold text-blue-600">← 返回四边裁剪</button>
-                    : <p className="mt-1 text-[11px] text-slate-500">画布常驻可见 · 调整即刻预览</p>}
+                  <h2 className="text-[17px] font-bold text-slate-900">
+                    {advancedCutOpen ? '高级图片分割' : toolName}
+                  </h2>
+                  {advancedCutOpen ? (
+                    <button
+                      type="button"
+                      onClick={() => setAdvancedCutOpen(false)}
+                      className="mt-1 text-xs font-semibold text-blue-600"
+                    >
+                      ← 返回四边裁剪
+                    </button>
+                  ) : (
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      画布常驻可见 · 调整即刻预览
+                    </p>
+                  )}
                 </div>
-                <button type="button" aria-label="关闭面板" onClick={closePanel} className="workspace-icon-button rounded-xl p-2">
+                <button
+                  type="button"
+                  aria-label="关闭面板"
+                  onClick={closePanel}
+                  className="workspace-icon-button rounded-xl p-2"
+                >
                   <X className="h-4 w-4" />
                 </button>
               </div>
               {(currentGroup === 'cut' || currentGroup === 'mockup') && (
                 <div className="workspace-subtabs mx-4 mt-4 flex shrink-0 gap-1 rounded-xl p-1">
                   {(currentGroup === 'cut'
-                    ? [{ id: 'cut', label: '裁剪' }, { id: 'markup', label: '标注与打码' }]
-                    : [{ id: 'mockup', label: '设备套壳' }, { id: 'statusbar', label: '状态栏' }, { id: 'watermark', label: '文字水印' }]
-                  ).map(item => (
+                    ? [
+                        { id: 'cut', label: '裁剪' },
+                        { id: 'markup', label: '标注与打码' },
+                      ]
+                    : [
+                        { id: 'mockup', label: '设备套壳' },
+                        { id: 'statusbar', label: '状态栏' },
+                        { id: 'watermark', label: '文字水印' },
+                      ]
+                  ).map((item) => (
                     <button
                       key={item.id}
                       type="button"
                       onClick={() => {
                         setActiveTab(item.id);
-                        setSelectedTool(item.id === 'markup' ? 'pen' : 'select');
+                        setSelectedTool(
+                          item.id === 'markup' ? 'pen' : 'select'
+                        );
                       }}
-                      className={activeTab === item.id ? 'workspace-subtab active' : 'workspace-subtab'}
-                    >{item.label}</button>
+                      className={
+                        activeTab === item.id
+                          ? 'workspace-subtab active'
+                          : 'workspace-subtab'
+                      }
+                    >
+                      {item.label}
+                    </button>
                   ))}
                 </div>
               )}
               <div className="min-h-0 flex-1 overflow-hidden">
                 {cropMode ? (
                   <div className="h-full overflow-y-auto">
-                    <ImageCropEditor images={images} selectedId={cropSelectedId}
-                      onSelect={setCropSelectedId} onChange={handleAdjustCrop}
-                      onCommit={handleDragEnd} onReset={handleResetOneCrop}/>
-                    <button type="button" onClick={() => setAdvancedCutOpen(true)}
-                      className="mx-4 mb-5 w-[calc(100%-2rem)] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-500 hover:bg-slate-50">
+                    <ImageCropEditor
+                      images={images}
+                      selectedId={cropSelectedId}
+                      onSelect={setCropSelectedId}
+                      onChange={handleAdjustCrop}
+                      onCommit={handleDragEnd}
+                      onReset={handleResetOneCrop}
+                      onApplyAll={(index) => {
+                        const source = images[index];
+                        const next = images.map((img) => {
+                          let result = { ...img };
+                          for (const key of [
+                            'cropTop',
+                            'cropBottom',
+                            'cropLeft',
+                            'cropRight',
+                          ] as const) {
+                            const vertical =
+                              key === 'cropTop' || key === 'cropBottom';
+                            result = {
+                              ...result,
+                              [key]: clampCropValue(
+                                result,
+                                key,
+                                source[key] *
+                                  (vertical
+                                    ? img.height / source.height
+                                    : img.width / source.width)
+                              ),
+                            };
+                          }
+                          return result;
+                        });
+                        commitState(
+                          next,
+                          clampOverlapsToVisibleImages(
+                            next,
+                            overlaps,
+                            direction
+                          ),
+                          annotations
+                        );
+                        setUncertainSeams(next.slice(1).map((_, i) => i));
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setAdvancedCutOpen(true)}
+                      className="mx-4 mb-5 w-[calc(100%-2rem)] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+                    >
                       高级：分割当前截图
                     </button>
                   </div>
-                ) : <ControlPanel
-                  hideTabNavigation
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                  direction={direction}
-                  setDirection={handleDirectionChange}
-                  gap={gap}
-                  setGap={setGap}
-                  overlaps={overlaps}
-                  setOverlaps={handleManualOverlapsChange}
-                  onOverlapCommit={handleManualOverlapCommit}
-                  uncertainSeams={uncertainSeams}
-                  focusedSeamIndex={focusedSeam?.index ?? null}
-                  onInspectSeam={inspectSeam}
-                  imageNames={images.map(img => img.name)}
-                  selectedTool={selectedTool}
-                  setSelectedTool={setSelectedTool}
-                  color={color}
-                  setColor={setColor}
-                  strokeWidth={strokeWidth}
-                  setStrokeWidth={setStrokeWidth}
-                  fontSize={fontSize}
-                  setFontSize={setFontSize}
-                  onUndo={handleUndo}
-                  onRedo={handleRedo}
-                  onClearAnnotations={handleClearAnnotations}
-                  canUndo={historyIndex > 0}
-                  canRedo={historyIndex < history.length - 1}
-                  statusBar={statusBar}
-                  setStatusBar={setStatusBar}
-                  mockup={mockup}
-                  setMockup={setMockup}
-                  watermark={watermark}
-                  setWatermark={setWatermark}
-                  exportConfig={exportConfig}
-                  setExportConfig={setExportConfig}
-                  onDownloadImage={handleDownloadImage}
-                  onCopyImage={handleCopyImage}
-                  onShareImage={handleShareImage}
-                  copyStatus={copyStatus}
-                  onDownloadPDF={handleDownloadPDF}
-                  onDownloadZip={handleDownloadZip}
-                  hasImages={images.length > 0}
-                  onResetCropsAndSplits={handleResetCropsAndSplits}
-                  isMobile={isMobile}
-                  images={images}
-                  onImagesChange={handleImagesChange}
-                  onAutoStitchTrigger={handleAutoStitch}
-                />}
+                ) : (
+                  <ControlPanel
+                    hideTabNavigation
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    direction={direction}
+                    setDirection={handleDirectionChange}
+                    gap={gap}
+                    setGap={setGap}
+                    overlaps={overlaps}
+                    setOverlaps={handleManualOverlapsChange}
+                    onOverlapCommit={handleManualOverlapCommit}
+                    uncertainSeams={uncertainSeams}
+                    focusedSeamIndex={focusedSeam?.index ?? null}
+                    onInspectSeam={inspectSeam}
+                    onRematchSeam={rematchSeam}
+                    onDetectBars={detectBars}
+                    barSuggestion={barSuggestion}
+                    onApplyBars={applyBars}
+                    imageNames={images.map((img) => img.name)}
+                    selectedTool={selectedTool}
+                    setSelectedTool={setSelectedTool}
+                    color={color}
+                    setColor={setColor}
+                    strokeWidth={strokeWidth}
+                    setStrokeWidth={setStrokeWidth}
+                    fontSize={fontSize}
+                    setFontSize={setFontSize}
+                    onUndo={handleUndo}
+                    onRedo={handleRedo}
+                    onClearAnnotations={handleClearAnnotations}
+                    selectedAnnotation={annotations.find(
+                      (a) => a.id === selectedAnnotationId
+                    )}
+                    onEditAnnotation={(anno) =>
+                      commitState(
+                        images,
+                        overlaps,
+                        annotations.map((a) => (a.id === anno.id ? anno : a))
+                      )
+                    }
+                    onDeleteAnnotation={() => {
+                      commitState(
+                        images,
+                        overlaps,
+                        annotations.filter((a) => a.id !== selectedAnnotationId)
+                      );
+                      setSelectedAnnotationId(null);
+                    }}
+                    canUndo={historyIndex > 0}
+                    canRedo={historyIndex < history.length - 1}
+                    statusBar={statusBar}
+                    setStatusBar={setStatusBar}
+                    mockup={mockup}
+                    setMockup={setMockup}
+                    watermark={watermark}
+                    setWatermark={setWatermark}
+                    exportConfig={exportConfig}
+                    setExportConfig={setExportConfig}
+                    onDownloadImage={handleDownloadImage}
+                    onCopyImage={handleCopyImage}
+                    onShareImage={handleShareImage}
+                    copyStatus={copyStatus}
+                    onDownloadPDF={handleDownloadPDF}
+                    onDownloadZip={handleDownloadZip}
+                    outputSize={getStitchedLayout(
+                      images,
+                      overlaps,
+                      gap,
+                      direction
+                    )}
+                    hasImages={images.length > 0}
+                    onResetCropsAndSplits={handleResetCropsAndSplits}
+                    isMobile={isMobile}
+                    images={images}
+                    onImagesChange={handleImagesChange}
+                    onAutoStitchTrigger={handleAutoStitch}
+                    incomingFiles={incomingShare?.files}
+                    onIncomingConsumed={consumeShare}
+                    onImportMessage={setCopyStatus}
+                  />
+                )}
               </div>
               <div className="workspace-sheet-footer shrink-0 px-5 py-3 text-xs text-slate-400">
-                <Check className="mr-1 inline h-3 w-3 text-emerald-600" /> 同一画布 · 自动保留编辑内容
+                <Check className="mr-1 inline h-3 w-3 text-emerald-600" />{' '}
+                {draft.status || '编辑仅在本机处理'}
               </div>
             </aside>
           </>
         )}
 
-        <nav className="workspace-dock absolute bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-[22px] p-1.5" aria-label="主要工具">
-          {tools.map(tool => {
+        <nav
+          className="workspace-dock absolute bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-[22px] p-1.5"
+          aria-label="主要工具"
+        >
+          {tools.map((tool) => {
             const Icon = tool.icon;
             return (
               <button
@@ -991,7 +1444,11 @@ function App() {
                 type="button"
                 onClick={() => openTool(tool.id)}
                 aria-pressed={panelOpen && currentGroup === tool.id}
-                className={panelOpen && currentGroup === tool.id ? 'workspace-dock-item active' : 'workspace-dock-item'}
+                className={
+                  panelOpen && currentGroup === tool.id
+                    ? 'workspace-dock-item active'
+                    : 'workspace-dock-item'
+                }
               >
                 <Icon className="h-[19px] w-[19px]" />
                 <span>{tool.label}</span>

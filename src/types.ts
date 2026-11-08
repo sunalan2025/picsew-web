@@ -4,10 +4,11 @@ export interface StitchedImage {
   src: string; // base64 or object URL
   width: number;
   height: number;
-  cropTop: number;     // pixels to crop from top
-  cropBottom: number;  // pixels to crop from bottom
-  cropLeft: number;    // pixels to crop from left
-  cropRight: number;   // pixels to crop from right
+  cropTop: number; // pixels to crop from top
+  cropBottom: number; // pixels to crop from bottom
+  cropLeft: number; // pixels to crop from left
+  cropRight: number; // pixels to crop from right
+  videoTime?: number;
   originalId?: string; // original image ID if split
 }
 
@@ -18,6 +19,7 @@ export interface BaseAnnotation {
   type: AnnotationType;
   color: string;
   strokeWidth: number;
+  imageId?: string; // Coordinates in this source image when anchored.
 }
 
 export interface PenAnnotation extends BaseAnnotation {
@@ -74,7 +76,10 @@ export interface StatusBarConfig {
 }
 
 export interface MockupConfig {
-  device: 'none' | 'iphone15' | 'iphone14' | 'ipad';
+  device: 'none' | 'iphone15' | 'iphone14' | 'iphone16pro' | 'android' | 'ipad';
+  rotation?: 0 | 90 | 180 | 270;
+  frameColor?: string;
+  borderWidth?: number;
   bgColorType: 'gradient' | 'solid' | 'blur';
   bgGradientStart: string;
   bgGradientEnd: string;
@@ -88,9 +93,10 @@ export interface ExportConfig {
   format: 'png' | 'jpeg';
   quality: number; // 0.1 to 1.0 (for jpeg)
   scale: number; // Slice height in pixels; 0 disables ZIP slicing.
+  pdfPpi?: number; // 0 uses A4 width; otherwise controls single-page physical size.
+  width?: number; // 0 keeps the original output width.
   pdfPageMode: 'single' | 'multi'; // single long page or split pages
 }
-
 
 /** Text watermark applied as the final image overlay. */
 export interface WatermarkConfig {

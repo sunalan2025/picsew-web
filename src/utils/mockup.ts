@@ -1,5 +1,32 @@
 import type { MockupConfig } from '../types';
 
+export function mockupOutputSize(
+  width: number,
+  height: number,
+  config: MockupConfig
+) {
+  if (config.device === 'none') return { width, height };
+  if (config.rotation === 90 || config.rotation === 270)
+    [width, height] = [height, width];
+  const aspect =
+    config.device === 'ipad'
+      ? 1.43
+      : config.device === 'iphone16pro'
+        ? 2622 / 1206
+        : config.device === 'android'
+          ? 20 / 9
+          : 2.16;
+  const bezel = config.borderWidth ?? (config.device === 'ipad' ? 32 : 18);
+  return {
+    width: Math.floor(width + 2 * bezel + 2 * config.padding),
+    height: Math.floor(
+      (config.extendBottom ? height : width * aspect) +
+        2 * bezel +
+        2 * config.padding
+    ),
+  };
+}
+
 /**
  * Draws a gorgeous device mockup wrapper around a source canvas.
  * Handles both "Standard Mockup" (cropped to aspect ratio) and "Extended Long Mockup" (device bezels wrap the entire long image).
@@ -9,10 +36,30 @@ export function drawMockup(
   contentCanvas: HTMLCanvasElement,
   config: MockupConfig
 ) {
+  const dimensions = mockupOutputSize(
+    contentCanvas.width,
+    contentCanvas.height,
+    config
+  );
+  if (
+    dimensions.width > 30000 ||
+    dimensions.height > 30000 ||
+    dimensions.width * dimensions.height > 32_000_000
+  )
+    throw new Error('套壳成品过大，请减小导出宽度或启用长图延伸模式');
   const ctx = targetCanvas.getContext('2d');
   if (!ctx) return;
 
-  const { device, bgColorType, bgGradientStart, bgGradientEnd, bgSolid, padding, shadow, extendBottom } = config;
+  const {
+    device,
+    bgColorType,
+    bgGradientStart,
+    bgGradientEnd,
+    bgSolid,
+    padding,
+    shadow,
+    extendBottom,
+  } = config;
 
   if (device === 'none') {
     // Just copy content
@@ -37,9 +84,24 @@ export function drawMockup(
     return;
   }
 
+  if (config.rotation) {
+    const rotated = document.createElement('canvas');
+    const sideways = config.rotation === 90 || config.rotation === 270;
+    rotated.width = sideways ? contentCanvas.height : contentCanvas.width;
+    rotated.height = sideways ? contentCanvas.width : contentCanvas.height;
+    const rotationCtx = rotated.getContext('2d')!;
+    rotationCtx.translate(rotated.width / 2, rotated.height / 2);
+    rotationCtx.rotate((config.rotation * Math.PI) / 180);
+    rotationCtx.drawImage(
+      contentCanvas,
+      -contentCanvas.width / 2,
+      -contentCanvas.height / 2
+    );
+    contentCanvas = rotated;
+  }
   // Device Specifications
   const isTablet = device === 'ipad';
-  const bezel = isTablet ? 32 : 18; // phone bezel: 18px, tablet: 32px
+  const bezel = config.borderWidth ?? (isTablet ? 32 : 18); // phone bezel: 18px, tablet: 32px
   const cornerRadius = isTablet ? 36 : 48; // screen corner radius
   const deviceCornerRadius = cornerRadius + bezel; // outer device corner radius
 
@@ -48,7 +110,12 @@ export function drawMockup(
   let screenH = contentCanvas.height;
 
   // Aspect ratio for standard crop mode (typical modern iPhone is 19.5:9 -> height is 2.16 times width)
-  const phoneAspectRatio = 2.16;
+  const phoneAspectRatio =
+    device === 'iphone16pro'
+      ? 2622 / 1206
+      : device === 'android'
+        ? 20 / 9
+        : 2.16;
   const tabletAspectRatio = 1.43; // 4.3:3
   const aspectRatio = isTablet ? tabletAspectRatio : phoneAspectRatio;
 
@@ -102,7 +169,10 @@ export function drawMockup(
     ctx.globalAlpha = 0.45;
     ctx.filter = 'blur(40px)';
     // Scale image to cover canvas
-    const scale = Math.max(canvasW / contentCanvas.width, canvasH / contentCanvas.height);
+    const scale = Math.max(
+      canvasW / contentCanvas.width,
+      canvasH / contentCanvas.height
+    );
     const w = contentCanvas.width * scale;
     const h = contentCanvas.height * scale;
     const x = (canvasW - w) / 2;
@@ -134,7 +204,7 @@ export function drawMockup(
 
   // --- Step 3: Draw Device Outer Frame (Black shell) ---
   ctx.save();
-  ctx.fillStyle = '#1c1d22'; // Sleek dark Titanium / matte black frame
+  ctx.fillStyle = config.frameColor || '#1c1d22'; // Sleek dark Titanium / matte black frame
   ctx.beginPath();
   if (ctx.roundRect) {
     ctx.roundRect(deviceX, deviceY, deviceW, deviceH, deviceCornerRadius);
@@ -175,8 +245,14 @@ export function drawMockup(
     // Here we draw top-aligned
     ctx.drawImage(
       contentCanvas,
-      0, 0, contentCanvas.width, Math.min(contentCanvas.height, screenH),
-      screenX, screenY, screenW, Math.min(contentCanvas.height, screenH)
+      0,
+      0,
+      contentCanvas.width,
+      Math.min(contentCanvas.height, screenH),
+      screenX,
+      screenY,
+      screenW,
+      Math.min(contentCanvas.height, screenH)
     );
   }
   ctx.restore();
@@ -198,7 +274,7 @@ export function drawMockup(
   ctx.save();
   ctx.fillStyle = '#000000';
 
-  if (device === 'iphone15') {
+  if (device === 'iphone15' || device === 'iphone16pro') {
     // Dynamic Island
     const islandW = screenW * 0.28;
     const islandH = Math.round(islandW * 0.26);
@@ -217,13 +293,34 @@ export function drawMockup(
     // Camera reflection (tiny dark blue-green dot)
     ctx.fillStyle = '#0a101f';
     ctx.beginPath();
-    ctx.arc(islandX + islandW * 0.78, islandY + islandH * 0.5, islandH * 0.15, 0, Math.PI * 2);
+    ctx.arc(
+      islandX + islandW * 0.78,
+      islandY + islandH * 0.5,
+      islandH * 0.15,
+      0,
+      Math.PI * 2
+    );
     ctx.fill();
     ctx.fillStyle = '#142036';
     ctx.beginPath();
-    ctx.arc(islandX + islandW * 0.78, islandY + islandH * 0.5, islandH * 0.05, 0, Math.PI * 2);
+    ctx.arc(
+      islandX + islandW * 0.78,
+      islandY + islandH * 0.5,
+      islandH * 0.05,
+      0,
+      Math.PI * 2
+    );
     ctx.fill();
-
+  } else if (device === 'android') {
+    ctx.beginPath();
+    ctx.arc(
+      screenX + screenW / 2,
+      screenY + bezel + 8,
+      Math.max(3, screenW * 0.012),
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
   } else if (device === 'iphone14') {
     // Classic Notch
     const notchW = screenW * 0.38;
@@ -236,9 +333,21 @@ export function drawMockup(
     ctx.moveTo(notchX, notchY);
     // Draw notch with rounded bottom corners
     ctx.lineTo(notchX + 5, notchY + notchH - 5);
-    ctx.arcTo(notchX + 5, notchY + notchH, notchX + notchR + 5, notchY + notchH, notchR);
+    ctx.arcTo(
+      notchX + 5,
+      notchY + notchH,
+      notchX + notchR + 5,
+      notchY + notchH,
+      notchR
+    );
     ctx.lineTo(notchX + notchW - notchR - 5, notchY + notchH);
-    ctx.arcTo(notchX + notchW - 5, notchY + notchH, notchX + notchW - 5, notchY + notchH - 5, notchR);
+    ctx.arcTo(
+      notchX + notchW - 5,
+      notchY + notchH,
+      notchX + notchW - 5,
+      notchY + notchH - 5,
+      notchR
+    );
     ctx.lineTo(notchX + notchW, notchY);
     ctx.closePath();
     ctx.fill();
@@ -252,7 +361,13 @@ export function drawMockup(
     // Tablet Camera dot in bezel
     const camSize = 5;
     ctx.beginPath();
-    ctx.arc(screenX + screenW / 2, deviceY + bezel / 2, camSize, 0, Math.PI * 2);
+    ctx.arc(
+      screenX + screenW / 2,
+      deviceY + bezel / 2,
+      camSize,
+      0,
+      Math.PI * 2
+    );
     ctx.fill();
   }
 

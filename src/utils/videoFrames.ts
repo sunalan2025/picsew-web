@@ -6,32 +6,62 @@ const MAX_SCAN_FRAMES = 480;
 const MAX_REFINEMENTS = 48;
 
 /** Legacy sampling helper retained for compatibility with older tests. */
-export function planVideoSamples(duration: number, frameLimit: number): number[] {
+export function planVideoSamples(
+  duration: number,
+  frameLimit: number
+): number[] {
   if (!Number.isFinite(duration) || duration <= 0 || frameLimit < 1) return [];
-  const count = Math.min(Math.floor(frameLimit), Math.max(1, Math.ceil(duration / 0.8) + 1));
+  const count = Math.min(
+    Math.floor(frameLimit),
+    Math.max(1, Math.ceil(duration / 0.8) + 1)
+  );
   if (count === 1) return [Math.min(0.05, duration / 2)];
   const start = Math.min(0.05, duration / 4);
   const end = Math.max(start, duration - 0.08);
-  return Array.from({ length: count }, (_, i) => start + (end - start) * i / (count - 1));
+  return Array.from(
+    { length: count },
+    (_, i) => start + ((end - start) * i) / (count - 1)
+  );
 }
 
 /** Scan video ~4 times per second, independently of the number of *kept* frames. */
-export function planVideoScanTimes(duration: number, limit = MAX_SCAN_FRAMES): number[] {
-  if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(limit) || limit < 2) return [];
+export function planVideoScanTimes(
+  duration: number,
+  limit = MAX_SCAN_FRAMES
+): number[] {
+  if (
+    !Number.isFinite(duration) ||
+    duration <= 0 ||
+    !Number.isFinite(limit) ||
+    limit < 2
+  )
+    return [];
   const start = Math.min(0.04, duration / 5);
   const end = Math.max(start, duration - 0.075);
-  const count = Math.max(2, Math.min(Math.floor(limit), Math.ceil(duration / 0.25) + 1));
-  return Array.from({ length: count }, (_, i) => start + (end - start) * i / (count - 1));
+  const count = Math.max(
+    2,
+    Math.min(Math.floor(limit), Math.ceil(duration / 0.25) + 1)
+  );
+  return Array.from(
+    { length: count },
+    (_, i) => start + ((end - start) * i) / (count - 1)
+  );
 }
 
 /** Mean RGB difference, alpha excluded. */
-export function frameDifference(a: Uint8ClampedArray, b: Uint8ClampedArray): number {
+export function frameDifference(
+  a: Uint8ClampedArray,
+  b: Uint8ClampedArray
+): number {
   if (!a.length || a.length !== b.length || a.length % 4 !== 0) return 255;
   let total = 0;
   for (let i = 0; i < a.length; i += 4) {
-    total += Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]);
+    total +=
+      Math.abs(a[i] - b[i]) +
+      Math.abs(a[i + 1] - b[i + 1]) +
+      Math.abs(a[i + 2] - b[i + 2]);
   }
-  return total / (a.length / 4 * 3);
+  return total / ((a.length / 4) * 3);
 }
 
 export interface ScrollMotion {
@@ -43,24 +73,34 @@ export interface ScrollMotion {
 
 /** Determine vertical scrolling distance between two tiny RGBA previews. */
 export function estimateScrollMotion(
-  before: Uint8ClampedArray, after: Uint8ClampedArray,
-  width: number, height: number
+  before: Uint8ClampedArray,
+  after: Uint8ClampedArray,
+  width: number,
+  height: number
 ): ScrollMotion {
   const unknown: ScrollMotion = { shift: 0, confidence: 'low', error: 255 };
-  if (width < 16 || height < 24 || before.length !== width * height * 4 || after.length !== before.length) {
+  if (
+    width < 16 ||
+    height < 24 ||
+    before.length !== width * height * 4 ||
+    after.length !== before.length
+  ) {
     return unknown;
   }
   const x0 = Math.floor(width * 0.18);
   const x1 = Math.ceil(width * 0.82);
-  const margin = Math.max(3, Math.floor(height * 0.10));
+  const margin = Math.max(3, Math.floor(height * 0.1));
   const maxShift = Math.floor(height * 0.64);
   // Content must have actual texture; a plain screen can never provide a
   // unique displacement, even if its pixel difference appears to be zero.
-  let texture = 0, texN = 0;
+  let texture = 0,
+    texN = 0;
   for (let y = margin + 2; y < height - margin; y += 3) {
     for (let x = x0 + 2; x < x1 - 1; x += 3) {
-      const p = (y * width + x) * 4, prev = p - width * 4;
-      texture += Math.abs(before[p] - before[prev]) +
+      const p = (y * width + x) * 4,
+        prev = p - width * 4;
+      texture +=
+        Math.abs(before[p] - before[prev]) +
         Math.abs(before[p + 1] - before[prev + 1]) +
         Math.abs(before[p + 2] - before[prev + 2]);
       texN++;
@@ -75,11 +115,13 @@ export function estimateScrollMotion(
     if (end - begin < 13) continue;
     const rows: number[] = [];
     for (let y = begin; y < end; y += 2) {
-      let diff = 0, samples = 0;
+      let diff = 0,
+        samples = 0;
       for (let x = x0; x < x1; x += 2) {
         const a = ((y + shift) * width + x) * 4;
         const b = (y * width + x) * 4;
-        diff += Math.abs(before[a] - after[b]) +
+        diff +=
+          Math.abs(before[a] - after[b]) +
           Math.abs(before[a + 1] - after[b + 1]) +
           Math.abs(before[a + 2] - after[b + 2]);
         samples++;
@@ -94,7 +136,7 @@ export function estimateScrollMotion(
   candidates.sort((a, b) => a.score - b.score);
   const best = candidates[0];
   if (!best) return unknown;
-  const runner = candidates.find(c => Math.abs(c.shift - best.shift) >= 3);
+  const runner = candidates.find((c) => Math.abs(c.shift - best.shift) >= 3);
   const gap = runner ? runner.score - best.score : 255;
   if (best.score <= 11 && gap >= 3.4) {
     return { shift: best.shift, confidence: 'high', error: best.score };
@@ -105,7 +147,10 @@ export function estimateScrollMotion(
   return { ...unknown, error: best.score };
 }
 
-export function shouldKeepScrollFrame(motion: ScrollMotion, atEnd = false): boolean {
+export function shouldKeepScrollFrame(
+  motion: ScrollMotion,
+  atEnd = false
+): boolean {
   if (motion.confidence === 'low' || motion.shift < 0) return false;
   return motion.shift >= (atEnd ? 5 : 18);
 }
@@ -128,23 +173,52 @@ function awaitMediaEvent(
       signal.removeEventListener('abort', onAbort);
       if (timer) clearTimeout(timer);
     };
-    const onSuccess = () => { cleanup(); resolve(); };
-    const onError = () => { cleanup(); reject(new Error('无法解码录屏，请尝试 MP4 或 WebM')); };
-    const onAbort = () => { cleanup(); reject(new DOMException('用户已取消', 'AbortError')); };
+    const onSuccess = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error('无法解码录屏，请尝试 MP4 或 WebM'));
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(new DOMException('用户已取消', 'AbortError'));
+    };
     video.addEventListener(eventName, onSuccess, { once: true });
     video.addEventListener('error', onError, { once: true });
     signal.addEventListener('abort', onAbort, { once: true });
-    timer = setTimeout(() => { cleanup(); reject(new Error('录屏解码超时，请尝试缩短视频')); }, 12000);
-    if (signal.aborted) { onAbort(); return; }
-    try { onStart?.(); } catch (error) { cleanup(); reject(error); }
+    timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('录屏解码超时，请尝试缩短视频'));
+    }, 12000);
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    try {
+      onStart?.();
+    } catch (error) {
+      cleanup();
+      reject(error);
+    }
   });
 }
 
-async function seekFrame(video: HTMLVideoElement, seconds: number, signal: AbortSignal): Promise<void> {
+async function seekFrame(
+  video: HTMLVideoElement,
+  seconds: number,
+  signal: AbortSignal
+): Promise<void> {
   assertNotAborted(signal);
-  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
-      Math.abs(video.currentTime - seconds) < 0.002) return;
-  await awaitMediaEvent(video, 'seeked', signal, () => { video.currentTime = seconds; });
+  if (
+    video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+    Math.abs(video.currentTime - seconds) < 0.002
+  )
+    return;
+  await awaitMediaEvent(video, 'seeked', signal, () => {
+    video.currentTime = seconds;
+  });
   assertNotAborted(signal);
 }
 
@@ -162,11 +236,15 @@ export async function extractVideoFrames(
   file: File,
   maxFrames: number,
   signal: AbortSignal,
-  onProgress: (completed: number, total: number) => void
+  onProgress: (completed: number, total: number) => void,
+  range: { start?: number; end?: number; singleFrameTime?: number } = {}
 ): Promise<VideoExtractionResult> {
   assertNotAborted(signal);
   if (maxFrames < 1) throw new Error('图片数量已达到上限，请先移除部分图片');
-  if (!file.type.startsWith('video/') && !/\.(mp4|m4v|mov|webm)$/i.test(file.name)) {
+  if (
+    !file.type.startsWith('video/') &&
+    !/\.(mp4|m4v|mov|webm)$/i.test(file.name)
+  ) {
     throw new Error('请选择浏览器支持的视频文件');
   }
   if (file.size > 300 * 1024 * 1024) throw new Error('录屏文件不能超过 300 MB');
@@ -175,15 +253,42 @@ export async function extractVideoFrames(
   video.playsInline = true;
   video.preload = 'auto';
   const url = URL.createObjectURL(file);
+  const images: StitchedImage[] = [];
+  let completed = false;
   try {
-    await awaitMediaEvent(video, 'loadedmetadata', signal, () => { video.src = url; video.load(); });
+    await awaitMediaEvent(video, 'loadedmetadata', signal, () => {
+      video.src = url;
+      video.load();
+    });
     const duration = video.duration;
-    if (!Number.isFinite(duration) || duration <= 0 || duration > 180) {
-      throw new Error('仅支持 3 分钟以内的录屏；更长录屏请分段导入');
-    }
+    if (!Number.isFinite(duration) || duration <= 0)
+      throw new Error('录屏时长无效');
+    const start = range.start ?? 0,
+      end = range.end ?? Math.min(duration, 180);
+    if (
+      range.singleFrameTime === undefined &&
+      (!Number.isFinite(start) ||
+        !Number.isFinite(end) ||
+        start < 0 ||
+        end > duration ||
+        end <= start ||
+        end - start > 180)
+    )
+      throw new Error('请选择视频内有效的起止时间，每次最多提取 180 秒');
+    if (
+      range.singleFrameTime !== undefined &&
+      (!Number.isFinite(range.singleFrameTime) ||
+        range.singleFrameTime < 0 ||
+        range.singleFrameTime >= duration)
+    )
+      throw new Error('当前帧超出视频范围');
     const originalWidth = video.videoWidth;
     const originalHeight = video.videoHeight;
-    if (!originalWidth || !originalHeight || originalWidth * originalHeight > 25_000_000) {
+    if (
+      !originalWidth ||
+      !originalHeight ||
+      originalWidth * originalHeight > 25_000_000
+    ) {
       throw new Error('录屏分辨率过高或不受支持');
     }
     const ratio = Math.min(1, 1080 / originalWidth, 2400 / originalHeight);
@@ -196,25 +301,42 @@ export async function extractVideoFrames(
     const compareCanvas = document.createElement('canvas');
     compareCanvas.width = PREVIEW_WIDTH;
     compareCanvas.height = PREVIEW_HEIGHT;
-    const compareCtx = compareCanvas.getContext('2d', { willReadFrequently: true });
+    const compareCtx = compareCanvas.getContext('2d', {
+      willReadFrequently: true,
+    });
     if (!frameCtx || !compareCtx) throw new Error('浏览器无法创建视频帧画布');
 
-    const scanTimes = planVideoScanTimes(duration);
-    const images: StitchedImage[] = [];
+    const scanTimes =
+      range.singleFrameTime !== undefined
+        ? [range.singleFrameTime]
+        : planVideoScanTimes(end - start).map((t) => start + t);
+
     let considered = 0;
     let refinements = 0;
     let uncertainTransitions = 0;
     let truncated = false;
     let previousAccepted: Uint8ClampedArray | null = null;
     let acceptedTime = 0;
-    const makeImage = (time: number): void => {
+    const makeImage = async (time: number): Promise<void> => {
       frameCtx.drawImage(video, 0, 0, width, height);
+      const blob = await new Promise<Blob>((resolve, reject) =>
+        frameCanvas.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error('帧编码失败'))),
+          'image/jpeg',
+          0.92
+        )
+      );
       images.push({
         id: crypto.randomUUID(),
         name: `${file.name.replace(/\.[^.]+$/, '')} · ${time.toFixed(1)}s`,
-        src: frameCanvas.toDataURL('image/jpeg', 0.90),
-        width, height,
-        cropTop: 0, cropBottom: 0, cropLeft: 0, cropRight: 0
+        src: URL.createObjectURL(blob),
+        videoTime: time,
+        width,
+        height,
+        cropTop: 0,
+        cropBottom: 0,
+        cropLeft: 0,
+        cropRight: 0,
       });
     };
 
@@ -223,24 +345,37 @@ export async function extractVideoFrames(
       const time = scanTimes[i];
       await seekFrame(video, time, signal);
       compareCtx.drawImage(video, 0, 0, PREVIEW_WIDTH, PREVIEW_HEIGHT);
-      const current = compareCtx.getImageData(0, 0, PREVIEW_WIDTH, PREVIEW_HEIGHT).data;
+      const current = compareCtx.getImageData(
+        0,
+        0,
+        PREVIEW_WIDTH,
+        PREVIEW_HEIGHT
+      ).data;
       considered++;
       if (!previousAccepted) {
-        makeImage(time);
+        await makeImage(time);
         previousAccepted = new Uint8ClampedArray(current);
         acceptedTime = time;
       } else {
-        const motion = estimateScrollMotion(previousAccepted, current, PREVIEW_WIDTH, PREVIEW_HEIGHT);
+        const motion = estimateScrollMotion(
+          previousAccepted,
+          current,
+          PREVIEW_WIDTH,
+          PREVIEW_HEIGHT
+        );
         const changed = frameDifference(previousAccepted, current);
         const endFrame = i === scanTimes.length - 1;
         // A fast scroll can jump beyond the matchable content region.
         // Retry the midpoint before allowing a discontinuity.
-        const mayHaveLostContent = changed > 4 && (
-          (motion.confidence === 'low') || motion.shift >= PREVIEW_HEIGHT * 0.50
-        );
-        if (mayHaveLostContent && refinements < MAX_REFINEMENTS &&
-            scanTimes.length < MAX_SCAN_FRAMES + MAX_REFINEMENTS &&
-            time - acceptedTime >= 0.18) {
+        const mayHaveLostContent =
+          changed > 4 &&
+          (motion.confidence === 'low' || motion.shift >= PREVIEW_HEIGHT * 0.5);
+        if (
+          mayHaveLostContent &&
+          refinements < MAX_REFINEMENTS &&
+          scanTimes.length < MAX_SCAN_FRAMES + MAX_REFINEMENTS &&
+          time - acceptedTime >= 0.18
+        ) {
           const middle = (acceptedTime + time) / 2;
           if (middle > acceptedTime + 0.065 && middle < time - 0.065) {
             scanTimes.splice(i, 0, middle);
@@ -257,7 +392,7 @@ export async function extractVideoFrames(
             truncated = true;
             break;
           }
-          makeImage(time);
+          await makeImage(time);
           previousAccepted = new Uint8ClampedArray(current);
           acceptedTime = time;
         } else if (motion.confidence === 'low' && changed > 8) {
@@ -268,7 +403,7 @@ export async function extractVideoFrames(
             truncated = true;
             break;
           }
-          makeImage(time);
+          await makeImage(time);
           previousAccepted = new Uint8ClampedArray(current);
           acceptedTime = time;
         }
@@ -276,8 +411,10 @@ export async function extractVideoFrames(
       onProgress(i + 1, scanTimes.length);
     }
     assertNotAborted(signal);
+    completed = true;
     return { images, considered, duration, uncertainTransitions, truncated };
   } finally {
+    if (!completed) for (const image of images) URL.revokeObjectURL(image.src);
     video.pause();
     video.removeAttribute('src');
     video.load();

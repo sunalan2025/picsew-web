@@ -25,3 +25,10 @@ test('invalid sizes and too many pages are rejected', () => {
   assert.throws(() => planPdfExport(0, 100, 'multi'));
   assert.throws(() => planPdfExport(100, 500000, 'multi'));
 });
+
+test('single-page PPI preserves physical dimensions, including landscape pages', () => {
+  const plan = planPdfExport(1800, 900, 'single', 300);
+  assert.equal(plan.widthPt, 432);
+  assert.equal(plan.heightPt, 216);
+  assert.throws(() => planPdfExport(1800, 900, 'single', -10));
+});

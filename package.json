@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "node --experimental-strip-types --test tests/*.test.mjs"
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "check": "npm run lint && npm test && npm run build",
+    "test:browser": "node tests/browser-crop-smoke.mjs && node tests/browser-stitch-smoke.mjs && node tests/browser-product-smoke.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.3",

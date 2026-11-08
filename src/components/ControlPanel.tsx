@@ -1,6 +1,21 @@
 import React from 'react';
 import {
-  Scissors, Type, Battery, ShieldAlert, Monitor, Download, Copy, Share2, FileText, Split, Undo, Redo, Trash2, Check, Layers, FolderOpen
+  Scissors,
+  Type,
+  Battery,
+  ShieldAlert,
+  Monitor,
+  Download,
+  Copy,
+  Share2,
+  FileText,
+  Split,
+  Undo,
+  Redo,
+  Trash2,
+  Check,
+  Layers,
+  FolderOpen,
 } from 'lucide-react';
 import type {
   AnnotationType,
@@ -8,16 +23,22 @@ import type {
   MockupConfig,
   WatermarkConfig,
   ExportConfig,
-  StitchedImage
+  StitchedImage,
 } from '../types';
+import { AnnotationInspector } from './AnnotationInspector';
+import type { Annotation } from '../types';
+import { SeamInspector } from './SeamInspector';
 import { ImageUploader } from './ImageUploader';
 import { clampOverlapsToVisibleImages } from '../utils/imageState';
 
 interface ControlPanelProps {
+  onImportMessage?: (message: string) => void;
+  incomingFiles?: File[];
+  onIncomingConsumed?: () => void;
   hideTabNavigation?: boolean;
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  
+
   // Stitching
   direction: 'vertical' | 'horizontal';
   setDirection: (dir: 'vertical' | 'horizontal') => void;
@@ -28,6 +49,10 @@ interface ControlPanelProps {
   onOverlapCommit?: () => void;
   uncertainSeams?: number[];
   focusedSeamIndex?: number | null;
+  onDetectBars: () => void;
+  barSuggestion: { top: number; bottom: number } | null;
+  onApplyBars: () => void;
+  onRematchSeam?: (index: number) => void;
   onInspectSeam?: (index: number) => void;
   imageNames: string[];
 
@@ -42,6 +67,9 @@ interface ControlPanelProps {
   setFontSize: (size: number) => void;
   onUndo: () => void;
   onRedo: () => void;
+  selectedAnnotation?: Annotation;
+  onEditAnnotation: (anno: Annotation) => void;
+  onDeleteAnnotation: () => void;
   onClearAnnotations: () => void;
   canUndo: boolean;
   canRedo: boolean;
@@ -66,6 +94,7 @@ interface ControlPanelProps {
   onDownloadPDF: () => void;
   onDownloadZip: () => void;
 
+  outputSize?: { width: number; height: number };
   hasImages: boolean;
   onResetCropsAndSplits?: () => void;
 
@@ -78,6 +107,9 @@ interface ControlPanelProps {
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({
   hideTabNavigation = false,
+  incomingFiles,
+  onIncomingConsumed,
+  onImportMessage,
   activeTab,
   setActiveTab,
   direction,
@@ -90,6 +122,10 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   uncertainSeams = [],
   focusedSeamIndex = null,
   onInspectSeam,
+  onRematchSeam,
+  onDetectBars,
+  barSuggestion,
+  onApplyBars,
   imageNames,
   selectedTool,
   setSelectedTool,
@@ -102,6 +138,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   onUndo,
   onRedo,
   onClearAnnotations,
+  selectedAnnotation,
+  onEditAnnotation,
+  onDeleteAnnotation,
   canUndo,
   canRedo,
   statusBar,
@@ -119,11 +158,12 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   onDownloadPDF,
   onDownloadZip,
   hasImages,
+  outputSize,
   onResetCropsAndSplits,
   isMobile = false,
   images,
   onImagesChange,
-  onAutoStitchTrigger
+  onAutoStitchTrigger,
 }) => {
   const tabs = [
     ...(isMobile ? [{ id: 'upload', label: '素材', icon: FolderOpen }] : []),
@@ -149,9 +189,12 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   // A stable physical maximum is essential: max={value+200} makes a range
   // thumb chase its moving endpoint and prevents precise positioning.
   const maxOverlapFor = (index: number): number => {
-    if (!images || images.length < index + 2) return Math.max(500, overlaps[index] || 0);
+    if (!images || images.length < index + 2)
+      return Math.max(500, overlaps[index] || 0);
     return clampOverlapsToVisibleImages(
-      images, Array(images.length - 1).fill(Number.MAX_SAFE_INTEGER), direction
+      images,
+      Array(images.length - 1).fill(Number.MAX_SAFE_INTEGER),
+      direction
     )[index];
   };
   const updateOverlap = (index: number, val: number) => {
@@ -163,42 +206,48 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Navigation tabs: hidden in the streamlined workspace; dock controls them. */}
-      {!hideTabNavigation && <div
-        role="tablist"
-        aria-label="控制面板标签"
-        className="flex border-b border-slate-200 p-1 bg-slate-50 shrink-0 overflow-x-auto"
-      >
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              role="tab"
-              aria-selected={isActive}
-              aria-controls={`panel-${tab.id}`}
-              id={`tab-${tab.id}`}
-              onClick={() => {
-                setActiveTab(tab.id);
-                if (tab.id !== 'cut' && (selectedTool === 'cut-horizontal' || selectedTool === 'cut-vertical')) {
-                  setSelectedTool('select');
-                }
-                if (tab.id === 'markup' && selectedTool === 'select') {
-                  setSelectedTool('pen');
-                }
-              }}
-              className={`flex-1 flex flex-col items-center justify-center py-2 px-1.5 min-w-[50px] text-[10px] font-semibold rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
-                isActive
-                  ? 'bg-primary-500/15 text-blue-600 border border-primary-500/30'
-                  : 'text-slate-600 hover:text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5 mb-1" />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>}
+      {!hideTabNavigation && (
+        <div
+          role="tablist"
+          aria-label="控制面板标签"
+          className="flex border-b border-slate-200 p-1 bg-slate-50 shrink-0 overflow-x-auto"
+        >
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`panel-${tab.id}`}
+                id={`tab-${tab.id}`}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  if (
+                    tab.id !== 'cut' &&
+                    (selectedTool === 'cut-horizontal' ||
+                      selectedTool === 'cut-vertical')
+                  ) {
+                    setSelectedTool('select');
+                  }
+                  if (tab.id === 'markup' && selectedTool === 'select') {
+                    setSelectedTool('pen');
+                  }
+                }}
+                className={`flex-1 flex flex-col items-center justify-center py-2 px-1.5 min-w-[50px] text-[10px] font-semibold rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
+                  isActive
+                    ? 'bg-primary-500/15 text-blue-600 border border-primary-500/30'
+                    : 'text-slate-600 hover:text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5 mb-1" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Tab Panels */}
       <div
@@ -211,7 +260,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         {!hasImages && activeTab !== 'upload' && (
           <div className="flex flex-col items-center justify-center h-full text-center text-slate-500 text-xs py-10">
             <ShieldAlert className="w-8 h-8 text-slate-400 mb-2" />
-            <p>{isMobile ? '请先切换到“素材”卡片上传截图' : '请先在素材页添加截图'}</p>
+            <p>
+              {isMobile
+                ? '请先切换到“素材”卡片上传截图'
+                : '请先在素材页添加截图'}
+            </p>
           </div>
         )}
 
@@ -220,6 +273,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           <div className="h-full flex flex-col min-h-0">
             <ImageUploader
               images={images}
+              incomingFiles={incomingFiles}
+              onIncomingConsumed={onIncomingConsumed}
+              onImportMessage={onImportMessage}
               onImagesChange={onImagesChange}
               onAutoStitchTrigger={onAutoStitchTrigger || (() => {})}
             />
@@ -231,11 +287,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             {/* 1. Stitch Tab */}
             {activeTab === 'stitch' && (
               <div className="space-y-4">
-
-
                 {/* Direction */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-600">拼接方向</label>
+                  <label className="text-xs font-bold text-slate-600">
+                    拼接方向
+                  </label>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setDirection('vertical')}
@@ -262,10 +318,41 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   </div>
                 </div>
 
+                <button
+                  type="button"
+                  className="w-full rounded-lg border px-3 py-2 text-xs text-blue-700"
+                  onClick={onDetectBars}
+                >
+                  识别重复顶栏 / 底栏
+                </button>
+                {barSuggestion && (
+                  <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+                    {barSuggestion.top || barSuggestion.bottom ? (
+                      <>
+                        <p>
+                          建议去除顶部 {(barSuggestion.top * 100).toFixed(1)}
+                          %、底部 {(barSuggestion.bottom * 100).toFixed(1)}
+                          %。请先确认这些区域没有正文。
+                        </p>
+                        <button
+                          type="button"
+                          onClick={onApplyBars}
+                          className="mt-2 rounded-lg border px-3 py-2"
+                        >
+                          确认并应用到全部
+                        </button>
+                      </>
+                    ) : (
+                      <p>没有找到可靠的重复边栏，请使用逐图裁剪。</p>
+                    )}
+                  </div>
+                )}
                 {/* Gap */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-xs font-bold text-slate-600">
-                    <label htmlFor="stitch-gap" className="cursor-pointer">接缝间距</label>
+                    <label htmlFor="stitch-gap" className="cursor-pointer">
+                      接缝间距
+                    </label>
                     <span className="text-blue-600 font-mono">{gap} px</span>
                   </div>
                   <input
@@ -297,13 +384,20 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     <summary className="cursor-pointer font-semibold">
                       {uncertainSeams.length} 处匹配不确定 · 展开查看
                     </summary>
-                    <p className="font-bold">有 {uncertainSeams.length} 处接缝需要检查</p>
-                    <p className="mt-1 leading-5">这些图片的内容相似或无法找到可靠的重叠位置。请检查对应连接点并手动微调，其他接缝无需操作。</p>
+                    <p className="font-bold">
+                      有 {uncertainSeams.length} 处接缝需要检查
+                    </p>
+                    <p className="mt-1 leading-5">
+                      这些图片的内容相似或无法找到可靠的重叠位置。请检查对应连接点并手动微调，其他接缝无需操作。
+                    </p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {uncertainSeams.map(idx => (
-                        <button key={idx} type="button"
+                      {uncertainSeams.map((idx) => (
+                        <button
+                          key={idx}
+                          type="button"
                           onClick={() => onInspectSeam?.(idx)}
-                          className="rounded-lg border border-amber-300 bg-white px-2 py-1 font-semibold">
+                          className="rounded-lg border border-amber-300 bg-white px-2 py-1 font-semibold"
+                        >
                           接缝 {idx + 1}
                         </button>
                       ))}
@@ -319,27 +413,58 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     </label>
                     <div className="overlap-list space-y-3.5 max-h-[300px] overflow-y-auto pr-1">
                       {overlaps.map((val, idx) => (
-                        <div key={idx} data-overlap-card={idx}
-                           className={`space-y-2 rounded-xl border p-3 transition-colors ${focusedSeamIndex === idx
-                             ? 'border-blue-400 bg-blue-50 shadow-sm' : 'border-slate-200 bg-white'}`}>
+                        <div
+                          key={idx}
+                          data-overlap-card={idx}
+                          className={`space-y-2 rounded-xl border p-3 transition-colors ${
+                            focusedSeamIndex === idx
+                              ? 'border-blue-400 bg-blue-50 shadow-sm'
+                              : 'border-slate-200 bg-white'
+                          }`}
+                        >
                           <div className="flex justify-between items-center text-[11px]">
-                            <label htmlFor={`overlap-${idx}`} className="text-slate-600 font-medium truncate max-w-[170px] cursor-pointer">
-                              连接点 {idx + 1}: {imageNames[idx]} {direction === 'vertical' ? '↓' : '→'} {imageNames[idx + 1]}
+                            <label
+                              htmlFor={`overlap-${idx}`}
+                              className="text-slate-600 font-medium truncate max-w-[170px] cursor-pointer"
+                            >
+                              连接点 {idx + 1}: {imageNames[idx]}{' '}
+                              {direction === 'vertical' ? '↓' : '→'}{' '}
+                              {imageNames[idx + 1]}
                             </label>
-                            <button type="button" onClick={() => onInspectSeam?.(idx)}
+                            <button
+                              type="button"
+                              onClick={() => onInspectSeam?.(idx)}
                               aria-label={`在画布定位接缝 ${idx + 1}`}
-                              className="flex items-center gap-1 rounded-lg bg-blue-50 px-2 py-1 font-semibold text-blue-700 hover:bg-blue-100">
-                              {uncertainSeams.includes(idx) && <span className="text-amber-600">需检查 ·</span>}
+                              className="flex items-center gap-1 rounded-lg bg-blue-50 px-2 py-1 font-semibold text-blue-700 hover:bg-blue-100"
+                            >
+                              {uncertainSeams.includes(idx) && (
+                                <span className="text-amber-600">需检查 ·</span>
+                              )}
                               定位 ↗ <span className="font-mono">{val} px</span>
                             </button>
                           </div>
+                          {focusedSeamIndex === idx && images && (
+                            <SeamInspector
+                              images={images}
+                              overlaps={overlaps}
+                              direction={direction}
+                              gap={gap}
+                              index={idx}
+                              max={maxOverlapFor(idx)}
+                              onChange={(value) => updateOverlap(idx, value)}
+                              onCommit={() => onOverlapCommit?.()}
+                              onRematch={() => onRematchSeam?.(idx)}
+                            />
+                          )}
                           <input
                             id={`overlap-${idx}`}
                             type="range"
                             min="0"
                             max={maxOverlapFor(idx)}
                             value={val}
-                            onChange={(e) => updateOverlap(idx, parseInt(e.target.value))}
+                            onChange={(e) =>
+                              updateOverlap(idx, parseInt(e.target.value))
+                            }
                             onPointerUp={onOverlapCommit}
                             onPointerCancel={onOverlapCommit}
                             onKeyUp={onOverlapCommit}
@@ -357,84 +482,99 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             {/* 2. Cut Tab */}
             {activeTab === 'cut' && (
               <div className="space-y-4">
-                <details open className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <summary className="cursor-pointer text-xs font-semibold text-slate-600">图片分割操作
+                <details
+                  open
+                  className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                >
+                  <summary className="cursor-pointer text-xs font-semibold text-slate-600">
+                    图片分割操作
                   </summary>
                   <div className="mt-3 space-y-4">
-                <div className="bg-primary-500/10 border border-primary-500/20 p-3 rounded-xl text-xs text-blue-600 space-y-2">
-                  <p className="font-semibold">使用指南：</p>
-                  <ol className="list-decimal list-inside text-slate-600 leading-relaxed space-y-1.5">
-                    <li>点击下方 <b>“放置水平/垂直分割线”</b>。</li>
-                    <li>在图片需要切开的相对位置<b>点击一次</b>，画面将被切开。</li>
-                    <li>
-                      结束分割线模式后，在图片边缘附近<b>按住左键拖拽</b>：
-                      <ul className="list-disc list-inside pl-4 text-slate-500 mt-1">
-                        <li><b>靠近上/下边缘拖拽</b>：进行上下裁剪</li>
-                        <li><b>靠近左/右边缘拖拽</b>：进行左右裁剪</li>
-                      </ul>
-                    </li>
-                  </ol>
-                </div>
+                    <div className="bg-primary-500/10 border border-primary-500/20 p-3 rounded-xl text-xs text-blue-600 space-y-2">
+                      <p className="font-semibold">使用指南：</p>
+                      <ol className="list-decimal list-inside text-slate-600 leading-relaxed space-y-1.5">
+                        <li>
+                          点击下方 <b>“放置水平/垂直分割线”</b>。
+                        </li>
+                        <li>
+                          在图片需要切开的相对位置<b>点击一次</b>
+                          ，画面将被切开。
+                        </li>
+                        <li>
+                          结束分割线模式后，在图片边缘附近<b>按住左键拖拽</b>：
+                          <ul className="list-disc list-inside pl-4 text-slate-500 mt-1">
+                            <li>
+                              <b>靠近上/下边缘拖拽</b>：进行上下裁剪
+                            </li>
+                            <li>
+                              <b>靠近左/右边缘拖拽</b>：进行左右裁剪
+                            </li>
+                          </ul>
+                        </li>
+                      </ol>
+                    </div>
 
-                {/* Split Action Select */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-600">选择裁剪线工具</label>
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => setSelectedTool('cut-horizontal')}
-                      aria-pressed={selectedTool === 'cut-horizontal'}
-                      className={`w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 border transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
-                        selectedTool === 'cut-horizontal'
-                          ? 'bg-red-600 border-red-500 text-white shadow-md'
-                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <Split className="w-3.5 h-3.5 rotate-90" />
-                      水平分割
-                    </button>
+                    {/* Split Action Select */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-600">
+                        选择裁剪线工具
+                      </label>
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={() => setSelectedTool('cut-horizontal')}
+                          aria-pressed={selectedTool === 'cut-horizontal'}
+                          className={`w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 border transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
+                            selectedTool === 'cut-horizontal'
+                              ? 'bg-red-600 border-red-500 text-white shadow-md'
+                              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          <Split className="w-3.5 h-3.5 rotate-90" />
+                          水平分割
+                        </button>
 
-                    <button
-                      onClick={() => setSelectedTool('cut-vertical')}
-                      aria-pressed={selectedTool === 'cut-vertical'}
-                      className={`w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 border transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
-                        selectedTool === 'cut-vertical'
-                          ? 'bg-blue-600 border-blue-500 text-white shadow-md'
-                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <Split className="w-3.5 h-3.5" />
-                      垂直分割
-                    </button>
-                    
-                    <button
-                      onClick={() => setSelectedTool('select')}
-                      aria-pressed={selectedTool === 'select'}
-                      className={`w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 border transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
-                        selectedTool === 'select'
-                          ? 'bg-primary-600 border-primary-500 text-white shadow-md'
-                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      结束分割，进入拖拽裁剪模式
-                    </button>
-                  </div>
-                </div>
+                        <button
+                          onClick={() => setSelectedTool('cut-vertical')}
+                          aria-pressed={selectedTool === 'cut-vertical'}
+                          className={`w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 border transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
+                            selectedTool === 'cut-vertical'
+                              ? 'bg-blue-600 border-blue-500 text-white shadow-md'
+                              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          <Split className="w-3.5 h-3.5" />
+                          垂直分割
+                        </button>
 
-                {/* Reset button */}
-                {onResetCropsAndSplits && (
-                  <button
-                    onClick={() => {
-                      if (window.confirm("确定要重置裁剪与分割吗？")) {
-                        onResetCropsAndSplits();
-                      }
-                    }}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-900/30 text-xs font-semibold rounded-lg transition mt-4"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    重置所有裁剪与分割
-                  </button>
-                )}
+                        <button
+                          onClick={() => setSelectedTool('select')}
+                          aria-pressed={selectedTool === 'select'}
+                          className={`w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 border transition focus-visible:ring-2 focus-visible:ring-primary-500 focus:outline-none ${
+                            selectedTool === 'select'
+                              ? 'bg-primary-600 border-primary-500 text-white shadow-md'
+                              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          结束分割，进入拖拽裁剪模式
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Reset button */}
+                    {onResetCropsAndSplits && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm('确定要重置裁剪与分割吗？')) {
+                            onResetCropsAndSplits();
+                          }
+                        }}
+                        className="w-full flex items-center justify-center gap-1.5 py-2 bg-red-950/20 hover:bg-red-950/40 text-red-400 border border-red-900/30 text-xs font-semibold rounded-lg transition mt-4"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        重置所有裁剪与分割
+                      </button>
+                    )}
                   </div>
                 </details>
               </div>
@@ -443,11 +583,29 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             {/* 3. Markup Tab */}
             {activeTab === 'markup' && (
               <div className="space-y-4">
+                {selectedAnnotation && (
+                  <AnnotationInspector
+                    annotation={selectedAnnotation}
+                    onChange={onEditAnnotation}
+                    onDelete={onDeleteAnnotation}
+                  />
+                )}
                 {/* Tools */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-600">标注工具</label>
+                  <label className="text-xs font-bold text-slate-600">
+                    标注工具
+                  </label>
                   <div className="grid grid-cols-3 gap-2">
-                    {(['select', 'pen', 'arrow', 'rect', 'text', 'blur'] as const).map((t) => (
+                    {(
+                      [
+                        'select',
+                        'pen',
+                        'arrow',
+                        'rect',
+                        'text',
+                        'blur',
+                      ] as const
+                    ).map((t) => (
                       <button
                         key={t}
                         onClick={() => setSelectedTool(t)}
@@ -458,7 +616,17 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                             : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                         }`}
                       >
-                        {t === 'select' ? '选择模式' : t === 'pen' ? '自由画笔' : t === 'rect' ? '矩形框' : t === 'arrow' ? '箭头' : t === 'text' ? '添加文字' : '模糊马赛克'}
+                        {t === 'select'
+                          ? '选择模式'
+                          : t === 'pen'
+                            ? '自由画笔'
+                            : t === 'rect'
+                              ? '矩形框'
+                              : t === 'arrow'
+                                ? '箭头'
+                                : t === 'text'
+                                  ? '添加文字'
+                                  : '模糊马赛克'}
                       </button>
                     ))}
                   </div>
@@ -467,7 +635,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 {/* Colors */}
                 {selectedTool !== 'select' && selectedTool !== 'blur' && (
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-600 block">边框/字体颜色</label>
+                    <label className="text-xs font-bold text-slate-600 block">
+                      边框/字体颜色
+                    </label>
                     <div className="flex gap-2.5 flex-wrap">
                       {colors.map((c) => (
                         <button
@@ -477,11 +647,15 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                           aria-label={`选择颜色 ${c}`}
                           aria-pressed={color === c}
                           className={`w-6 h-6 rounded-full border flex items-center justify-center shadow-inner transition hover:scale-110 focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-900 focus:outline-none ${
-                            color === c ? 'border-primary-300 scale-105' : 'border-slate-200'
+                            color === c
+                              ? 'border-primary-300 scale-105'
+                              : 'border-slate-200'
                           }`}
                         >
                           {color === c && (
-                            <Check className={`w-3.5 h-3.5 ${c === '#ffffff' || c === '#ffcc00' ? 'text-black' : 'text-white'}`} />
+                            <Check
+                              className={`w-3.5 h-3.5 ${c === '#ffffff' || c === '#ffcc00' ? 'text-black' : 'text-white'}`}
+                            />
                           )}
                         </button>
                       ))}
@@ -490,43 +664,59 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 )}
 
                 {/* Size Controls */}
-                {selectedTool !== 'select' && selectedTool !== 'cut-horizontal' && selectedTool !== 'cut-vertical' && (
-                  <div className="space-y-3">
-                    {selectedTool !== 'text' ? (
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between text-xs text-slate-600 font-semibold">
-                          <label htmlFor="stroke-width" className="cursor-pointer">线条粗细</label>
-                          <span>{strokeWidth} px</span>
+                {selectedTool !== 'select' &&
+                  selectedTool !== 'cut-horizontal' &&
+                  selectedTool !== 'cut-vertical' && (
+                    <div className="space-y-3">
+                      {selectedTool !== 'text' ? (
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs text-slate-600 font-semibold">
+                            <label
+                              htmlFor="stroke-width"
+                              className="cursor-pointer"
+                            >
+                              线条粗细
+                            </label>
+                            <span>{strokeWidth} px</span>
+                          </div>
+                          <input
+                            id="stroke-width"
+                            type="range"
+                            min="2"
+                            max="20"
+                            value={strokeWidth}
+                            onChange={(e) =>
+                              setStrokeWidth(parseInt(e.target.value))
+                            }
+                            className="w-full h-1 bg-slate-50 rounded accent-primary-500 cursor-pointer"
+                          />
                         </div>
-                        <input
-                          id="stroke-width"
-                          type="range"
-                          min="2"
-                          max="20"
-                          value={strokeWidth}
-                          onChange={(e) => setStrokeWidth(parseInt(e.target.value))}
-                          className="w-full h-1 bg-slate-50 rounded accent-primary-500 cursor-pointer"
-                        />
-                      </div>
-                    ) : (
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between text-xs text-slate-600 font-semibold">
-                          <label htmlFor="font-size" className="cursor-pointer">字号大小</label>
-                          <span>{fontSize} px</span>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs text-slate-600 font-semibold">
+                            <label
+                              htmlFor="font-size"
+                              className="cursor-pointer"
+                            >
+                              字号大小
+                            </label>
+                            <span>{fontSize} px</span>
+                          </div>
+                          <input
+                            id="font-size"
+                            type="range"
+                            min="12"
+                            max="72"
+                            value={fontSize}
+                            onChange={(e) =>
+                              setFontSize(parseInt(e.target.value))
+                            }
+                            className="w-full h-1 bg-slate-50 rounded accent-primary-500 cursor-pointer"
+                          />
                         </div>
-                        <input
-                          id="font-size"
-                          type="range"
-                          min="12"
-                          max="72"
-                          value={fontSize}
-                          onChange={(e) => setFontSize(parseInt(e.target.value))}
-                          className="w-full h-1 bg-slate-50 rounded accent-primary-500 cursor-pointer"
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  )}
 
                 {/* History Action Buttons */}
                 <div className="space-y-2 pt-2 border-t border-slate-200">
@@ -552,7 +742,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   </div>
                   <button
                     onClick={() => {
-                      if (window.confirm("确定要清除所有标注吗？")) {
+                      if (window.confirm('确定要清除所有标注吗？')) {
                         onClearAnnotations();
                       }
                     }}
@@ -570,12 +760,19 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               <div className="space-y-4">
                 {/* Toggle Enable */}
                 <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                  <label htmlFor="statusbar-toggle" className="text-xs font-bold text-slate-700 cursor-pointer">叠加状态栏</label>
+                  <label
+                    htmlFor="statusbar-toggle"
+                    className="text-xs font-bold text-slate-700 cursor-pointer"
+                  >
+                    叠加状态栏
+                  </label>
                   <input
                     id="statusbar-toggle"
                     type="checkbox"
                     checked={statusBar.enabled}
-                    onChange={(e) => setStatusBar({ ...statusBar, enabled: e.target.checked })}
+                    onChange={(e) =>
+                      setStatusBar({ ...statusBar, enabled: e.target.checked })
+                    }
                     className="w-4 h-4 rounded text-primary-500 bg-slate-50 border-slate-200 focus:ring-primary-500 accent-primary-500 cursor-pointer"
                   />
                 </div>
@@ -584,13 +781,20 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   <div className="space-y-4 animate-fade-in">
                     {/* Time Input */}
                     <div className="space-y-1.5">
-                      <label htmlFor="statusbar-time" className="text-xs font-bold text-slate-600 cursor-pointer">时间文本</label>
+                      <label
+                        htmlFor="statusbar-time"
+                        className="text-xs font-bold text-slate-600 cursor-pointer"
+                      >
+                        时间文本
+                      </label>
                       <input
                         id="statusbar-time"
                         type="text"
                         maxLength={10}
                         value={statusBar.time}
-                        onChange={(e) => setStatusBar({ ...statusBar, time: e.target.value })}
+                        onChange={(e) =>
+                          setStatusBar({ ...statusBar, time: e.target.value })
+                        }
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-3 text-xs text-slate-700 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-hidden font-mono"
                         placeholder="9:41"
                       />
@@ -599,8 +803,15 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     {/* Battery Slider */}
                     <div className="space-y-1.5">
                       <div className="flex justify-between text-xs text-slate-600 font-bold">
-                        <label htmlFor="statusbar-battery" className="cursor-pointer">电量比例</label>
-                        <span className="text-blue-600 font-mono">{statusBar.battery}%</span>
+                        <label
+                          htmlFor="statusbar-battery"
+                          className="cursor-pointer"
+                        >
+                          电量比例
+                        </label>
+                        <span className="text-blue-600 font-mono">
+                          {statusBar.battery}%
+                        </span>
                       </div>
                       <input
                         id="statusbar-battery"
@@ -608,26 +819,39 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                         min="0"
                         max="100"
                         value={statusBar.battery}
-                        onChange={(e) => setStatusBar({ ...statusBar, battery: parseInt(e.target.value) })}
+                        onChange={(e) =>
+                          setStatusBar({
+                            ...statusBar,
+                            battery: parseInt(e.target.value),
+                          })
+                        }
                         className="w-full h-1 bg-slate-50 rounded accent-primary-500 cursor-pointer"
                       />
                     </div>
 
                     {/* Signal Network */}
                     <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-600">网络连接</label>
+                      <label className="text-xs font-bold text-slate-600">
+                        网络连接
+                      </label>
                       <div className="flex gap-2">
                         {(['wifi', 'cellular', 'none'] as const).map((net) => (
                           <button
                             key={net}
-                            onClick={() => setStatusBar({ ...statusBar, wifi: net })}
+                            onClick={() =>
+                              setStatusBar({ ...statusBar, wifi: net })
+                            }
                             className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${
                               statusBar.wifi === net
                                 ? 'bg-primary-600 text-white'
                                 : 'bg-slate-50 text-slate-600 border border-slate-200'
                             }`}
                           >
-                            {net === 'wifi' ? 'Wi-Fi' : net === 'cellular' ? '蜂窝网' : '无'}
+                            {net === 'wifi'
+                              ? 'Wi-Fi'
+                              : net === 'cellular'
+                                ? '蜂窝网'
+                                : '无'}
                           </button>
                         ))}
                       </div>
@@ -635,10 +859,14 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
                     {/* Status bar text style */}
                     <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-600">图标与文字颜色</label>
+                      <label className="text-xs font-bold text-slate-600">
+                        图标与文字颜色
+                      </label>
                       <div className="flex gap-2">
                         <button
-                          onClick={() => setStatusBar({ ...statusBar, style: 'light' })}
+                          onClick={() =>
+                            setStatusBar({ ...statusBar, style: 'light' })
+                          }
                           className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${
                             statusBar.style === 'light'
                               ? 'bg-primary-600 text-white'
@@ -648,7 +876,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                           白色 (深背景用)
                         </button>
                         <button
-                          onClick={() => setStatusBar({ ...statusBar, style: 'dark' })}
+                          onClick={() =>
+                            setStatusBar({ ...statusBar, style: 'dark' })
+                          }
                           className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${
                             statusBar.style === 'dark'
                               ? 'bg-primary-600 text-white'
@@ -669,13 +899,19 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               <div className="space-y-4">
                 {/* Select Device */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-600">套壳机型</label>
+                  <label className="text-xs font-bold text-slate-600">
+                    套壳机型
+                  </label>
                   <select
                     value={mockup.device}
-                    onChange={(e) => setMockup({ ...mockup, device: e.target.value as any })}
+                    onChange={(e) =>
+                      setMockup({ ...mockup, device: e.target.value as any })
+                    }
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-3 text-xs text-slate-700 focus:border-primary-500 outline-hidden"
                   >
                     <option value="none">无套壳</option>
+                    <option value="iphone16pro">iPhone 16 Pro</option>
+                    <option value="android">Android（居中镜头）</option>
                     <option value="iphone15">iPhone 15 Pro (灵动岛)</option>
                     <option value="iphone14">iPhone 14 (刘海屏)</option>
                     <option value="ipad">iPad Pro (平板边框)</option>
@@ -683,13 +919,76 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 </div>
 
                 {mockup.device !== 'none' && (
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <label>
+                      旋转
+                      <select
+                        aria-label="设备内容旋转"
+                        value={mockup.rotation || 0}
+                        onChange={(e) =>
+                          setMockup({
+                            ...mockup,
+                            rotation: Number(e.target.value) as
+                              | 0
+                              | 90
+                              | 180
+                              | 270,
+                          })
+                        }
+                        className="w-full"
+                      >
+                        {[0, 90, 180, 270].map((n) => (
+                          <option key={n} value={n}>
+                            {n}°
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      外框颜色
+                      <input
+                        type="color"
+                        aria-label="外框颜色"
+                        value={mockup.frameColor || '#1c1d22'}
+                        onChange={(e) =>
+                          setMockup({ ...mockup, frameColor: e.target.value })
+                        }
+                      />
+                    </label>
+                    <label>
+                      边框宽度
+                      <input
+                        aria-label="设备边框宽度"
+                        type="number"
+                        min={0}
+                        max={80}
+                        value={mockup.borderWidth ?? 18}
+                        onChange={(e) =>
+                          setMockup({
+                            ...mockup,
+                            borderWidth: Math.max(
+                              0,
+                              Math.min(80, Number(e.target.value))
+                            ),
+                          })
+                        }
+                        className="w-full"
+                      />
+                    </label>
+                  </div>
+                )}
+                {mockup.device !== 'none' && (
                   <div className="space-y-4 animate-fade-in">
                     {/* Extend Bottom Mode */}
                     <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-600">套壳布局模式</label>
+                      <label className="text-xs font-bold text-slate-600">
+                        套壳布局模式
+                      </label>
                       <div className="flex gap-2">
                         <button
-                          onClick={() => setMockup({ ...mockup, extendBottom: true })}
+                          onClick={() =>
+                            setMockup({ ...mockup, extendBottom: true })
+                          }
                           className={`flex-1 py-2 px-2.5 rounded-lg text-xs font-semibold leading-4 transition ${
                             mockup.extendBottom
                               ? 'bg-primary-600 text-white'
@@ -699,7 +998,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                           无限延伸 ( scrolling 长图适用 )
                         </button>
                         <button
-                          onClick={() => setMockup({ ...mockup, extendBottom: false })}
+                          onClick={() =>
+                            setMockup({ ...mockup, extendBottom: false })
+                          }
                           className={`flex-1 py-2 px-2.5 rounded-lg text-xs font-semibold leading-4 transition ${
                             !mockup.extendBottom
                               ? 'bg-primary-600 text-white'
@@ -713,19 +1014,27 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
                     {/* Background Type */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-600">套壳背景样式</label>
+                      <label className="text-xs font-bold text-slate-600">
+                        套壳背景样式
+                      </label>
                       <div className="grid grid-cols-3 gap-2">
                         {(['gradient', 'solid', 'blur'] as const).map((bg) => (
                           <button
                             key={bg}
-                            onClick={() => setMockup({ ...mockup, bgColorType: bg })}
+                            onClick={() =>
+                              setMockup({ ...mockup, bgColorType: bg })
+                            }
                             className={`py-1.5 rounded-lg text-xs font-semibold transition ${
                               mockup.bgColorType === bg
                                 ? 'bg-primary-600 text-white'
                                 : 'bg-slate-50 text-slate-600 border border-slate-200'
                             }`}
                           >
-                            {bg === 'gradient' ? '多彩渐变' : bg === 'solid' ? '纯色' : '截图毛玻璃'}
+                            {bg === 'gradient'
+                              ? '多彩渐变'
+                              : bg === 'solid'
+                                ? '纯色'
+                                : '截图毛玻璃'}
                           </button>
                         ))}
                       </div>
@@ -734,12 +1043,19 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     {/* Background settings based on type */}
                     {mockup.bgColorType === 'solid' && (
                       <div className="space-y-1.5 bg-slate-50 p-2 rounded-lg border border-slate-200">
-                        <label htmlFor="mockup-bg-solid" className="text-[11px] text-slate-600 font-semibold block cursor-pointer">选择背景纯色</label>
+                        <label
+                          htmlFor="mockup-bg-solid"
+                          className="text-[11px] text-slate-600 font-semibold block cursor-pointer"
+                        >
+                          选择背景纯色
+                        </label>
                         <input
                           id="mockup-bg-solid"
                           type="color"
                           value={mockup.bgSolid}
-                          onChange={(e) => setMockup({ ...mockup, bgSolid: e.target.value })}
+                          onChange={(e) =>
+                            setMockup({ ...mockup, bgSolid: e.target.value })
+                          }
                           className="w-full h-8 bg-transparent border-0 rounded cursor-pointer mt-1"
                         />
                       </div>
@@ -748,22 +1064,42 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     {mockup.bgColorType === 'gradient' && (
                       <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
                         <div>
-                          <label htmlFor="mockup-bg-grad-start" className="text-[11px] text-slate-600 font-semibold cursor-pointer">渐变起点</label>
+                          <label
+                            htmlFor="mockup-bg-grad-start"
+                            className="text-[11px] text-slate-600 font-semibold cursor-pointer"
+                          >
+                            渐变起点
+                          </label>
                           <input
                             id="mockup-bg-grad-start"
                             type="color"
                             value={mockup.bgGradientStart}
-                            onChange={(e) => setMockup({ ...mockup, bgGradientStart: e.target.value })}
+                            onChange={(e) =>
+                              setMockup({
+                                ...mockup,
+                                bgGradientStart: e.target.value,
+                              })
+                            }
                             className="w-full h-8 bg-transparent border-0 rounded cursor-pointer mt-1"
                           />
                         </div>
                         <div>
-                          <label htmlFor="mockup-bg-grad-end" className="text-[11px] text-slate-600 font-semibold cursor-pointer">渐变终点</label>
+                          <label
+                            htmlFor="mockup-bg-grad-end"
+                            className="text-[11px] text-slate-600 font-semibold cursor-pointer"
+                          >
+                            渐变终点
+                          </label>
                           <input
                             id="mockup-bg-grad-end"
                             type="color"
                             value={mockup.bgGradientEnd}
-                            onChange={(e) => setMockup({ ...mockup, bgGradientEnd: e.target.value })}
+                            onChange={(e) =>
+                              setMockup({
+                                ...mockup,
+                                bgGradientEnd: e.target.value,
+                              })
+                            }
                             className="w-full h-8 bg-transparent border-0 rounded cursor-pointer mt-1"
                           />
                         </div>
@@ -773,8 +1109,15 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     {/* Padding slider */}
                     <div className="space-y-1.5">
                       <div className="flex justify-between text-xs text-slate-600 font-bold">
-                        <label htmlFor="mockup-padding" className="cursor-pointer">设备边距</label>
-                        <span className="text-blue-600 font-mono">{mockup.padding} px</span>
+                        <label
+                          htmlFor="mockup-padding"
+                          className="cursor-pointer"
+                        >
+                          设备边距
+                        </label>
+                        <span className="text-blue-600 font-mono">
+                          {mockup.padding} px
+                        </span>
                       </div>
                       <input
                         id="mockup-padding"
@@ -782,19 +1125,31 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                         min="0"
                         max="120"
                         value={mockup.padding}
-                        onChange={(e) => setMockup({ ...mockup, padding: parseInt(e.target.value) })}
+                        onChange={(e) =>
+                          setMockup({
+                            ...mockup,
+                            padding: parseInt(e.target.value),
+                          })
+                        }
                         className="w-full h-1 bg-slate-50 rounded accent-primary-500 cursor-pointer"
                       />
                     </div>
 
                     {/* Shadow toggle */}
                     <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                      <label htmlFor="mockup-shadow" className="text-xs font-bold text-slate-700 cursor-pointer">立体设备阴影</label>
+                      <label
+                        htmlFor="mockup-shadow"
+                        className="text-xs font-bold text-slate-700 cursor-pointer"
+                      >
+                        立体设备阴影
+                      </label>
                       <input
                         id="mockup-shadow"
                         type="checkbox"
                         checked={mockup.shadow}
-                        onChange={(e) => setMockup({ ...mockup, shadow: e.target.checked })}
+                        onChange={(e) =>
+                          setMockup({ ...mockup, shadow: e.target.checked })
+                        }
                         className="w-4 h-4 rounded accent-primary-500 cursor-pointer"
                       />
                     </div>
@@ -807,59 +1162,141 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             {activeTab === 'watermark' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <label htmlFor="watermark-enabled" className="text-sm font-semibold text-slate-700">添加文字水印</label>
-                  <input id="watermark-enabled" type="checkbox" checked={watermark.enabled}
-                    onChange={e => setWatermark({ ...watermark, enabled: e.target.checked })}
-                    className="h-4 w-4 accent-primary-500" />
+                  <label
+                    htmlFor="watermark-enabled"
+                    className="text-sm font-semibold text-slate-700"
+                  >
+                    添加文字水印
+                  </label>
+                  <input
+                    id="watermark-enabled"
+                    type="checkbox"
+                    checked={watermark.enabled}
+                    onChange={(e) =>
+                      setWatermark({ ...watermark, enabled: e.target.checked })
+                    }
+                    className="h-4 w-4 accent-primary-500"
+                  />
                 </div>
                 {watermark.enabled && (
                   <>
                     <div className="space-y-2">
-                      <label htmlFor="watermark-text" className="text-xs font-semibold text-slate-600">水印内容</label>
-                      <input id="watermark-text" value={watermark.text} maxLength={100}
-                        onChange={e => setWatermark({ ...watermark, text: e.target.value })}
+                      <label
+                        htmlFor="watermark-text"
+                        className="text-xs font-semibold text-slate-600"
+                      >
+                        水印内容
+                      </label>
+                      <input
+                        id="watermark-text"
+                        value={watermark.text}
+                        maxLength={100}
+                        onChange={(e) =>
+                          setWatermark({ ...watermark, text: e.target.value })
+                        }
                         className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-primary-500"
-                        placeholder="输入自己的水印文字" />
+                        placeholder="输入自己的水印文字"
+                      />
                     </div>
                     <div className="space-y-2">
                       <div className="flex justify-between text-xs font-semibold text-slate-600">
                         <label htmlFor="watermark-opacity">透明度</label>
                         <span>{Math.round(watermark.opacity * 100)}%</span>
                       </div>
-                      <input id="watermark-opacity" type="range" min="0.05" max="0.8" step="0.05"
+                      <input
+                        id="watermark-opacity"
+                        type="range"
+                        min="0.05"
+                        max="0.8"
+                        step="0.05"
                         value={watermark.opacity}
-                        onChange={e => setWatermark({ ...watermark, opacity: Number(e.target.value) })}
-                        className="w-full accent-primary-500" />
+                        onChange={(e) =>
+                          setWatermark({
+                            ...watermark,
+                            opacity: Number(e.target.value),
+                          })
+                        }
+                        className="w-full accent-primary-500"
+                      />
                     </div>
                     <div className="space-y-2">
                       <div className="flex justify-between text-xs font-semibold text-slate-600">
-                        <label htmlFor="watermark-size">文字大小</label><span>{watermark.size} px</span>
+                        <label htmlFor="watermark-size">文字大小</label>
+                        <span>{watermark.size} px</span>
                       </div>
-                      <input id="watermark-size" type="range" min="12" max="100" step="2"
+                      <input
+                        id="watermark-size"
+                        type="range"
+                        min="12"
+                        max="100"
+                        step="2"
                         value={watermark.size}
-                        onChange={e => setWatermark({ ...watermark, size: Number(e.target.value) })}
-                        className="w-full accent-primary-500" />
+                        onChange={(e) =>
+                          setWatermark({
+                            ...watermark,
+                            size: Number(e.target.value),
+                          })
+                        }
+                        className="w-full accent-primary-500"
+                      />
                     </div>
                     <div className="space-y-2">
                       <div className="flex justify-between text-xs font-semibold text-slate-600">
-                        <label htmlFor="watermark-angle">倾斜角度</label><span>{watermark.angle}°</span>
+                        <label htmlFor="watermark-angle">倾斜角度</label>
+                        <span>{watermark.angle}°</span>
                       </div>
-                      <input id="watermark-angle" type="range" min="-60" max="60" step="5"
+                      <input
+                        id="watermark-angle"
+                        type="range"
+                        min="-60"
+                        max="60"
+                        step="5"
                         value={watermark.angle}
-                        onChange={e => setWatermark({ ...watermark, angle: Number(e.target.value) })}
-                        className="w-full accent-primary-500" />
+                        onChange={(e) =>
+                          setWatermark({
+                            ...watermark,
+                            angle: Number(e.target.value),
+                          })
+                        }
+                        className="w-full accent-primary-500"
+                      />
                     </div>
                     <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3">
-                      <label htmlFor="watermark-repeat" className="text-xs font-semibold text-slate-700">重复铺满画面</label>
-                      <input id="watermark-repeat" type="checkbox" checked={watermark.repeat}
-                        onChange={e => setWatermark({ ...watermark, repeat: e.target.checked })}
-                        className="h-4 w-4 accent-primary-500" />
+                      <label
+                        htmlFor="watermark-repeat"
+                        className="text-xs font-semibold text-slate-700"
+                      >
+                        重复铺满画面
+                      </label>
+                      <input
+                        id="watermark-repeat"
+                        type="checkbox"
+                        checked={watermark.repeat}
+                        onChange={(e) =>
+                          setWatermark({
+                            ...watermark,
+                            repeat: e.target.checked,
+                          })
+                        }
+                        className="h-4 w-4 accent-primary-500"
+                      />
                     </div>
                     <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3">
-                      <label htmlFor="watermark-color" className="text-xs font-semibold text-slate-700">文字颜色</label>
-                      <input id="watermark-color" type="color" value={watermark.color}
-                        onChange={e => setWatermark({ ...watermark, color: e.target.value })}
-                        className="h-8 w-12 cursor-pointer rounded-lg border border-slate-200" />
+                      <label
+                        htmlFor="watermark-color"
+                        className="text-xs font-semibold text-slate-700"
+                      >
+                        文字颜色
+                      </label>
+                      <input
+                        id="watermark-color"
+                        type="color"
+                        value={watermark.color}
+                        onChange={(e) =>
+                          setWatermark({ ...watermark, color: e.target.value })
+                        }
+                        className="h-8 w-12 cursor-pointer rounded-lg border border-slate-200"
+                      />
                     </div>
                   </>
                 )}
@@ -869,14 +1306,60 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             {/* 6. Export Tab */}
             {activeTab === 'export' && (
               <div className="space-y-4">
+                <div
+                  className="rounded-xl bg-blue-50 p-3 text-xs text-blue-900"
+                  aria-label="导出规格"
+                >
+                  <p>
+                    原始拼接：{outputSize?.width} × {outputSize?.height} px
+                  </p>
+                  <p className="mt-1">
+                    {exportConfig.format.toUpperCase()} ·{' '}
+                    {exportConfig.width
+                      ? `输出宽度 ${exportConfig.width} px`
+                      : '保留原始宽度'}
+                    {mockup.device !== 'none' ? ' · 包含设备外框' : ''}
+                  </p>
+                  <p className="mt-1 text-blue-700">
+                    PNG 为无损；JPEG
+                    体积取决于画面和画质。文件大小在编码后显示。
+                  </p>
+                </div>
+                <label className="block text-xs font-semibold">
+                  拼接内容宽度（0 保留原尺寸）
+                  <input
+                    type="number"
+                    aria-label="导出宽度"
+                    min={0}
+                    max={outputSize?.width ?? 30000}
+                    value={exportConfig.width || 0}
+                    onChange={(e) =>
+                      setExportConfig({
+                        ...exportConfig,
+                        width: Math.max(
+                          0,
+                          Math.min(
+                            outputSize?.width ?? 30000,
+                            Number(e.target.value)
+                          )
+                        ),
+                      })
+                    }
+                    className="mt-2 w-full"
+                  />
+                </label>
                 {/* Format selection */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-600">导出格式</label>
+                  <label className="text-xs font-bold text-slate-600">
+                    导出格式
+                  </label>
                   <div className="flex gap-2">
                     {(['png', 'jpeg'] as const).map((fmt) => (
                       <button
                         key={fmt}
-                        onClick={() => setExportConfig({ ...exportConfig, format: fmt })}
+                        onClick={() =>
+                          setExportConfig({ ...exportConfig, format: fmt })
+                        }
                         className={`flex-1 py-1.5 rounded-lg text-xs font-semibold capitalize transition ${
                           exportConfig.format === fmt
                             ? 'bg-primary-600 text-white'
@@ -893,8 +1376,15 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 {exportConfig.format === 'jpeg' && (
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-xs text-slate-600 font-bold">
-                      <label htmlFor="export-quality" className="cursor-pointer">JPEG 压缩质量</label>
-                      <span className="text-blue-600 font-mono">{Math.round(exportConfig.quality * 100)}%</span>
+                      <label
+                        htmlFor="export-quality"
+                        className="cursor-pointer"
+                      >
+                        JPEG 压缩质量
+                      </label>
+                      <span className="text-blue-600 font-mono">
+                        {Math.round(exportConfig.quality * 100)}%
+                      </span>
                     </div>
                     <input
                       id="export-quality"
@@ -903,7 +1393,12 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                       max="1.0"
                       step="0.05"
                       value={exportConfig.quality}
-                      onChange={(e) => setExportConfig({ ...exportConfig, quality: parseFloat(e.target.value) })}
+                      onChange={(e) =>
+                        setExportConfig({
+                          ...exportConfig,
+                          quality: parseFloat(e.target.value),
+                        })
+                      }
                       className="w-full h-1 bg-slate-50 rounded accent-primary-500 cursor-pointer"
                     />
                   </div>
@@ -917,14 +1412,25 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   </label>
                   <div className="space-y-1.5 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                     <div className="flex justify-between text-[11px] text-slate-600">
-                      <label htmlFor="export-scale" className="cursor-pointer">等高切片（0 表示关闭）</label>
-                      <span className="text-blue-600 font-mono">{exportConfig.scale === 0 ? '不切' : `${exportConfig.scale} px`}</span>
+                      <label htmlFor="export-scale" className="cursor-pointer">
+                        等高切片（0 表示关闭）
+                      </label>
+                      <span className="text-blue-600 font-mono">
+                        {exportConfig.scale === 0
+                          ? '不切'
+                          : `${exportConfig.scale} px`}
+                      </span>
                     </div>
                     <input
                       id="export-scale"
                       type="number"
                       value={exportConfig.scale}
-                      onChange={(e) => setExportConfig({ ...exportConfig, scale: Math.max(0, parseInt(e.target.value) || 0) })}
+                      onChange={(e) =>
+                        setExportConfig({
+                          ...exportConfig,
+                          scale: Math.max(0, parseInt(e.target.value) || 0),
+                        })
+                      }
                       className="w-full bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2.5 text-xs text-slate-700 mt-1 focus:border-primary-500 outline-hidden font-mono"
                       placeholder="例如 1200"
                     />
@@ -937,9 +1443,34 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     <FileText className="w-3.5 h-3.5 text-blue-600" />
                     PDF 文档设置
                   </label>
+                  <label className="block text-xs">
+                    单页 PDF PPI（0 按 A4 宽度）
+                    <input
+                      type="number"
+                      aria-label="PDF PPI"
+                      min={0}
+                      max={600}
+                      value={exportConfig.pdfPpi || 0}
+                      onChange={(e) =>
+                        setExportConfig({
+                          ...exportConfig,
+                          pdfPpi: Math.max(
+                            0,
+                            Math.min(600, Number(e.target.value))
+                          ),
+                        })
+                      }
+                      className="mt-1 w-full"
+                    />
+                  </label>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => setExportConfig({ ...exportConfig, pdfPageMode: 'single' })}
+                      onClick={() =>
+                        setExportConfig({
+                          ...exportConfig,
+                          pdfPageMode: 'single',
+                        })
+                      }
                       className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold leading-4 transition ${
                         exportConfig.pdfPageMode === 'single'
                           ? 'bg-primary-600 text-white'
@@ -949,7 +1480,12 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                       单页长图 PDF
                     </button>
                     <button
-                      onClick={() => setExportConfig({ ...exportConfig, pdfPageMode: 'multi' })}
+                      onClick={() =>
+                        setExportConfig({
+                          ...exportConfig,
+                          pdfPageMode: 'multi',
+                        })
+                      }
                       className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold leading-4 transition ${
                         exportConfig.pdfPageMode === 'multi'
                           ? 'bg-primary-600 text-white'
@@ -988,7 +1524,15 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                       <Share2 className="w-4 h-4" />
                     </button>
                   </div>
-                  {copyStatus && <p role="status" aria-live="polite" className="text-xs text-slate-600">{copyStatus}</p>}
+                  {copyStatus && (
+                    <p
+                      role="status"
+                      aria-live="polite"
+                      className="text-xs text-slate-600"
+                    >
+                      {copyStatus}
+                    </p>
+                  )}
 
                   <button
                     onClick={onDownloadPDF}

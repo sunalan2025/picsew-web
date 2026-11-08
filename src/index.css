@@ -166,11 +166,11 @@ button:disabled { cursor: not-allowed; }
 .workspace-app .text-gray-400 { color:#66758a; }
 .workspace-app .text-gray-500 { color:#76849a; }
 .workspace-app .text-gray-600 { color:#8593a8; }
-.workspace-app .hover\\:text-white:hover { color:#1d4ed8; }
+.workspace-app .hover\:text-white:hover { color:#1d4ed8; }
 .workspace-app .border-dashed { border-color:#bfd2ef; }
 .workspace-canvas > .flex { min-height:0; }
 /* Keep the original editor features; remove the redundant explanatory paragraphs. */
-.workspace-app .workspace-sheet .bg-primary-500\\/10.text-\\[11px\\] { display:none; }
+.workspace-app .workspace-sheet .bg-primary-500\/10.text-\[11px\] { display:none; }
 @keyframes sheet-in { from { opacity:0; transform:translateX(14px) scale(.985); } to { opacity:1; transform:translateX(0) scale(1); } }
 @media (max-width:767px) {
   .workspace-header { padding:11px 14px; }
