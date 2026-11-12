@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "check": "npm run audit:security && npm run lint && npm test && npm run build",
-    "test:browser": "node tests/browser-crop-smoke.mjs && node tests/browser-stitch-smoke.mjs && node tests/browser-product-smoke.mjs && node tests/browser-beginner-smoke.mjs",
+    "test:browser": "node tests/browser-crop-smoke.mjs && node tests/browser-stitch-smoke.mjs && node tests/browser-product-smoke.mjs && node tests/browser-beginner-smoke.mjs && node tests/browser-update-smoke.mjs",
     "audit:security": "node scripts/audit-dependencies.mjs"
   },
   "dependencies": {

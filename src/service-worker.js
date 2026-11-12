@@ -1,15 +1,22 @@
 /* Local-only app shell and system share inbox. Never cache external requests. */
 const CACHE = 'picsew-__CACHE_VERSION__';
 const FILES = __PRECACHE_FILES__;
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'PICSEW_ACTIVATE_UPDATE')
+    event.waitUntil(self.skipWaiting());
+});
 self.addEventListener('install', (event) =>
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(FILES)))
 );
 self.addEventListener('activate', (event) =>
   event.waitUntil(
     (async () => {
-      for (const name of await caches.keys())
-        if (name.startsWith('picsew-') && name !== CACHE)
-          await caches.delete(name);
+      const old = (await caches.keys()).filter(
+        (name) => name.startsWith('picsew-') && name !== CACHE
+      );
+      // Keep one previous build for tabs that are still editing or temporarily offline.
+      const previous = old.at(-1);
+      for (const name of old) if (name !== previous) await caches.delete(name);
       await self.clients.claim();
     })()
   )
@@ -135,6 +142,14 @@ self.addEventListener('fetch', (event) => {
       }
       const cached = await cache.match(event.request);
       if (cached) return cached;
+      if (
+        url.pathname.startsWith(
+          new URL('assets/', self.registration.scope).pathname
+        )
+      ) {
+        const previous = await caches.match(event.request);
+        if (previous) return previous;
+      }
       return fetch(event.request);
     })()
   );

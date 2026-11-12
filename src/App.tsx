@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Smartphone,
   RefreshCw,
@@ -34,6 +35,7 @@ import {
   acknowledgeIncomingShare,
 } from './utils/incomingShare';
 import { useDraft } from './hooks/useDraft';
+import { useAppUpdate } from './hooks/useAppUpdate';
 import { useEditorProject } from './hooks/useEditorProject';
 import { renderProject, exportSource } from './utils/renderProject';
 import { anchorAnnotation } from './utils/annotations';
@@ -91,6 +93,7 @@ function App() {
     },
     !isExample
   );
+  const appUpdate = useAppUpdate(draft.saveForReload);
   const [incomingShare, setIncomingShare] = useState<{
     id: string;
     files: File[];
@@ -1133,7 +1136,10 @@ function App() {
   );
 
   return (
-    <div className="workspace-app flex h-dvh w-screen flex-col overflow-hidden text-slate-800">
+    <div
+      className="workspace-app flex h-dvh w-screen flex-col overflow-hidden text-slate-800"
+      inert={appUpdate.busy}
+    >
       <header className="workspace-header relative z-20 flex shrink-0 items-center justify-between gap-3 px-4 py-3 md:px-7">
         <div className="flex min-w-0 items-center gap-3">
           <div className="workspace-brand flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white">
@@ -1201,6 +1207,42 @@ function App() {
           </button>
         </div>
       </header>
+
+      {appUpdate.available && (
+        <aside
+          className="beginner-tip flex flex-wrap items-center justify-between gap-2"
+          aria-label="应用更新"
+          aria-live="polite"
+        >
+          <p>
+            {isExample
+              ? '发现新版本。更新会重新打开应用，示例可以再次体验。'
+              : images.length
+                ? '发现新版本。更新前会保存本机草稿，重新打开后可恢复编辑。'
+                : '发现新版本，更新后会重新打开应用。'}
+            {appUpdate.error && (
+              <span className="block text-red-700">{appUpdate.error}</span>
+            )}
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="rounded-lg bg-blue-600 px-3 py-2 font-semibold text-white disabled:opacity-40"
+              disabled={isStitching || isExporting || isPreparingExample}
+              onClick={() => void appUpdate.update()}
+            >
+              更新并重新打开
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border px-3 py-2"
+              onClick={appUpdate.dismiss}
+            >
+              稍后
+            </button>
+          </div>
+        </aside>
+      )}
 
       <QuickStart
         hasImages={images.length > 0}
@@ -1662,6 +1704,19 @@ function App() {
           })}
         </nav>
       </main>
+      {appUpdate.busy &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/30 px-6"
+            role="status"
+            aria-live="polite"
+          >
+            <p className="rounded-2xl bg-white px-6 py-4 text-sm font-semibold text-slate-800 shadow-xl">
+              正在准备更新，请稍候…
+            </p>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

@@ -51,4 +51,6 @@ npm run build
 
 完整实现范围、测试命令及大图/原生端限制见 [实现与验收状态](docs/IMPLEMENTATION_STATUS.md)。这些能力仍需真实 iOS/Android 设备和录屏素材验收，不代表与原版 Picsew 完全一致。
 
-开发检查：`npm run check` 会执行安全审计、lint、单元测试和构建；`npm run test:browser` 包含新手流程的桌面/手机浏览器测试。
+素材面板支持一键倒序并撤销。收到新版提示时，应用会先保存草稿再重新打开；更新后可恢复继续编辑。
+
+开发检查：`npm run check` 会执行安全审计、lint、单元测试和构建；`npm run test:browser` 包含新手流程的桌面/手机浏览器测试，以及真实生产构建的离线更新和草稿保护测试。

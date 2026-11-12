@@ -9,6 +9,7 @@ on:
       - 'tests/browser-stitch-smoke.mjs'
       - 'tests/browser-product-smoke.mjs'
       - 'tests/browser-beginner-smoke.mjs'
+      - 'tests/browser-update-smoke.mjs'
       - 'tests/fixtures/**'
       - 'public/**'
       - 'index.html'

@@ -12,6 +12,7 @@ export function useDraft(
   const [ready, setReady] = useState(false);
   const [status, setStatus] = useState('');
   const latest = useRef(project);
+  const ownsDraft = useRef(false);
   latest.current = project;
   useEffect(() => {
     let alive = true;
@@ -36,13 +37,17 @@ export function useDraft(
     };
   }, []);
   useEffect(() => {
-    if (!ready || !enabled || !project.images.length) return;
+    if (!ready || !enabled) return;
+    if (project.images.length) ownsDraft.current = true;
+    else if (!ownsDraft.current) return;
     let alive = true;
-    setStatus('正在保存草稿…');
+    setStatus(project.images.length ? '正在保存草稿…' : '');
     const timer = setTimeout(() => {
-      saveDraft(project)
+      (project.images.length ? saveDraft(project) : deleteDraft())
         .then(() => {
-          if (alive) setStatus('草稿已保存在本机');
+          if (!project.images.length && !latest.current.images.length)
+            ownsDraft.current = false;
+          if (alive) setStatus(project.images.length ? '草稿已保存在本机' : '');
         })
         .catch((error) => {
           console.error('Local draft save failed', error);
@@ -56,13 +61,23 @@ export function useDraft(
   }, [project, ready, enabled]);
   useEffect(() => {
     const flush = () => {
+      const snapshot = latest.current;
       if (
         document.visibilityState === 'hidden' &&
         ready &&
         enabled &&
-        latest.current.images.length
+        (snapshot.images.length || ownsDraft.current)
       )
-        void saveDraft(latest.current).catch(() => {});
+        void (
+          snapshot.images.length
+            ? saveDraft(snapshot)
+            : deleteDraft()
+        )
+          .then(() => {
+            if (!snapshot.images.length && !latest.current.images.length)
+              ownsDraft.current = false;
+          })
+          .catch(() => {});
     };
     document.addEventListener('visibilitychange', flush);
     return () => document.removeEventListener('visibilitychange', flush);
@@ -70,6 +85,30 @@ export function useDraft(
   return {
     pending,
     status,
+    saveForReload: async () => {
+      if (!enabled) return;
+      if (!ready) {
+        if (latest.current.images.length)
+          throw new Error('请先选择恢复草稿或新建并替换草稿，再更新应用。');
+        return;
+      }
+      if (!latest.current.images.length && !ownsDraft.current) return;
+      try {
+        // Include edits that completed while a prior write was still running.
+        let snapshot;
+        do {
+          snapshot = latest.current;
+          await (snapshot.images.length ? saveDraft(snapshot) : deleteDraft());
+        } while (snapshot !== latest.current);
+        if (!latest.current.images.length) ownsDraft.current = false;
+        setStatus(latest.current.images.length ? '草稿已保存在本机' : '');
+      } catch {
+        setStatus('草稿保存失败，请及时导出');
+        throw new Error(
+          '更新前无法保存草稿，请检查本机存储后重试，或先保存成品图片。'
+        );
+      }
+    },
     restore: () => {
       if (pending) {
         restore(pending.project);

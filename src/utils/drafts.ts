@@ -85,5 +85,13 @@ export async function loadDraft(): Promise<{
     },
   };
 }
-export const deleteDraft = () =>
-  transaction('readwrite', (store) => store.delete('current'));
+export function deleteDraft(): Promise<void> {
+  // A slower earlier save must never recreate a draft after it was deleted.
+  const operation = queue
+    .catch(() => {})
+    .then(async () => {
+      await transaction('readwrite', (store) => store.delete('current'));
+    });
+  queue = operation;
+  return operation;
+}

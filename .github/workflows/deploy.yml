@@ -49,3 +49,32 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Verify published website revision
+        timeout-minutes: 4
+        env:
+          SITE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          node --input-type=module <<'NODE'
+          const expected = process.env.GITHUB_SHA;
+          const site = new URL(process.env.SITE_URL);
+          for (let attempt = 1; attempt <= 12; attempt++) {
+            try {
+              const infoUrl = new URL('build-info.json', site);
+              const pageUrl = new URL(site);
+              for (const url of [infoUrl, pageUrl]) url.searchParams.set('revision', expected);
+              const options = () => ({ signal: AbortSignal.timeout(10000), headers: { 'Cache-Control': 'no-cache' } });
+              const [info, page] = await Promise.all([fetch(infoUrl, options()), fetch(pageUrl, options())]);
+              if (!info.ok || !page.ok) throw new Error(`HTTP ${info.status}/${page.status}`);
+              const [build, html] = await Promise.all([info.json(), page.text()]);
+              if (build.commit !== expected || !html.includes(`name="picsew-build" content="${expected}"`))
+                throw new Error('Published content has not reached the requested revision yet');
+              console.log(`Verified published homepage and build-info.json at ${site.href}: ${expected}`);
+              process.exit(0);
+            } catch (error) {
+              console.log(`Website verification ${attempt}/12: ${error.message}`);
+            }
+            if (attempt < 12) await new Promise((resolve) => setTimeout(resolve, 5000));
+          }
+          throw new Error('The published website revision could not be verified');
+          NODE

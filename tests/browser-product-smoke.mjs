@@ -41,6 +41,26 @@ async function download(page, button) {
   for await (const chunk of stream) chunks.push(chunk);
   return Buffer.concat(chunks);
 }
+async function waitForDraftImages(page, expected) {
+  let actual;
+  for (let i = 0; i < 40; i++) {
+    actual = await page.evaluate(async () => {
+      const { loadDraft } = await import('/src/utils/drafts.ts');
+      const draft = await loadDraft();
+      if (draft)
+        for (const image of draft.project.images)
+          URL.revokeObjectURL(image.src);
+      return draft?.project.images.length ?? 0;
+    });
+    if (actual === expected) return;
+    await page.waitForTimeout(100);
+  }
+  assert.equal(
+    actual,
+    expected,
+    'persisted draft must match the current images'
+  );
+}
 try {
   for (const port of [4175, 4176]) {
     let ready = false;
@@ -236,6 +256,33 @@ try {
   const canvas = page.locator('.workspace-canvas canvas');
   await canvas.waitFor();
   const dock = page.getByRole('navigation', { name: '主要工具' });
+  await dock.getByRole('button', { name: '素材', exact: true }).click();
+  const originalOrder = await page
+    .locator('[data-picsew-image-id]')
+    .evaluateAll((nodes) => nodes.map((node) => node.dataset.picsewImageId));
+  await page.getByRole('button', { name: '一键倒序', exact: true }).click();
+  await page.waitForFunction(
+    (ids) =>
+      JSON.stringify(
+        Array.from(
+          document.querySelectorAll('[data-picsew-image-id]'),
+          (node) => node.dataset.picsewImageId
+        )
+      ) === JSON.stringify(ids),
+    [...originalOrder].reverse()
+  );
+  await page.keyboard.press('Control+z');
+  await page.waitForFunction(
+    (ids) =>
+      JSON.stringify(
+        Array.from(
+          document.querySelectorAll('[data-picsew-image-id]'),
+          (node) => node.dataset.picsewImageId
+        )
+      ) === JSON.stringify(ids),
+    originalOrder
+  );
+  console.log('PASS: reverse screenshot order as one undoable project change');
   await dock.getByRole('button', { name: '拼接', exact: true }).click();
   await page.locator('#overlap-0').focus();
   await page.locator('#overlap-0').press('ArrowRight');
@@ -319,6 +366,87 @@ try {
   console.log(
     'PASS: IndexedDB draft restores original files and complete project settings'
   );
+  await waitForDraftImages(page, files.length);
+  await dock.getByRole('button', { name: '素材', exact: true }).click();
+  for (let i = 0; i < files.length; i++)
+    await page
+      .getByRole('button', { name: '移除图片', exact: true })
+      .first()
+      .click();
+  await canvas.waitFor({ state: 'hidden' });
+  await waitForDraftImages(page, 0);
+  await page.keyboard.press('Control+z');
+  await canvas.waitFor();
+  await waitForDraftImages(page, 1);
+  await page.getByRole('button', { name: '移除图片', exact: true }).click();
+  await canvas.waitFor({ state: 'hidden' });
+  await page.waitForTimeout(1000);
+  await page.reload();
+  assert.equal(
+    await page.getByRole('button', { name: '恢复草稿', exact: true }).count(),
+    0
+  );
+  console.log(
+    'PASS: removing the last image clears its draft; undo saves the restored project'
+  );
+  const draftQueue = await page.evaluate(async () => {
+    const { saveDraft, deleteDraft, loadDraft } =
+      await import('/src/utils/drafts.ts');
+    const { emptyProject } = await import('/src/utils/project.ts');
+    const src = URL.createObjectURL(new Blob(['queued source']));
+    const project = emptyProject();
+    project.images = [
+      {
+        id: 'queued',
+        src,
+        name: 'queued.png',
+        width: 1,
+        height: 1,
+        cropTop: 0,
+        cropBottom: 0,
+        cropLeft: 0,
+        cropRight: 0,
+      },
+    ];
+    const originalFetch = window.fetch;
+    let release, started;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    const reading = new Promise((resolve) => {
+      started = resolve;
+    });
+    window.fetch = async (...args) => {
+      if (args[0] === src) {
+        started();
+        await gate;
+      }
+      return originalFetch(...args);
+    };
+    try {
+      const saving = saveDraft(project);
+      await reading;
+      let deleted = false;
+      const deleting = deleteDraft().then(() => {
+        deleted = true;
+      });
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      const waitedForSave = !deleted;
+      release();
+      await Promise.all([saving, deleting]);
+      const final = await loadDraft();
+      if (final)
+        for (const image of final.project.images)
+          URL.revokeObjectURL(image.src);
+      return { waitedForSave, empty: final === null };
+    } finally {
+      release();
+      window.fetch = originalFetch;
+      URL.revokeObjectURL(src);
+    }
+  });
+  assert.deepEqual(draftQueue, { waitedForSave: true, empty: true });
+  console.log('PASS: a slow pending save cannot resurrect a deleted draft');
   const nativeResults = await page.evaluate(async () => {
     const { downloadBlob } = await import('/src/utils/download.ts');
     const blob = new Blob(['native-test'], { type: 'image/png' });

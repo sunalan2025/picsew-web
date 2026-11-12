@@ -574,23 +574,35 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
       {images.length > 1 && (
         <div className="mb-2 flex items-center justify-between gap-2 text-xs text-slate-500">
-          <span>从上往下拼接 · {images.length} 张</span>
-          <button
-            type="button"
-            onClick={() =>
-              onImagesChange(
-                [...images].sort((a, b) =>
-                  new Intl.Collator('zh-CN', {
-                    numeric: true,
-                    sensitivity: 'base',
-                  }).compare(a.name, b.name)
+          <span>阅读顺序 · {images.length} 张</span>
+          <div className="flex flex-wrap justify-end gap-1">
+            <button
+              type="button"
+              disabled={isImporting}
+              onClick={() => onImagesChange([...images].reverse())}
+              title="截图顺序相反时，一次反转整组图片；可撤销"
+              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-blue-600 font-semibold disabled:opacity-40"
+            >
+              一键倒序
+            </button>
+            <button
+              type="button"
+              disabled={isImporting}
+              onClick={() =>
+                onImagesChange(
+                  [...images].sort((a, b) =>
+                    new Intl.Collator('zh-CN', {
+                      numeric: true,
+                      sensitivity: 'base',
+                    }).compare(a.name, b.name)
+                  )
                 )
-              )
-            }
-            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-blue-600 font-semibold"
-          >
-            按文件名重排
-          </button>
+              }
+              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-blue-600 font-semibold"
+            >
+              按文件名重排
+            </button>
+          </div>
         </div>
       )}
       {/* Image list */}
