@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Smartphone,
   RefreshCw,
@@ -13,6 +13,8 @@ import {
   Check,
 } from 'lucide-react';
 import type { StitchedImage, Annotation, AnnotationType } from './types';
+import { QuickStart } from './components/QuickStart';
+import { createExampleFiles } from './utils/exampleImages';
 import { ImageUploader } from './components/ImageUploader';
 import { ControlPanel } from './components/ControlPanel';
 import { ImageCropEditor } from './components/ImageCropEditor';
@@ -69,17 +71,26 @@ function App() {
     history,
     historyIndex,
   } = useEditorProject();
-  const draft = useDraft(project, (next) => {
-    // Restoration is a project command: invalidate any older import/alignment result.
-    imageChangeSequenceRef.current++;
-    pendingCropRef.current = null;
-    pendingOverlapRef.current = null;
-    setIsStitching(false);
-    setUncertainSeams([]);
-    setFocusedSeam(null);
-    setSelectedAnnotationId(null);
-    restoreProject(next);
-  });
+  const [isExample, setIsExample] = useState(false);
+  const [isPreparingExample, setIsPreparingExample] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [exportFailed, setExportFailed] = useState(false);
+  const draft = useDraft(
+    project,
+    (next) => {
+      // Restoration is a project command: invalidate any older import/alignment result.
+      imageChangeSequenceRef.current++;
+      pendingCropRef.current = null;
+      pendingOverlapRef.current = null;
+      setIsStitching(false);
+      setUncertainSeams([]);
+      setFocusedSeam(null);
+      setSelectedAnnotationId(null);
+      setIsExample(false);
+      restoreProject(next);
+    },
+    !isExample
+  );
   const [incomingShare, setIncomingShare] = useState<{
     id: string;
     files: File[];
@@ -229,6 +240,10 @@ function App() {
 
   const pendingOverlapRef = useRef<number[] | null>(null);
   const [copyStatus, setCopyStatus] = useState('');
+  const showImportMessage = useCallback((message: string) => {
+    setCopyStatus(message);
+    setExportFailed(false);
+  }, []);
   const [isExporting, setIsExporting] = useState(false);
   const exportInFlightRef = useRef(false);
   // Canvas Reference to fetch rendered bitmap
@@ -309,10 +324,10 @@ function App() {
         newOverlaps.push(0);
         newWarnings.push(i);
       }
-      if (sequence !== imageChangeSequenceRef.current) return;
+      if (sequence !== imageChangeSequenceRef.current) return false;
     }
 
-    if (sequence !== imageChangeSequenceRef.current) return;
+    if (sequence !== imageChangeSequenceRef.current) return false;
     commitState(
       newImgs,
       clampOverlapsToVisibleImages(newImgs, newOverlaps, direction),
@@ -325,6 +340,7 @@ function App() {
       setPanelOpen(false);
       setSelectedTool('select');
     }
+    return true;
   };
 
   // --- Auto Stitching Logic ---
@@ -364,7 +380,9 @@ function App() {
       setActiveTab('stitch');
     } catch (err) {
       console.error('Error during auto stitching', err);
-      alert('自动拼接算法出错，请尝试拖动手动微调！');
+      setCopyStatus(
+        '自动拼接暂时没有完成，图片仍在。可以再次尝试，或点击“检查拼接”手动确认连接处。'
+      );
     } finally {
       if (imageChangeSequenceRef.current === sequence) setIsStitching(false);
     }
@@ -829,10 +847,14 @@ function App() {
     exportInFlightRef.current = true;
     setIsExporting(true);
     setCopyStatus('');
+    setExportFailed(false);
     try {
       await task();
     } catch (error) {
       console.error('Export error', error);
+      setExportFailed(
+        !(error instanceof DOMException && error.name === 'AbortError')
+      );
       setCopyStatus(
         error instanceof DOMException && error.name === 'AbortError'
           ? '已取消保存'
@@ -995,6 +1017,52 @@ function App() {
     });
   };
 
+  const tryExample = async () => {
+    if (images.length || isPreparingExample) return;
+    setIsPreparingExample(true);
+    try {
+      const files = await createExampleFiles();
+      setIsExample(true);
+      setIncomingShare({ id: '', files });
+      setActiveTab('upload');
+      setPanelOpen(true);
+    } catch (error) {
+      setCopyStatus(
+        error instanceof Error
+          ? error.message
+          : '示例生成失败，请添加自己的截图'
+      );
+    } finally {
+      setIsPreparingExample(false);
+    }
+  };
+  const addOwnImages = () => {
+    if (isExample) {
+      imageChangeSequenceRef.current++;
+      commitState([], [], []);
+      setIsExample(false);
+      setUncertainSeams([]);
+      setFocusedSeam(null);
+    }
+    setActiveTab('upload');
+    setPanelOpen(true);
+    setSelectedTool('select');
+  };
+  const goToStep = (stage: 'upload' | 'review' | 'save') => {
+    if (stage === 'upload') {
+      addOwnImages();
+      return;
+    }
+    if (!images.length) return;
+    if (stage === 'review' && uncertainSeams.length) {
+      inspectSeam(uncertainSeams[0]);
+      return;
+    }
+    setActiveTab(stage === 'review' ? 'stitch' : 'export');
+    setPanelOpen(true);
+    setSelectedTool('select');
+  };
+
   const tools = [
     { id: 'upload', label: '素材', icon: Images },
     { id: 'stitch', label: '拼接', icon: WandSparkles },
@@ -1082,6 +1150,15 @@ function App() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="workspace-icon-button rounded-xl px-3 py-2 text-sm"
+            aria-expanded={showHelp}
+            onClick={() => setShowHelp((value) => !value)}
+            aria-label="使用帮助"
+          >
+            ?
+          </button>
           {uncertainSeams.length > 0 && (
             <button
               type="button"
@@ -1104,7 +1181,7 @@ function App() {
           )}
           <button
             type="button"
-            onClick={() => openTool('upload')}
+            onClick={addOwnImages}
             className="workspace-top-button flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium"
           >
             <Plus className="h-4 w-4" />{' '}
@@ -1114,14 +1191,77 @@ function App() {
           <button
             type="button"
             onClick={handleDownloadImage}
-            disabled={!images.length || isExporting}
+            disabled={
+              !images.length || isExporting || isStitching || isPreparingExample
+            }
             className="workspace-primary flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-semibold text-white disabled:opacity-40"
           >
-            <Download className="h-4 w-4" /> 导出
+            <Download className="h-4 w-4" />{' '}
+            {isExporting ? '正在保存…' : '保存图片'}
           </button>
         </div>
       </header>
 
+      <QuickStart
+        hasImages={images.length > 0}
+        stage={
+          !images.length || (panelOpen && activeTab === 'upload')
+            ? 'upload'
+            : panelOpen && activeTab === 'export'
+              ? 'save'
+              : 'review'
+        }
+        onStep={goToStep}
+      />
+      {showHelp && (
+        <aside className="beginner-tip" aria-label="新手使用说明">
+          <p>
+            <strong>1 添加：</strong>
+            按阅读顺序选截图，相邻截图保留一部分重复内容，系统才能自动找到连接位置。
+          </p>
+          <p>
+            <strong>2 检查：</strong>
+            看看文字有没有重复或缺失。需要时点“裁剪”去掉多余边缘；标注和打码也在里面。
+          </p>
+          <p>
+            <strong>3 保存：</strong>
+            直接点“保存图片”即可。PDF、压缩画质和分段保存在“更多保存选项”里。
+          </p>
+          <p>
+            图片在本机处理。手机通常可在“文件 /
+            下载”找到成品，保存到相册的方式取决于系统。
+          </p>
+        </aside>
+      )}
+      {images.length > 0 && isExample && (
+        <aside className="beginner-tip" aria-label="示例模式">
+          <p>
+            你正在体验示例，原图和拼接结果都可以查看。准备好后，换成自己的截图。
+          </p>
+          <button
+            type="button"
+            className="mt-1 font-semibold underline"
+            onClick={addOwnImages}
+          >
+            换成我的截图
+          </button>
+        </aside>
+      )}
+      {images.length > 0 && uncertainSeams.length > 0 && !panelOpen && (
+        <aside className="beginner-tip" aria-label="拼接检查提示">
+          <p>
+            有 {uncertainSeams.length}{' '}
+            处连接需要看一眼。确认文字没有重复或缺失即可，无需先理解像素参数。
+          </p>
+          <button
+            type="button"
+            className="mt-1 font-semibold underline"
+            onClick={() => inspectSeam(uncertainSeams[0])}
+          >
+            检查第一处
+          </button>
+        </aside>
+      )}
       {draft.pending && (
         <div
           role="status"
@@ -1154,6 +1294,44 @@ function App() {
           className="bg-blue-50 px-4 py-2 text-center text-xs text-blue-800"
         >
           {copyStatus}
+          {exportFailed && (
+            <div className="mt-2 flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                className="rounded-lg border px-3 py-2"
+                onClick={() => {
+                  const width = getStitchedLayout(
+                    images,
+                    overlaps,
+                    gap,
+                    direction
+                  ).width;
+                  setExportConfig({
+                    ...exportConfig,
+                    width: Math.max(
+                      1,
+                      Math.floor((exportConfig.width || width) / 2)
+                    ),
+                  });
+                  setActiveTab('export');
+                  setPanelOpen(true);
+                  setCopyStatus(
+                    '已调低图片宽度，请再次点击保存图片；仍过大时可在更多选项中分段保存。'
+                  );
+                  setExportFailed(false);
+                }}
+              >
+                减小尺寸再保存
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border px-3 py-2"
+                onClick={() => goToStep('save')}
+              >
+                打开保存选项
+              </button>
+            </div>
+          )}
         </div>
       )}
       <main
@@ -1171,7 +1349,7 @@ function App() {
               多张截图，一张长图
             </h2>
             <p className="mb-7 max-w-[380px] text-sm leading-6 text-slate-500">
-              拖入截图即可自动对齐。裁剪、打码、设备外框与高清导出都在这里完成。
+              按顺序添加截图，系统自动拼接。检查后点“保存图片”，不需要先调参数。
             </p>
             <div className="workspace-import-card w-full max-w-[450px] rounded-[26px] p-4 text-left">
               {!panelOpen && (
@@ -1181,11 +1359,30 @@ function App() {
                   onAutoStitchTrigger={handleAutoStitch}
                   incomingFiles={incomingShare?.files}
                   onIncomingConsumed={consumeShare}
-                  onImportMessage={setCopyStatus}
+                  onImportMessage={showImportMessage}
                 />
               )}
             </div>
-            <p className="mt-5 text-xs text-slate-400">
+            {!panelOpen && (
+              <div className="mt-4 flex items-center justify-center gap-3 text-xs">
+                <button
+                  type="button"
+                  disabled={isPreparingExample}
+                  className="rounded-xl border border-blue-200 bg-white px-4 py-2.5 font-semibold text-blue-700"
+                  onClick={() => void tryExample()}
+                >
+                  {isPreparingExample ? '正在准备示例…' : '先用示例试试看'}
+                </button>
+                <button
+                  type="button"
+                  className="text-slate-600 underline"
+                  onClick={() => setShowHelp((value) => !value)}
+                >
+                  第一次使用？看操作说明
+                </button>
+              </div>
+            )}
+            <p className="mt-4 text-xs text-slate-400">
               图片仅在当前设备处理，不会上传到服务器
             </p>
           </section>
@@ -1357,6 +1554,14 @@ function App() {
                     focusedSeamIndex={focusedSeam?.index ?? null}
                     onInspectSeam={inspectSeam}
                     onRematchSeam={rematchSeam}
+                    onAcceptSeam={(index) => {
+                      const remaining = uncertainSeams.filter(
+                        (i) => i !== index
+                      );
+                      setUncertainSeams(remaining);
+                      if (remaining.length) inspectSeam(remaining[0]);
+                      else setCopyStatus('连接检查完成，现在可以保存图片。');
+                    }}
                     onDetectBars={detectBars}
                     barSuggestion={barSuggestion}
                     onApplyBars={applyBars}
@@ -1420,7 +1625,7 @@ function App() {
                     onAutoStitchTrigger={handleAutoStitch}
                     incomingFiles={incomingShare?.files}
                     onIncomingConsumed={consumeShare}
-                    onImportMessage={setCopyStatus}
+                    onImportMessage={showImportMessage}
                   />
                 )}
               </div>

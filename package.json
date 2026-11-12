@@ -9,12 +9,12 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
-    "check": "npm run lint && npm test && npm run build",
-    "test:browser": "node tests/browser-crop-smoke.mjs && node tests/browser-stitch-smoke.mjs && node tests/browser-product-smoke.mjs"
+    "check": "npm run audit:security && npm run lint && npm test && npm run build",
+    "test:browser": "node tests/browser-crop-smoke.mjs && node tests/browser-stitch-smoke.mjs && node tests/browser-product-smoke.mjs && node tests/browser-beginner-smoke.mjs",
+    "audit:security": "node scripts/audit-dependencies.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.3",
-    "@capacitor/cli": "^8.4.3",
     "@capacitor/core": "^8.4.3",
     "@capacitor/ios": "^8.4.3",
     "@tailwindcss/vite": "^4.3.3",
@@ -33,6 +33,10 @@
     "@vitejs/plugin-react": "^6.0.3",
     "oxlint": "^1.71.0",
     "typescript": "~6.0.2",
-    "vite": "^8.1.6"
+    "vite": "^8.1.6",
+    "@capacitor/cli": "^8.4.3"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }

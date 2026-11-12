@@ -4,6 +4,8 @@
 
 👉 **在线体验**: [https://sunalan2025.github.io/picsew-web/](https://sunalan2025.github.io/picsew-web/)
 
+第一次使用可以先看 [三步上手说明](docs/QUICK_START.md)，或在应用首页点击「先用示例试试看」。
+
 ---
 
 ## 主要功能
@@ -48,3 +50,5 @@ npm run build
 现已加入接缝放大精调、完整项目撤销、素材坐标标注、录屏区间选择、本地草稿恢复、离线应用与系统图片分享入口。导出使用独立的成品渲染器，避免工具辅助线或编辑状态影响结果。
 
 完整实现范围、测试命令及大图/原生端限制见 [实现与验收状态](docs/IMPLEMENTATION_STATUS.md)。这些能力仍需真实 iOS/Android 设备和录屏素材验收，不代表与原版 Picsew 完全一致。
+
+开发检查：`npm run check` 会执行安全审计、lint、单元测试和构建；`npm run test:browser` 包含新手流程的桌面/手机浏览器测试。

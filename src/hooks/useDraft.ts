@@ -4,7 +4,8 @@ import { deleteDraft, loadDraft, saveDraft } from '../utils/drafts';
 
 export function useDraft(
   project: EditorProject,
-  restore: (p: EditorProject) => void
+  restore: (p: EditorProject) => void,
+  enabled = true
 ) {
   const [pending, setPending] =
     useState<Awaited<ReturnType<typeof loadDraft>>>(null);
@@ -35,7 +36,7 @@ export function useDraft(
     };
   }, []);
   useEffect(() => {
-    if (!ready || !project.images.length) return;
+    if (!ready || !enabled || !project.images.length) return;
     let alive = true;
     setStatus('正在保存草稿…');
     const timer = setTimeout(() => {
@@ -52,19 +53,20 @@ export function useDraft(
       alive = false;
       clearTimeout(timer);
     };
-  }, [project, ready]);
+  }, [project, ready, enabled]);
   useEffect(() => {
     const flush = () => {
       if (
         document.visibilityState === 'hidden' &&
         ready &&
+        enabled &&
         latest.current.images.length
       )
         void saveDraft(latest.current).catch(() => {});
     };
     document.addEventListener('visibilitychange', flush);
     return () => document.removeEventListener('visibilitychange', flush);
-  }, [ready]);
+  }, [ready, enabled]);
   return {
     pending,
     status,

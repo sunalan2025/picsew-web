@@ -12,6 +12,7 @@ interface Props {
   onChange: (value: number) => void;
   onCommit: () => void;
   onRematch?: () => void;
+  onAccept?: () => void;
 }
 export function SeamInspector({
   images,
@@ -23,6 +24,7 @@ export function SeamInspector({
   onChange,
   onCommit,
   onRematch,
+  onAccept,
 }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [opacity, setOpacity] = useState(0.5);
@@ -90,6 +92,16 @@ export function SeamInspector({
   };
   return (
     <div className="space-y-2" aria-label={`接缝 ${index + 1} 放大精调`}>
+      <p className="text-xs text-slate-600">
+        先看文字是否重复、缺失或错位，正常就点下面的确认按钮。
+      </p>
+      <button
+        type="button"
+        onClick={onAccept}
+        className="w-full rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white"
+      >
+        这处看起来没问题
+      </button>
       <p className="text-xs text-slate-500">
         两图叠加检查重影；方向键微调 1 px，Shift 微调 10 px。
       </p>

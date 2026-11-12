@@ -30,3 +30,6 @@ Picsew_v1.0.0.apk
 .jules/
 *AGENT*.md
 *JULES*.md
+
+# Local dependency audit reports
+.audit/

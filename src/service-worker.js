@@ -35,6 +35,15 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       (async () => {
         try {
+          // Bound stored share payloads before they can consume the local inbox.
+          if (
+            Number(event.request.headers.get('content-length') || 0) >
+            80 * 1024 * 1024
+          )
+            return new Response(
+              '分享文件太多，请分批添加（总大小最多 80 MB）',
+              { status: 413 }
+            );
           const data = await event.request.formData();
           const files = data.getAll('images');
           if (
@@ -43,30 +52,66 @@ self.addEventListener('fetch', (event) => {
             files.some(
               (file) =>
                 !(file instanceof File) ||
-                !file.type.startsWith('image/') ||
+                ![
+                  'image/png',
+                  'image/jpeg',
+                  'image/webp',
+                  'image/gif',
+                ].includes(file.type) ||
                 file.size > 50 * 1024 * 1024
             )
           )
             return new Response('请选择最多 50 张图片，每张不超过 50 MB', {
               status: 400,
             });
+          if (
+            files.reduce((total, file) => total + file.size, 0) >
+            80 * 1024 * 1024
+          )
+            return new Response(
+              '分享文件太多，请分批添加（总大小最多 80 MB）',
+              { status: 413 }
+            );
           const id = crypto.randomUUID(),
             db = await database();
-          await new Promise((resolve, reject) => {
-            const tx = db.transaction('inbox', 'readwrite');
-            tx.objectStore('inbox').put({ files, createdAt: Date.now() }, id);
-            tx.oncomplete = resolve;
-            tx.onabort = tx.onerror = () => reject(tx.error);
-          });
-          db.close();
+          let inboxFull = false;
+          try {
+            await new Promise((resolve, reject) => {
+              const tx = db.transaction('inbox', 'readwrite');
+              const store = tx.objectStore('inbox');
+              const count = store.count();
+              count.onsuccess = () => {
+                if (count.result >= 3) {
+                  inboxFull = true;
+                  tx.abort();
+                  return;
+                }
+                store.put({ files, createdAt: Date.now() }, id);
+              };
+              tx.oncomplete = resolve;
+              tx.onabort = tx.onerror = () => reject(tx.error);
+            });
+          } catch (error) {
+            if (inboxFull)
+              return new Response(
+                '已有 3 组图片等待添加，请先打开应用处理，再分享下一组',
+                { status: 409 }
+              );
+            throw error;
+          } finally {
+            db.close();
+          }
           return Response.redirect(
             new URL(`./?share=${id}`, self.registration.scope).href,
             303
           );
         } catch {
-          return new Response('无法接收分享，请打开应用后手动导入', {
-            status: 500,
-          });
+          return new Response(
+            '无法接收分享，请先打开应用处理待导入的图片，或从相册手动添加',
+            {
+              status: 500,
+            }
+          );
         }
       })()
     );

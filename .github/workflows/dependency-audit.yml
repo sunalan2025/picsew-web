@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/dependency-audit.yml"
+      - "scripts/audit-dependencies.mjs"
       - "package.json"
       - "package-lock.json"
       - ".github/dependabot.yml"
@@ -23,29 +24,12 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci --ignore-scripts
-      - name: Summarize known dependency advisories
-        shell: bash
-        run: |
-          npm audit --json > audit-all.json || true
-          npm audit --omit=dev --json > audit-production.json || true
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          for (const [name, filename] of [
-            ['all', 'audit-all.json'],
-            ['production', 'audit-production.json']
-          ]) {
-            const json = JSON.parse(fs.readFileSync(filename, 'utf8'));
-            const counts = json.metadata?.vulnerabilities || {};
-            console.log(name + ' audit: ' + JSON.stringify(counts));
-            for (const [pkg, entry] of Object.entries(json.vulnerabilities || {})) {
-              console.log(JSON.stringify({
-                package: pkg,
-                severity: entry.severity,
-                direct: entry.isDirect,
-                range: entry.range,
-                fix: entry.fixAvailable
-              }));
-            }
-          }
-          NODE
+      - run: npm ci --ignore-scripts --registry=https://registry.npmjs.org --replace-registry-host=always
+      - name: Audit dependencies (moderate or higher blocks the check)
+        run: npm run audit:security -- --output-dir .audit
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-audit-reports
+          path: .audit/*.json
+          if-no-files-found: ignore

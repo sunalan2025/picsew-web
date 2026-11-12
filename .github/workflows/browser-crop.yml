@@ -8,6 +8,7 @@ on:
       - 'tests/browser-crop-smoke.mjs'
       - 'tests/browser-stitch-smoke.mjs'
       - 'tests/browser-product-smoke.mjs'
+      - 'tests/browser-beginner-smoke.mjs'
       - 'tests/fixtures/**'
       - 'public/**'
       - 'index.html'

@@ -36,7 +36,14 @@ export async function downloadBlob(
       };
       const onResult = (event: Event) => {
         const result = (event as CustomEvent<NativeResult>).detail;
-        if (result.id !== id) return;
+        if (
+          !result ||
+          typeof result !== 'object' ||
+          result.id !== id ||
+          typeof result.success !== 'boolean' ||
+          typeof result.message !== 'string'
+        )
+          return;
         clear();
         if (result.cancelled)
           reject(new DOMException('已取消保存', 'AbortError'));

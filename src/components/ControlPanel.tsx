@@ -52,6 +52,7 @@ interface ControlPanelProps {
   onDetectBars: () => void;
   barSuggestion: { top: number; bottom: number } | null;
   onApplyBars: () => void;
+  onAcceptSeam: (index: number) => void;
   onRematchSeam?: (index: number) => void;
   onInspectSeam?: (index: number) => void;
   imageNames: string[];
@@ -101,7 +102,9 @@ interface ControlPanelProps {
   // Mobile responsiveness addition
   isMobile?: boolean;
   images?: StitchedImage[];
-  onImagesChange?: (imgs: StitchedImage[]) => void;
+  onImagesChange?: (
+    imgs: StitchedImage[]
+  ) => void | boolean | Promise<void | boolean>;
   onAutoStitchTrigger?: () => void;
 }
 
@@ -123,6 +126,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   focusedSeamIndex = null,
   onInspectSeam,
   onRematchSeam,
+  onAcceptSeam,
   onDetectBars,
   barSuggestion,
   onApplyBars,
@@ -454,6 +458,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                               onChange={(value) => updateOverlap(idx, value)}
                               onCommit={() => onOverlapCommit?.()}
                               onRematch={() => onRematchSeam?.(idx)}
+                              onAccept={() => onAcceptSeam(idx)}
                             />
                           )}
                           <input
@@ -1325,29 +1330,6 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     体积取决于画面和画质。文件大小在编码后显示。
                   </p>
                 </div>
-                <label className="block text-xs font-semibold">
-                  拼接内容宽度（0 保留原尺寸）
-                  <input
-                    type="number"
-                    aria-label="导出宽度"
-                    min={0}
-                    max={outputSize?.width ?? 30000}
-                    value={exportConfig.width || 0}
-                    onChange={(e) =>
-                      setExportConfig({
-                        ...exportConfig,
-                        width: Math.max(
-                          0,
-                          Math.min(
-                            outputSize?.width ?? 30000,
-                            Number(e.target.value)
-                          )
-                        ),
-                      })
-                    }
-                    className="mt-2 w-full"
-                  />
-                </label>
                 {/* Format selection */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-600">
@@ -1356,7 +1338,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                   <div className="flex gap-2">
                     {(['png', 'jpeg'] as const).map((fmt) => (
                       <button
-                        key={fmt}
+                        key={
+                          fmt === 'png' ? 'PNG · 清晰推荐' : 'JPEG · 文件较小'
+                        }
                         onClick={() =>
                           setExportConfig({ ...exportConfig, format: fmt })
                         }
@@ -1366,137 +1350,190 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                             : 'bg-slate-50 text-slate-600 border border-slate-200'
                         }`}
                       >
-                        {fmt}
+                        {fmt === 'png' ? 'PNG · 清晰推荐' : 'JPEG · 文件较小'}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Quality control for JPEG */}
-                {exportConfig.format === 'jpeg' && (
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs text-slate-600 font-bold">
-                      <label
-                        htmlFor="export-quality"
-                        className="cursor-pointer"
+                <details
+                  className="rounded-xl border border-slate-200 bg-white p-3"
+                  data-save-options
+                >
+                  <summary className="cursor-pointer text-xs font-semibold text-slate-600">
+                    更多保存选项（画质、PDF、分段）
+                  </summary>
+                  <div className="mt-3 space-y-4">
+                    <label className="block text-xs font-semibold">
+                      拼接内容宽度（0 保留原尺寸）
+                      <input
+                        type="number"
+                        aria-label="导出宽度"
+                        min={0}
+                        max={outputSize?.width ?? 30000}
+                        value={exportConfig.width || 0}
+                        onChange={(e) =>
+                          setExportConfig({
+                            ...exportConfig,
+                            width: Math.max(
+                              0,
+                              Math.min(
+                                outputSize?.width ?? 30000,
+                                Number(e.target.value)
+                              )
+                            ),
+                          })
+                        }
+                        className="mt-2 w-full"
+                      />
+                    </label>
+                    {/* Quality control for JPEG */}
+                    {exportConfig.format === 'jpeg' && (
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs text-slate-600 font-bold">
+                          <label
+                            htmlFor="export-quality"
+                            className="cursor-pointer"
+                          >
+                            JPEG 压缩质量
+                          </label>
+                          <span className="text-blue-600 font-mono">
+                            {Math.round(exportConfig.quality * 100)}%
+                          </span>
+                        </div>
+                        <input
+                          id="export-quality"
+                          type="range"
+                          min="0.4"
+                          max="1.0"
+                          step="0.05"
+                          value={exportConfig.quality}
+                          onChange={(e) =>
+                            setExportConfig({
+                              ...exportConfig,
+                              quality: parseFloat(e.target.value),
+                            })
+                          }
+                          className="w-full h-1 bg-slate-50 rounded accent-primary-500 cursor-pointer"
+                        />
+                      </div>
+                    )}
+
+                    {/* Slicing options */}
+                    <div className="space-y-2 border-t border-slate-200 pt-3">
+                      <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                        <Split className="w-3.5 h-3.5 text-blue-600" />
+                        长图分割切片 (Slicing)
+                      </label>
+                      <div className="space-y-1.5 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                        <div className="flex justify-between text-[11px] text-slate-600">
+                          <label
+                            htmlFor="export-scale"
+                            className="cursor-pointer"
+                          >
+                            等高切片（0 表示关闭）
+                          </label>
+                          <span className="text-blue-600 font-mono">
+                            {exportConfig.scale === 0
+                              ? '不切'
+                              : `${exportConfig.scale} px`}
+                          </span>
+                        </div>
+                        <input
+                          id="export-scale"
+                          type="number"
+                          value={exportConfig.scale}
+                          onChange={(e) =>
+                            setExportConfig({
+                              ...exportConfig,
+                              scale: Math.max(0, parseInt(e.target.value) || 0),
+                            })
+                          }
+                          className="w-full bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2.5 text-xs text-slate-700 mt-1 focus:border-primary-500 outline-hidden font-mono"
+                          placeholder="例如 1200"
+                        />
+                      </div>
+                    </div>
+
+                    {/* PDF settings */}
+                    <div className="space-y-2 border-t border-slate-200 pt-3">
+                      <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-blue-600" />
+                        PDF 文档设置
+                      </label>
+                      <label className="block text-xs">
+                        单页 PDF PPI（0 按 A4 宽度）
+                        <input
+                          type="number"
+                          aria-label="PDF PPI"
+                          min={0}
+                          max={600}
+                          value={exportConfig.pdfPpi || 0}
+                          onChange={(e) =>
+                            setExportConfig({
+                              ...exportConfig,
+                              pdfPpi: Math.max(
+                                0,
+                                Math.min(600, Number(e.target.value))
+                              ),
+                            })
+                          }
+                          className="mt-1 w-full"
+                        />
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() =>
+                            setExportConfig({
+                              ...exportConfig,
+                              pdfPageMode: 'single',
+                            })
+                          }
+                          className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold leading-4 transition ${
+                            exportConfig.pdfPageMode === 'single'
+                              ? 'bg-primary-600 text-white'
+                              : 'bg-slate-50 text-slate-600 border border-slate-200'
+                          }`}
+                        >
+                          单页长图 PDF
+                        </button>
+                        <button
+                          onClick={() =>
+                            setExportConfig({
+                              ...exportConfig,
+                              pdfPageMode: 'multi',
+                            })
+                          }
+                          className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold leading-4 transition ${
+                            exportConfig.pdfPageMode === 'multi'
+                              ? 'bg-primary-600 text-white'
+                              : 'bg-slate-50 text-slate-600 border border-slate-200'
+                          }`}
+                        >
+                          自动分页 (A4 比例)
+                        </button>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={onDownloadPDF}
+                      className="w-full flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium py-2 px-4 rounded-xl border border-slate-200 transition duration-200 text-sm"
+                    >
+                      <FileText className="w-4 h-4 text-orange-400" />
+                      导出 PDF 电子书
+                    </button>
+
+                    {exportConfig.scale > 0 && (
+                      <button
+                        onClick={onDownloadZip}
+                        className="w-full flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium py-2 px-4 rounded-xl border border-slate-200 transition duration-200 text-sm"
                       >
-                        JPEG 压缩质量
-                      </label>
-                      <span className="text-blue-600 font-mono">
-                        {Math.round(exportConfig.quality * 100)}%
-                      </span>
-                    </div>
-                    <input
-                      id="export-quality"
-                      type="range"
-                      min="0.4"
-                      max="1.0"
-                      step="0.05"
-                      value={exportConfig.quality}
-                      onChange={(e) =>
-                        setExportConfig({
-                          ...exportConfig,
-                          quality: parseFloat(e.target.value),
-                        })
-                      }
-                      className="w-full h-1 bg-slate-50 rounded accent-primary-500 cursor-pointer"
-                    />
+                        <Split className="w-4 h-4 text-green-400" />
+                        打包下载分段切片 (.zip)
+                      </button>
+                    )}
                   </div>
-                )}
-
-                {/* Slicing options */}
-                <div className="space-y-2 border-t border-slate-200 pt-3">
-                  <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                    <Split className="w-3.5 h-3.5 text-blue-600" />
-                    长图分割切片 (Slicing)
-                  </label>
-                  <div className="space-y-1.5 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                    <div className="flex justify-between text-[11px] text-slate-600">
-                      <label htmlFor="export-scale" className="cursor-pointer">
-                        等高切片（0 表示关闭）
-                      </label>
-                      <span className="text-blue-600 font-mono">
-                        {exportConfig.scale === 0
-                          ? '不切'
-                          : `${exportConfig.scale} px`}
-                      </span>
-                    </div>
-                    <input
-                      id="export-scale"
-                      type="number"
-                      value={exportConfig.scale}
-                      onChange={(e) =>
-                        setExportConfig({
-                          ...exportConfig,
-                          scale: Math.max(0, parseInt(e.target.value) || 0),
-                        })
-                      }
-                      className="w-full bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2.5 text-xs text-slate-700 mt-1 focus:border-primary-500 outline-hidden font-mono"
-                      placeholder="例如 1200"
-                    />
-                  </div>
-                </div>
-
-                {/* PDF settings */}
-                <div className="space-y-2 border-t border-slate-200 pt-3">
-                  <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-blue-600" />
-                    PDF 文档设置
-                  </label>
-                  <label className="block text-xs">
-                    单页 PDF PPI（0 按 A4 宽度）
-                    <input
-                      type="number"
-                      aria-label="PDF PPI"
-                      min={0}
-                      max={600}
-                      value={exportConfig.pdfPpi || 0}
-                      onChange={(e) =>
-                        setExportConfig({
-                          ...exportConfig,
-                          pdfPpi: Math.max(
-                            0,
-                            Math.min(600, Number(e.target.value))
-                          ),
-                        })
-                      }
-                      className="mt-1 w-full"
-                    />
-                  </label>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() =>
-                        setExportConfig({
-                          ...exportConfig,
-                          pdfPageMode: 'single',
-                        })
-                      }
-                      className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold leading-4 transition ${
-                        exportConfig.pdfPageMode === 'single'
-                          ? 'bg-primary-600 text-white'
-                          : 'bg-slate-50 text-slate-600 border border-slate-200'
-                      }`}
-                    >
-                      单页长图 PDF
-                    </button>
-                    <button
-                      onClick={() =>
-                        setExportConfig({
-                          ...exportConfig,
-                          pdfPageMode: 'multi',
-                        })
-                      }
-                      className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold leading-4 transition ${
-                        exportConfig.pdfPageMode === 'multi'
-                          ? 'bg-primary-600 text-white'
-                          : 'bg-slate-50 text-slate-600 border border-slate-200'
-                      }`}
-                    >
-                      自动分页 (A4 比例)
-                    </button>
-                  </div>
-                </div>
-
+                </details>
                 {/* Main downloads */}
                 <div className="space-y-2.5 pt-4 border-t border-slate-200">
                   <div className="flex gap-2">
@@ -1532,24 +1569,6 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     >
                       {copyStatus}
                     </p>
-                  )}
-
-                  <button
-                    onClick={onDownloadPDF}
-                    className="w-full flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium py-2 px-4 rounded-xl border border-slate-200 transition duration-200 text-sm"
-                  >
-                    <FileText className="w-4 h-4 text-orange-400" />
-                    导出 PDF 电子书
-                  </button>
-
-                  {exportConfig.scale > 0 && (
-                    <button
-                      onClick={onDownloadZip}
-                      className="w-full flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium py-2 px-4 rounded-xl border border-slate-200 transition duration-200 text-sm"
-                    >
-                      <Split className="w-4 h-4 text-green-400" />
-                      打包下载分段切片 (.zip)
-                    </button>
                   )}
                 </div>
               </div>

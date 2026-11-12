@@ -11,6 +11,7 @@ import {
 import type { StitchedImage } from '../types';
 import { reorderImages } from '../utils/imageState';
 import { extractVideoFrames } from '../utils/videoFrames';
+import { importFeedback, supportedRasterHeader } from '../utils/importFeedback';
 import { sortScreenshotFiles } from '../utils/importOrder';
 
 interface ImageUploaderProps {
@@ -18,7 +19,9 @@ interface ImageUploaderProps {
   incomingFiles?: File[];
   onIncomingConsumed?: () => void;
   images: StitchedImage[];
-  onImagesChange: (images: StitchedImage[]) => void;
+  onImagesChange: (
+    images: StitchedImage[]
+  ) => void | boolean | Promise<void | boolean>;
   onAutoStitchTrigger: () => void;
 }
 
@@ -82,6 +85,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       importingRef.current = true;
       setIsImporting(true);
       setUploadMessage('');
+      onImportMessage?.('');
 
       const skipped = { limit: 0, format: 0, size: 0, pixels: 0, failed: 0 };
       const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -89,6 +93,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       const supportedTypes = new Set([
         'image/png',
         'image/jpeg',
+        'image/jpg',
         'image/webp',
         'image/gif',
       ]);
@@ -105,7 +110,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         // Decode sequentially instead of allocating dozens of large images at once.
         for (const file of filesToProcess) {
           if (
-            !supportedTypes.has(file.type) ||
+            (file.type
+              ? !supportedTypes.has(file.type)
+              : !/\.(png|jpe?g|webp|gif)$/i.test(file.name)) ||
             file.name.toLowerCase().endsWith('.svg')
           ) {
             skipped.format++;
@@ -117,6 +124,15 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           }
 
           try {
+            if (
+              !supportedRasterHeader(
+                new Uint8Array(await file.slice(0, 16).arrayBuffer()),
+                file.type
+              )
+            ) {
+              skipped.format++;
+              continue;
+            }
             const src = URL.createObjectURL(file);
             let image: StitchedImage;
             try {
@@ -155,27 +171,23 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           }
         }
 
-        if (loaded.length) await onImagesChange([...images, ...loaded]);
-        const warnings = [
-          skipped.limit && `超过 50 张上限 ${skipped.limit} 张`,
-          skipped.format && `格式不支持 ${skipped.format} 张`,
-          skipped.size && `超过 50 MB ${skipped.size} 张`,
-          skipped.pixels &&
-            `超过单图 2500 万 / 项目 8000 万像素预算 ${skipped.pixels} 张`,
-          skipped.failed && `读取失败 ${skipped.failed} 张`,
-        ].filter(Boolean);
-        setUploadMessage(
-          `按文件名顺序导入 ${loaded.length} 张，可拖动调整顺序。` +
-            (warnings.length ? ` 跳过：${warnings.join('、')}。` : '')
-        );
-        if (warnings.length)
-          onImportMessage?.(
-            `已导入 ${loaded.length} 张，跳过：${warnings.join('、')}`
-          );
+        if (loaded.length) {
+          const accepted = await onImagesChange([...images, ...loaded]);
+          if (accepted === false) {
+            for (const image of loaded) URL.revokeObjectURL(image.src);
+            return 0;
+          }
+        }
+        const message = importFeedback(loaded.length, skipped);
+        setUploadMessage(message);
+        if (Object.values(skipped).some(Boolean)) onImportMessage?.(message);
         return loaded.length;
       } catch (error) {
         console.error('Image import failed', error);
-        setUploadMessage('图片导入失败，请重试。');
+        for (const image of loaded) URL.revokeObjectURL(image.src);
+        setUploadMessage(
+          '图片导入失败，请重新选择原始截图；已有图片仍会保留。'
+        );
         return 0;
       } finally {
         importingRef.current = false;

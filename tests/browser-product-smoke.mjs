@@ -267,13 +267,17 @@ try {
   await page.getByRole('combobox').selectOption('iphone16pro');
   const decorated = await download(
     page,
-    page.locator('header').getByRole('button', { name: '导出', exact: true })
+    page
+      .locator('header')
+      .getByRole('button', { name: '保存图片', exact: true })
   );
   await dock.getByRole('button', { name: '裁剪', exact: true }).click();
   await page.getByRole('button', { name: '标注与打码', exact: true }).click();
   const fromMarkup = await download(
     page,
-    page.locator('header').getByRole('button', { name: '导出', exact: true })
+    page
+      .locator('header')
+      .getByRole('button', { name: '保存图片', exact: true })
   );
   assert.ok(
     decorated.equals(fromMarkup),
@@ -345,6 +349,37 @@ try {
     return results;
   });
   assert.deepEqual(nativeResults, ['success', 'failure', 'cancelled']);
+  const ignoresMalformed = await page.evaluate(async () => {
+    const { downloadBlob } = await import('/src/utils/download.ts');
+    window.AndroidApp = {
+      saveFile: (_data, _mime, _name, id) => {
+        window.dispatchEvent(
+          new CustomEvent('picsew-export-result', { detail: null })
+        );
+        window.dispatchEvent(
+          new CustomEvent('picsew-export-result', {
+            detail: { id, success: 'yes', message: 42 },
+          })
+        );
+        window.dispatchEvent(
+          new CustomEvent('picsew-export-result', {
+            detail: { id, success: true, message: 'saved' },
+          })
+        );
+      },
+    };
+    try {
+      return await downloadBlob(new Blob(['x']), 'image/png', 'fixture.png');
+    } finally {
+      delete window.AndroidApp;
+    }
+  });
+  assert.equal(
+    ignoresMalformed,
+    'saved',
+    'malformed bridge events cannot break a pending save'
+  );
+
   console.log(
     'PASS: native save success, failure, and cancellation propagate to the web layer'
   );
@@ -429,6 +464,68 @@ try {
   console.log(
     'PASS: production app shell works offline and imports a system share locally'
   );
+  await app.waitForFunction(
+    () => !new URL(location.href).searchParams.has('share')
+  );
+  const shareGuards = await app.evaluate(async (data) => {
+    const svg = new FormData();
+    svg.append(
+      'images',
+      new Blob(['<svg></svg>'], { type: 'image/svg+xml' }),
+      'fake.svg'
+    );
+    const unsupported = await fetch('./share-target', {
+      method: 'POST',
+      body: svg,
+    });
+    const codes = [];
+    for (let i = 0; i < 4; i++) {
+      const form = new FormData();
+      form.append(
+        'images',
+        await (await fetch(`data:image/png;base64,${data}`)).blob(),
+        `pending-${i}.png`
+      );
+      const response = await fetch('./share-target', {
+        method: 'POST',
+        body: form,
+      });
+      codes.push(response.status);
+    }
+    return { unsupported: unsupported.status, codes };
+  }, files[0]);
+  assert.equal(
+    shareGuards.unsupported,
+    400,
+    'active image formats cannot enter the share inbox'
+  );
+  assert.deepEqual(
+    shareGuards.codes,
+    [200, 200, 200, 409],
+    'a full inbox rejects another batch without overwriting pending files'
+  );
+  console.log('PASS: share-target raster allowlist and bounded pending inbox');
+  await app.goto('http://127.0.0.1:4176/');
+  await app.locator('.workspace-canvas canvas').waitFor({ timeout: 30000 });
+  await app.waitForFunction(
+    () =>
+      new Promise((resolve) => {
+        const r = indexedDB.open('picsew-local', 1);
+        r.onsuccess = () => {
+          const db = r.result,
+            tx = db.transaction('inbox', 'readonly'),
+            q = tx.objectStore('inbox').count();
+          tx.oncomplete = () => {
+            resolve(q.result === 2);
+            db.close();
+          };
+        };
+      })
+  );
+  console.log(
+    'PASS: reopening the app recovers an interrupted share and frees inbox capacity'
+  );
+
   await offline.close();
 } finally {
   await browser?.close();
